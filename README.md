@@ -193,7 +193,7 @@ src/
     tasks.js        lista de tareas: cola, reparto entre suscripciones, paralelo
     diagram.js      vista de diagrama por proyecto → grupo → agente
 skills-pack/        skills de ahorro de tokens que se instalan en cada CLI
-build/              íconos (icon.png / .icns / .ico), generados por scripts/make-icon.py
+build/              íconos (icon.png / .icns / .ico), generados por scripts/build-icons.js (`npm run icon`)
 scripts/check-agents.js     scripts/install-app.js (npm run app)     scripts/fix-pty.js (postinstall)
 scripts/agentboard-mcp.js   servidor MCP que registran los CLIs para hablar entre ellos
 .github/workflows/build.yml
