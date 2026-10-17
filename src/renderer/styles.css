@@ -665,3 +665,37 @@ body.flows-open #dock, body.flows-open #minimap, body.flows-open #sidebar, body.
 dialog.ask { width: 520px; }
 dialog.ask form { gap: 8px; }
 #askText { width: 100%; resize: vertical; background: var(--fill); border: none; box-shadow: inset 0 0 0 .5px var(--line-hi); padding: 10px 12px; color: var(--text); font: 13px/1.5 var(--font-ui); outline: none; }
+
+/* ---------- Íconos y ayuda contextual ---------- */
+.ic { display: inline-block; vertical-align: -2.5px; flex: none; }
+button .ic + * , button .ic { margin-right: 0; }
+button[data-icon]:not(.icon) .ic { margin-right: 6px; }
+button.icon .ic, .card-btn .ic { margin: 0; }
+.card-btn { display: inline-flex; align-items: center; gap: 4px; }
+.tacts button { display: inline-flex; align-items: center; justify-content: center; }
+.gitpill { display: inline-flex; align-items: center; gap: 4px; }
+.pal-icon { display: inline-flex; justify-content: center; }
+.fl-icon { display: inline-flex; }
+.fl-st { font: 500 10.5px var(--font-ui); padding: 1px 6px; border-radius: 10px; background: var(--fill); }
+.fl-st.st-ok { color: var(--ok); } .fl-st.st-fail { color: var(--bad); } .fl-st.st-running { color: var(--accent); } .fl-st.st-wait { color: var(--warn); }
+.tchip.branch { display: inline-flex; align-items: center; gap: 3px; }
+#helptip {
+  position: fixed; z-index: 10000; max-width: 300px; pointer-events: none;
+  padding: 6px 10px; border-radius: 7px; font: 12px/1.4 var(--font-ui); color: var(--text);
+  background: var(--surface); box-shadow: 0 0 0 .5px var(--line-hi), 0 8px 24px -8px rgba(0,0,0,.45);
+  opacity: 0; transform: translateY(-2px); transition: opacity .12s, transform .12s;
+}
+#helptip.show { opacity: 1; transform: none; }
+
+/* barra superior: íconos al lado del texto, sin cortes de línea */
+button[data-icon] { display: inline-flex; align-items: center; white-space: nowrap; }
+#topbar button, #topbar .group > * { white-space: nowrap; flex: none; }
+#topbar .group.spaces-wrap { flex: 1 1 auto; min-width: 120px; overflow: hidden; }
+#topbar .group.right { flex: none; }
+#topbar { gap: 10px; }
+#topbar .group { gap: 5px; }
+/* compositor de tareas en dos filas: selectores anchos arriba, acciones abajo */
+.composer-row { flex-wrap: wrap !important; }
+.composer-row select { flex: 1 1 120px; max-width: none !important; }
+.composer-row .spacer { flex-basis: 100%; height: 0; }
+.composer-row #taskPlan { margin-left: auto; }

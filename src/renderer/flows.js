@@ -7,12 +7,12 @@
    openTasks, tickTasks, diagramOpen, toggleDiagram, cardData, focusCardView, focusCard */
 
 const NODE_TYPES = {
-  trigger:   { icon: '⚡', label: 'Disparador', color: '#ffd60a', hint: 'Cuándo empieza: a mano, cada N minutos o a una hora.' },
-  agent:     { icon: '◎', label: 'Agente', color: '#0a84ff', hint: 'Un agente hace un trabajo (se vuelve una tarea de la cola).' },
-  command:   { icon: '›_', label: 'Comando', color: '#64d2ff', hint: 'Un comando de shell en el proyecto (tests, build, scripts).' },
-  condition: { icon: '◇', label: 'Decisión', color: '#ff9f0a', hint: 'La IA responde SÍ o NO sobre lo anterior y el flujo sigue por esa rama.' },
-  notify:    { icon: '◉', label: 'Aviso', color: '#30d158', hint: 'Te avisa con una notificación.' },
-  note:      { icon: '✎', label: 'Concepto', color: '#8e8e93', hint: 'Una idea o nota en el diagrama; no se ejecuta.' },
+  trigger:   { icon: 'bolt', label: 'Disparador', color: '#ffd60a', hint: 'Cuándo empieza: a mano, cada N minutos o a una hora.' },
+  agent:     { icon: 'agent', label: 'Agente', color: '#0a84ff', hint: 'Un agente hace un trabajo (se vuelve una tarea de la cola).' },
+  command:   { icon: 'terminal', label: 'Comando', color: '#64d2ff', hint: 'Un comando de shell en el proyecto (tests, build, scripts).' },
+  condition: { icon: 'decision', label: 'Decisión', color: '#ff9f0a', hint: 'La IA responde SÍ o NO sobre lo anterior y el flujo sigue por esa rama.' },
+  notify:    { icon: 'bell', label: 'Aviso', color: '#30d158', hint: 'Te avisa con una notificación.' },
+  note:      { icon: 'idea', label: 'Concepto', color: '#8e8e93', hint: 'Una idea o nota en el diagrama; no se ejecuta.' },
 };
 const NODE_W = 220;
 
@@ -38,7 +38,7 @@ function newFlow(name = 'Nueva automatización') {
 
 function nodeSummary(n) {
   const c = n.config || {};
-  if (n.type === 'trigger') return c.mode === 'every' ? `cada ${c.every || 60} min` : c.mode === 'daily' ? `todos los días ${c.at || '09:00'}` : 'a mano (▶ Ejecutar)';
+  if (n.type === 'trigger') return c.mode === 'every' ? `cada ${c.every || 60} min` : c.mode === 'daily' ? `todos los días ${c.at || '09:00'}` : 'a mano (botón Ejecutar)';
   if (n.type === 'agent') {
     const a = c.agent && c.agent !== 'auto' ? cfg.agents[c.agent]?.label : 'auto';
     return `${a}${c.mode && c.mode !== 'normal' ? ' · ' + c.mode : ''} — ${(c.prompt || 'sin instrucción').slice(0, 70)}`;
@@ -55,10 +55,10 @@ function renderFlowList() {
     const run = activeRuns.get(f.id);
     const trig = f.nodes.find((n) => n.type === 'trigger');
     const sched = trig && trig.config?.mode !== 'manual' && f.enabled !== false;
-    return `<button type="button" class="fl-item ${f.id === flowSel ? 'active' : ''}" data-flow="${esc(f.id)}">
+    return `<button type="button" class="fl-item ${f.id === flowSel ? 'active' : ''}" data-flow="${esc(f.id)}" title="Abrir ${esc(f.name)}${f.lastRun ? ` · última ejecución ${new Date(f.lastRun.at).toLocaleString()}` : ''}">
       <span class="fl-dot ${run ? 'running' : f.lastRun ? (f.lastRun.ok ? 'ok' : 'fail') : ''}"></span>
-      <span class="fl-item-name">${esc(f.name)}</span>${sched ? '<span class="fl-sched" title="Programada">⏱</span>' : ''}</button>`;
-  }).join('') || '<div class="side-empty">Aún no hay automatizaciones. Crea una con ＋ o describe lo que quieres y usa ✨ Diseñar con IA.</div>';
+      <span class="fl-item-name">${esc(f.name)}</span>${sched ? `<span class="fl-sched" title="Programada: corre sola según su disparador">${icon('clock', 13)}</span>` : ''}</button>`;
+  }).join('') || '<div class="side-empty">Aún no hay automatizaciones. Crea una en blanco o describe lo que quieres y usa Diseñar con IA.</div>';
 }
 
 function renderFlow() {
@@ -69,7 +69,8 @@ function renderFlow() {
   if (!f) { renderInspector(); return; }
   if (document.activeElement !== $('#flName')) $('#flName').value = f.name;
   const run = activeRuns.get(f.id);
-  $('#flRun').textContent = run ? '■ Detener' : '▶ Ejecutar';
+  $('#flRun').innerHTML = run ? `${icon('stop', 13)} Detener` : `${icon('play', 13)} Ejecutar`;
+  $('#flRun').title = run ? 'Detener la ejecución: las tareas en cola se cancelan; las que ya corren quedan para que las revises' : 'Ejecutar ahora; las ramas independientes corren en paralelo';
   $('#flRun').classList.toggle('primary', !run);
   const box = $('#flNodes');
   box.innerHTML = f.nodes.map((n) => {
@@ -81,7 +82,7 @@ function renderFlow() {
            ? '<span class="port out yes" data-port="out" data-branch="si" title="Sí"></span><span class="port out no" data-port="out" data-branch="no" title="No"></span>'
            : '<span class="port out" data-port="out" title="Arrastra para conectar"></span>'}`;
     return `<div class="fl-node t-${n.type} ${n.id === nodeSel ? 'sel' : ''} st-${st}" data-node="${esc(n.id)}" style="left:${n.x}px;top:${n.y}px;--ncolor:${T.color}">
-      <div class="fl-node-head"><span class="fl-icon">${T.icon}</span><span class="fl-type">${T.label}</span>${st ? `<span class="fl-st">${{ running: '…', ok: '✓', fail: '✕', skip: '–', wait: '⏸' }[st] || ''}</span>` : ''}</div>
+      <div class="fl-node-head"><span class="fl-icon">${icon(T.icon, 13)}</span><span class="fl-type">${T.label}</span>${st ? `<span class="fl-st st-${st}">${{ running: 'En curso', ok: 'Listo', fail: 'Error', skip: 'Saltado', wait: 'Espera' }[st] || ''}</span>` : ''}</div>
       <div class="fl-node-title">${esc(n.title || T.label)}</div>
       <div class="fl-node-sum">${esc(nodeSummary(n))}</div>
       ${run?.results[n.id]?.text ? `<div class="fl-node-res">${esc(run.results[n.id].text.slice(0, 120))}</div>` : ''}
@@ -149,9 +150,9 @@ function renderInspector() {
     box.innerHTML = `<h3>Automatización</h3>
       <label class="set-row check"><span>Activa (respeta su horario)</span><input type="checkbox" class="switch-input" data-f="enabled" ${f.enabled !== false ? 'checked' : ''}/></label>
       <p class="set-note">${trig ? `Empieza ${esc(nodeSummary(trig))}.` : 'Agrega un Disparador para indicar cuándo empieza.'}
-        ${last ? `<br/>Última ejecución: ${new Date(last.at).toLocaleString()} — ${last.ok ? '✓ bien' : '✕ con errores'}.` : ''}</p>
+        ${last ? `<br/>Última ejecución: ${new Date(last.at).toLocaleString()} — ${last.ok ? 'sin errores' : 'con errores'}.` : ''}</p>
       ${run ? `<h3>En curso</h3><ol class="fl-log">${run.log.slice(-12).map((l) => `<li>${esc(l)}</li>`).join('')}</ol>` : last?.log ? `<h3>Registro</h3><ol class="fl-log">${last.log.slice(-12).map((l) => `<li>${esc(l)}</li>`).join('')}</ol>` : ''}
-      ${flowPlan[f.id] ? `<h3>Cómo se ejecuta (IA)</h3><div class="fl-plan">${mdLite(flowPlan[f.id])}</div>` : `<p class="set-note">Selecciona un nodo para editarlo. Arrastra desde el punto de la derecha de un nodo hasta otro para conectarlos. <kbd>⌫</kbd> borra lo seleccionado.</p>`}
+      ${flowPlan[f.id] ? `<h3>Cómo se ejecuta (análisis de la IA)</h3><div class="fl-plan">${mdLite(flowPlan[f.id])}</div>` : `<p class="set-note">Selecciona un nodo para editarlo. Arrastra desde el punto de la derecha de un nodo hasta otro para conectarlos. <kbd>⌫</kbd> borra lo seleccionado.</p>`}
       <div class="row-end"><button type="button" data-x="dup-flow">Duplicar</button><button type="button" data-x="del-flow">Borrar automatización</button></div>`;
     return;
   }
@@ -182,10 +183,10 @@ function renderInspector() {
     body += field('message', 'Mensaje', `<input data-c="message" value="${esc(c.message || '')}" placeholder="Listo el deploy"/>`);
   } else {
     body += field('text', 'Idea', `<textarea data-c="text" rows="6">${esc(c.text || '')}</textarea>`);
-    body += `<p class="set-note">Úsalo para pensar el flujo. "✨ Diseñar con IA" puede convertir tus conceptos en pasos ejecutables.</p>`;
+    body += `<p class="set-note">Úsalo para pensar el flujo. "Diseñar con IA" puede convertir tus conceptos en pasos ejecutables.</p>`;
   }
   const res = activeRuns.get(f.id)?.results[n.id] || f.lastRun?.results?.[n.id];
-  box.innerHTML = `<h3><span style="color:${T.color}">${T.icon}</span> ${T.label}</h3><p class="set-note">${T.hint}</p>${body}
+  box.innerHTML = `<h3><span style="color:${T.color}">${icon(T.icon, 14)}</span> ${T.label}</h3><p class="set-note">${T.hint}</p>${body}
     ${res ? `<h3>Último resultado</h3><div class="fl-plan">${esc(res.text || '')}</div>` : ''}
     <div class="row-end"><button type="button" data-x="del-node">Borrar nodo</button></div>`;
 }
@@ -350,7 +351,7 @@ async function execNode(f, run, n) {
   if (n.type === 'notify') {
     const msg = c.message || n.title || 'Automatización';
     try { new Notification(f.name, { body: msg }); } catch {}
-    toast(`◉ ${esc(f.name)}: ${esc(msg)}`, 5000);
+    toast(`${esc(f.name)}: ${esc(msg)}`, 5000);
     return { ok: true, text: msg };
   }
   if (n.type === 'command') {
@@ -399,8 +400,8 @@ async function runFlow(f, reason = 'a mano') {
     run.results[n.id] = res;
     run.status[n.id] = res.skip ? 'skip' : res.ok ? 'ok' : 'fail';
     finished.add(n.id);
-    if (!res.ok && !res.skip) { failed = true; log(`✕ ${n.title}: ${res.text.split('\n')[0]}`); }
-    else if (!res.skip) log(`✓ ${n.title}${res.branch ? ` → ${res.text}` : ''}`);
+    if (!res.ok && !res.skip) { failed = true; log(`Error en ${n.title}: ${res.text.split('\n')[0]}`); }
+    else if (!res.skip) log(`Listo: ${n.title}${res.branch ? ` (${res.text})` : ''}`);
     for (const e of edges.filter((x) => x.from === n.id)) {
       const active = !res.skip && res.ok && (!res.branch || (e.branch || 'si') === res.branch);
       run.edge[e.i] = active ? 'active' : 'dead';
@@ -418,7 +419,7 @@ async function runFlow(f, reason = 'a mano') {
   const start = async (n) => {
     if (run.stopped) return settle(n, { ok: false, skip: true, text: 'Detenida' });
     run.status[n.id] = 'running';
-    log(`… ${n.title}`);
+    log(`Empieza: ${n.title}`);
     let res;
     try { res = await execNode(f, run, n); } catch (err) { res = { ok: false, text: err.message }; }
     return settle(n, res);
@@ -435,7 +436,7 @@ async function runFlow(f, reason = 'a mano') {
   activeRuns.delete(f.id);
   save();
   if (!document.hasFocus()) { try { new Notification(`${f.name}: ${failed ? 'con errores' : 'lista'}`, { body: run.log.slice(-1)[0] || '' }); } catch {} }
-  toast(`${failed ? '✕' : '✓'} Automatización "${esc(f.name)}" ${failed ? 'terminó con errores' : 'terminó'}`, 4500);
+  toast(`Automatización "${esc(f.name)}" ${failed ? 'terminó con errores' : 'terminó'}`, 4500);
   if (flowsOpen()) renderFlow(); else renderFlowList();
 }
 
@@ -517,7 +518,7 @@ async function designWithAI() {
     current ? 'Agrega un paso que…' : 'Cada vez que…');
   if (!desc) return;
   const btn = $('#flDesign');
-  btn.disabled = true; btn.textContent = '✨ Diseñando…';
+  btn.disabled = true; btn.lastChild.textContent = 'Diseñando…';
   const agents = ['auto', ...subscriptions().map(([k]) => k)].join(', ');
   const r = await ab.aiAsk([
     'Diseña una automatización para AgentBoard (una app que coordina agentes de código como Claude Code en terminales).',
@@ -530,7 +531,7 @@ async function designWithAI() {
     current ? `Automatización actual: ${current}` : '',
     `Pedido: ${desc}`,
   ].filter(Boolean).join('\n'), 'sonnet');
-  btn.disabled = false; btn.textContent = '✨ Diseñar con IA';
+  btn.disabled = false; btn.lastChild.textContent = 'Diseñar con IA';
   if (!r.ok) return toast(`No pude diseñarla: ${esc(r.error)}`, 6000);
   let spec;
   try { spec = JSON.parse(r.value.match(/\{[\s\S]*\}/)[0]); } catch { return toast('La IA no devolvió un diagrama válido; intenta describirlo de otra forma.', 6000); }
@@ -551,14 +552,14 @@ async function designWithAI() {
   flowSel = target.id; nodeSel = null; edgeSel = null;
   delete flowPlan[target.id];
   save(); renderFlow();
-  toast(`✨ Diseñada: ${nodes.length} pasos. Revísala y usa "Cómo ejecutarla" o ▶.`, 5000);
+  toast(`Automatización diseñada: ${nodes.length} pasos. Revísala y usa "Explicar ejecución" o "Ejecutar".`, 5000);
 }
 
 async function explainWithAI() {
   const f = curFlow();
   if (!f) return;
   const btn = $('#flExplain');
-  btn.disabled = true; btn.textContent = '💬 Pensando…';
+  btn.disabled = true; btn.lastChild.textContent = 'Analizando…';
   const r = await ab.aiAsk([
     'Eres un experto en automatización con agentes de código. Explica en español, breve (máx. 18 líneas) y concreto:',
     '1) qué hará esta automatización paso a paso cuando AgentBoard la ejecute (los nodos "agent" se vuelven tareas para Claude/Codex/Gemini en sesiones nuevas con un resumen de los pasos anteriores; "command" corre en el shell; "condition" la decide una IA con SÍ/NO);',
@@ -567,7 +568,7 @@ async function explainWithAI() {
     'Usa una lista numerada y **negritas** para los títulos.',
     JSON.stringify({ name: f.name, nodes: f.nodes.map(({ id, type, title, config }) => ({ id, type, title, config })), edges: f.edges }),
   ].join('\n'), 'haiku');
-  btn.disabled = false; btn.textContent = '💬 Cómo ejecutarla';
+  btn.disabled = false; btn.lastChild.textContent = 'Explicar ejecución';
   if (!r.ok) return toast(`No pude explicarla: ${esc(r.error)}`, 6000);
   flowPlan[f.id] = r.value;
   nodeSel = null; edgeSel = null;
@@ -597,7 +598,7 @@ function initFlows() {
   $('#flEmptyAI').onclick = () => { flowSel = null; designWithAI(); };
   $('#flName').addEventListener('input', (e) => { const f = curFlow(); if (f) { f.name = e.target.value; save(); renderFlowList(); } });
   $('#flAdd').addEventListener('click', (e) => { const t = e.target.closest('[data-type]')?.dataset.type; if (t) addNode(t); });
-  $('#flAdd').innerHTML = Object.entries(NODE_TYPES).map(([k, T]) => `<button type="button" data-type="${k}" title="${esc(T.hint)}"><span style="color:${T.color}">${T.icon}</span> ${T.label}</button>`).join('');
+  $('#flAdd').innerHTML = Object.entries(NODE_TYPES).map(([k, T]) => `<button type="button" data-type="${k}" title="Agregar un nodo ${T.label}: ${esc(T.hint)}"><span style="color:${T.color}">${icon(T.icon, 13)}</span> ${T.label}</button>`).join('');
   $('#flDesign').onclick = designWithAI;
   $('#flExplain').onclick = explainWithAI;
   $('#flRun').onclick = () => { const f = curFlow(); if (!f) return; if (activeRuns.has(f.id)) stopFlow(f); else runFlow(f); renderFlow(); };

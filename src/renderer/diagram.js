@@ -50,7 +50,7 @@ function nodeHtml(c) {
   const attrs = [
     task ? `<div class="dg-attr"><i>tarea</i> ${esc(task.text.length > 90 ? task.text.slice(0, 88) + '…' : task.text)}</div>` : '',
     `<div class="dg-attr"><i>estado</i> <span class="st-${st}">${STATUS_LABEL[st] || st}${busyFor}</span>${task ? ` · ${esc(task.status.replace('_', ' '))}` : ''}</div>`,
-    g ? `<div class="dg-attr"><i>rama</i> ⎇ ${esc(g.branch)}${g.changes ? ` <span class="dirty">●${g.changes}</span>` : ''}</div>` : '',
+    g ? `<div class="dg-attr"><i>rama</i> ${esc(g.branch)}${g.changes ? ` <span class="dirty">${g.changes} cambio${g.changes === 1 ? '' : 's'}</span>` : ''}</div>` : '',
     c.args ? `<div class="dg-attr"><i>args</i> <code>${esc(c.args)}</code></div>` : '',
   ].join('');
   const out = lastLine(c);
@@ -100,7 +100,7 @@ function renderDiagram() {
 
   const shown = used.filter(([k]) => dgProject === '*' || k === dgProject);
   if (!shown.length) {
-    box.innerHTML = `<div class="dg-empty"><h2>Todavía no hay agentes.</h2><p>Abre agentes en el tablero o escribe tareas en <a href="#" data-open-tasks>☑ Tareas</a>: aquí verás cada proyecto, sus grupos y qué está haciendo cada agente.</p></div>`;
+    box.innerHTML = `<div class="dg-empty"><h2>Todavía no hay agentes.</h2><p>Abre agentes en el tablero o escribe tareas en <a href="#" data-open-tasks>Tareas</a>: aquí verás cada proyecto, sus grupos y qué está haciendo cada agente.</p></div>`;
     $('#dgEdges').innerHTML = '';
     return;
   }
@@ -129,7 +129,7 @@ function renderDiagram() {
       const gBusy = cards.filter((c) => runtime.get(c.id)?.status === 'busy').length;
       return `<div class="dg-sub" style="--gcolor:${esc(g?.color || '#8f8577')}">
         <div class="dg-sub-tab">«grupo» <b>${esc(g ? g.title : 'Sin grupo')}</b> <span class="muted">${cards.length} agente${cards.length === 1 ? '' : 's'}${gBusy ? ` · ${gBusy} trabajando` : ''}</span>
-          ${g ? `<button class="card-btn" data-task-group="${esc(g.title)}" title="Nueva tarea para este grupo">＋ tarea</button>` : ''}</div>
+          ${g ? `<button class="card-btn" data-task-group="${esc(g.title)}" title="Nueva tarea para este grupo: su agente se abrirá dentro del marco">${icon('plus', 12)} Tarea</button>` : ''}</div>
         <div class="dg-nodes">${cards.map(nodeHtml).join('')}${queueHtml(gPending, 'Cola')}</div>
       </div>`;
     }).join('');

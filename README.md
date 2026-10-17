@@ -25,26 +25,26 @@ Tablero infinito con **terminales reales** para correr Claude Code, Codex y Gemi
 
 ## Automatizaciones (estilo n8n, ejecutadas por tus agentes)
 
-Botón **⟴ Automatizaciones** (`⇧⌘F`). Dibuja un flujo con nodos y conexiones:
+Botón **Automatizaciones** (`⇧⌘F`). Dibuja un flujo con nodos y conexiones:
 
 | Nodo | Qué hace |
 |---|---|
-| ⚡ Disparador | Cuándo empieza: a mano, cada N minutos o todos los días a una hora |
-| ◎ Agente | Un agente hace un trabajo: se vuelve una tarea de la cola (sesión nueva, suscripción auto o elegida, modo ligero/potente) |
-| ›_ Comando | Un comando de shell en el proyecto (tests, build, git); si falla, lo que sigue no corre |
-| ◇ Decisión | Claude (haiku) lee el resultado de lo anterior y responde SÍ o NO; el flujo sigue por esa rama |
-| ◉ Aviso | Notificación |
-| ✎ Concepto | Una idea en el diagrama; no se ejecuta |
+| Disparador | Cuándo empieza: a mano, cada N minutos o todos los días a una hora |
+| Agente | Un agente hace un trabajo: se vuelve una tarea de la cola (sesión nueva, suscripción auto o elegida, modo ligero/potente) |
+| Comando | Un comando de shell en el proyecto (tests, build, git); si falla, lo que sigue no corre |
+| Decisión | Claude (haiku) lee el resultado de lo anterior y responde SÍ o NO; el flujo sigue por esa rama |
+| Aviso | Notificación |
+| Concepto | Una idea en el diagrama; no se ejecuta |
 
 - Arrastra desde el punto derecho de un nodo hasta otro para conectarlos; `⌫` borra lo seleccionado; el inspector de la derecha edita cada nodo.
-- **✨ Diseñar con IA**: describe lo que quieres en tus palabras y Claude arma (o cambia) el diagrama.
-- **💬 Cómo ejecutarla**: la IA explica paso a paso qué va a pasar, qué falta o puede fallar, y cómo mejorarla o ahorrar tokens.
-- **▶ Ejecutar**: las ramas independientes corren en paralelo; cada agente recibe un resumen de una línea de los pasos anteriores, no todo su historial. Ves en vivo qué nodo está corriendo, cuál terminó y cuál se saltó.
+- **Diseñar con IA**: describe lo que quieres en tus palabras y Claude arma (o cambia) el diagrama.
+- **Explicar ejecución**: la IA explica paso a paso qué va a pasar, qué falta o puede fallar, y cómo mejorarla o ahorrar tokens.
+- **Ejecutar**: las ramas independientes corren en paralelo; cada agente recibe un resumen de una línea de los pasos anteriores, no todo su historial. Ves en vivo qué nodo está corriendo, cuál terminó y cuál se saltó.
 - Las programadas corren mientras AgentBoard esté abierto, también en segundo plano.
 
 ## Tareas: tus ToDo repartidos entre suscripciones
 
-Botón **☑ Tareas** (⇧⌘T / Ctrl+Shift+T). Escribe tus pendientes, uno por línea, y Enter:
+Botón **Tareas** (⇧⌘T / Ctrl+Shift+T). Escribe tus pendientes, uno por línea, y Enter:
 
 ```
 arreglar el login con Google #backend
@@ -57,12 +57,12 @@ nuevo botón de exportar
 - `@claude` `@codex` `@gemini` elige la suscripción; sin `@` es **auto**: va a la suscripción con menos tareas corriendo (eliges cuáles participan).
 - `#grupo` abre al agente dentro de ese grupo del tablero (lo crea si no existe). Una línea con solo `#grupo` o `@agente` aplica a las siguientes.
 - `+proyecto` elige el proyecto. `!` = **modo ligero** (modelo barato, ej. haiku) y `!!` = **modo potente** (ej. opus). Se editan en Configuración → Agentes.
-- **▲** sube una tarea al primer lugar de la cola. **⧉ Resumen** copia en Markdown lo hecho hoy y lo pendiente (para una daily, un correo o un commit).
+- **Subir** (flecha) lleva una tarea al primer lugar de la cola. **Resumen** copia en Markdown lo hecho hoy y lo pendiente (para una daily, un correo o un commit).
 - **Límite de uso**: si una suscripción avisa que llegó a su límite ("usage limit reached… resets 5pm"), la tarea vuelve a la cola y la toma otra suscripción; la agotada no recibe tareas hasta la hora de renovación (se ve tachada en "auto reparte entre").
 - **Confiar y seguir**: si el CLI pregunta si confías en la carpeta, la tarea lo muestra con un botón que responde por ti.
-- **✨ Dividir**: pega un texto libre y Claude (haiku, una llamada corta y sin herramientas) lo separa en tareas y sugiere a quién dárselas.
+- **Dividir**: pega un texto libre y Claude (haiku, una llamada corta y sin herramientas) lo separa en tareas y sugiere a quién dárselas.
 - **Varias a la vez**: *En paralelo* (total) y *por suscripción*. Con *Ejecutar la cola* activo, cada tarea pendiente arranca sola cuando hay cupo.
-- **Worktree por tarea** (opcional): cada tarea trabaja en `.agentboard/worktrees/<tarea>` en su propia rama `agentboard/<tarea>`, así los agentes no se pisan en el mismo repo. Al terminar, **±** muestra sus cambios y te deja **Fusionar** (commitea lo pendiente, hace merge en tu rama actual y borra el worktree; si hay conflictos no toca nada) o **Descartar**.
+- **Worktree por tarea** (opcional): cada tarea trabaja en `.agentboard/worktrees/<tarea>` en su propia rama `agentboard/<tarea>`, así los agentes no se pisan en el mismo repo. Al terminar, **Ver cambios** muestra lo que hizo y te deja **Fusionar** (commitea lo pendiente, hace merge en tu rama actual y borra el worktree; si hay conflictos no toca nada) o **Descartar**.
 - Cada tarea corre en una **sesión nueva** y se marca sola: *Hecho* cuando el agente escribe `HECHO: …` (o llama `complete_task`), *Necesita revisión* si queda esperando (permiso, pregunta), *Bloqueado* con `BLOQUEADO: …`.
 - La primera vez que un CLI abre una carpeta (o un worktree nuevo) puede preguntar si confías en ella: la tarea queda en *Necesita revisión* hasta que respondas en su tarjeta (⤢ te lleva ahí), y luego sigue sola.
 - Los agentes conectados también pueden usar la lista: `list_tasks`, `add_task` (repartir trabajo a otras suscripciones) y `complete_task`.
@@ -74,13 +74,14 @@ nuevo botón de exportar
 ## Más rápido
 
 - **Atajo global** `Control+Alt+Space` (configurable en Configuración → General): desde cualquier app abre AgentBoard con el panel de Tareas listo para escribir.
-- **Paleta** ⇧⌘P / Ctrl+Shift+P (o ⌕ arriba): busca un agente, grupo o tarea y salta a él, ejecuta acciones, o escribe algo nuevo y Enter lo agrega como tarea.
+- **Paleta** ⇧⌘P / Ctrl+Shift+P (o la lupa arriba): busca un agente, grupo o tarea y salta a él, ejecuta acciones, o escribe algo nuevo y Enter lo agrega como tarea.
 - **Insignia en el Dock** con las tareas que esperan tu revisión.
+- **Ayuda en cada botón**: deja el cursor 2 segundos sobre un botón y aparece qué hace.
 
 ## Grupos y diagrama
 
-- **▢ Grupo** (⇧⌘G): un marco en el tablero para un equipo de agentes (ej. *backend*, *frontend*). Las tarjetas cuyo centro queda dentro son del grupo; al mover el marco se mueven con él. ⋯ para nombre, color o ajustarlo a sus tarjetas. **Ordenar** respeta los grupos.
-- **◇ Diagrama** (⇧⌘D): vista tipo UML de componentes: un paquete por **proyecto**, dentro sus **grupos**, y en cada uno los **agentes** con su suscripción, tarea, estado, tiempo trabajando, rama git y última línea de salida; notas con la **cola** de tareas pendientes; y flechas de quién le pasó trabajo a quién. Pestañas para ver un proyecto o todos.
+- **Grupo** (⇧⌘G): un marco en el tablero para un equipo de agentes (ej. *backend*, *frontend*). Las tarjetas cuyo centro queda dentro son del grupo; al mover el marco se mueven con él. ⋯ para nombre, color o ajustarlo a sus tarjetas. **Ordenar** respeta los grupos.
+- **Diagrama** (⇧⌘D): vista tipo UML de componentes: un paquete por **proyecto**, dentro sus **grupos**, y en cada uno los **agentes** con su suscripción, tarea, estado, tiempo trabajando, rama git y última línea de salida; notas con la **cola** de tareas pendientes; y flechas de quién le pasó trabajo a quién. Pestañas para ver un proyecto o todos.
 
 ## ¿Mis suscripciones quedan guardadas al cerrar?
 

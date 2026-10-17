@@ -23,7 +23,7 @@
 
   <header id="topbar" class="glass">
     <div class="brand">
-      <button id="sidebarBtn" class="icon" title="Panel de agentes (⇧⌘A / Ctrl+Shift+A)">☰</button>
+      <button id="sidebarBtn" class="icon" data-icon="sidebar" title="Mostrar u ocultar la lista de agentes, agrupada por proyecto (⇧⌘A)"></button>
       <img class="logo" src="../assets/logo.svg" width="28" height="28" alt="" aria-hidden="true" draggable="false" />
       <span class="brand-name">AgentBoard</span>
       <span id="machine" class="machine" title="Este tablero es solo de este computador"></span>
@@ -31,20 +31,20 @@
 
     <div class="group spaces-wrap">
       <div id="spaceTabs" class="seg spaces" title="Proyectos abiertos: cada uno con sus agentes, trabajando a la vez"></div>
-      <button id="addProject" class="icon" title="Abrir otro proyecto (carpeta)">＋</button>
+      <button id="addProject" class="icon" data-icon="plus" title="Abrir otro proyecto: elige una carpeta y se agrega como pestaña"></button>
     </div>
 
     <div class="group">
-      <button id="tasksBtn" title="Tus tareas: escríbelas y se reparten entre tus suscripciones (⇧⌘T / Ctrl+Shift+T)">☑ Tareas <span id="tasksBadge" class="badge-n hidden"></span></button>
-      <button id="paletteBtn" class="icon" title="Buscar o ejecutar: agentes, tareas, acciones (⇧⌘P / Ctrl+Shift+P)">⌕</button>
-      <button id="flowsBtn" title="Automatizaciones: diagramas de pasos que ejecutan tus agentes (⇧⌘F / Ctrl+Shift+F)">⟴ Automatizaciones</button>
-      <button id="diagramBtn" title="Diagrama: qué hace cada grupo de agentes, por proyecto (⇧⌘D / Ctrl+Shift+D)">◇ Diagrama</button>
+      <button id="tasksBtn" data-icon="tasks" title="Tareas: escribe tus pendientes y se reparten entre tus suscripciones, en paralelo (⇧⌘T)">Tareas <span id="tasksBadge" class="badge-n hidden"></span></button>
+      <button id="paletteBtn" class="icon" data-icon="search" title="Buscar un agente, tarea o proyecto, o ejecutar una acción (⇧⌘P)"></button>
+      <button id="flowsBtn" data-icon="flows" title="Automatizaciones: diseña flujos de pasos que ejecutan tus agentes (⇧⌘F)">Automatizaciones</button>
+      <button id="diagramBtn" data-icon="diagram" title="Diagrama: qué está haciendo cada agente, por proyecto y grupo (⇧⌘D)">Diagrama</button>
     </div>
 
     <div class="group right">
       <button id="skillsBtn" title="Skills, tus agentes y la conexión entre agentes">Skills y agentes</button>
       <button id="accountsBtn" title="Suscripciones, CLIs y modelos locales">Suscripciones</button>
-      <button id="settingsBtn" class="icon" title="Ajustes">⚙</button>
+      <button id="settingsBtn" class="icon" data-icon="gear" title="Configuración: apariencia, atajos, agentes y más (⌘,)"></button>
     </div>
   </header>
 
@@ -59,12 +59,12 @@
 
   <nav id="dock" class="glass">
     <div id="agentButtons" class="dock-group"><!-- botones generados --></div>
-    <button id="moreAgents" class="chip ghost" title="Agregar agentes o modelos locales">＋</button>
+    <button id="moreAgents" class="chip ghost icon" data-icon="plus" title="Agregar suscripciones, cuentas o modelos locales a esta barra"></button>
     <span class="dock-sep"></span>
-    <button id="addNote" class="chip ghost" title="Nueva nota (⇧⌘N / Ctrl+Shift+N)">✎ Nota</button>
-    <button id="addGroup" class="chip ghost" title="Nuevo grupo: una sección del tablero para un equipo de agentes (⇧⌘G / Ctrl+Shift+G)">▢ Grupo</button>
-    <button id="arrange" class="chip ghost icon" title="Ordenar tarjetas (⇧⌘O)">▦</button>
-    <button id="fit" class="chip ghost icon" title="Ver todo (⌘0)">⤢</button>
+    <button id="addNote" class="chip ghost" data-icon="note" title="Nueva nota en el tablero (⇧⌘N)">Nota</button>
+    <button id="addGroup" class="chip ghost" data-icon="group" title="Nuevo grupo: un marco para reunir a un equipo de agentes (⇧⌘G)">Grupo</button>
+    <button id="arrange" class="chip ghost icon" data-icon="grid" title="Ordenar las tarjetas en grilla, respetando los grupos (⇧⌘O)"></button>
+    <button id="fit" class="chip ghost icon" data-icon="fit" title="Ajustar la vista para ver todas las tarjetas (⌘0)"></button>
     <span id="zoomLabel" class="zoom">100%</span>
   </nav>
 
@@ -73,7 +73,7 @@
       <span class="eyebrow">Tareas</span>
       <span id="taskCounts" class="muted small"></span>
       <span class="spacer"></span>
-      <button id="tasksClose" class="card-btn" title="Cerrar">✕</button>
+      <button id="tasksClose" class="card-btn" data-icon="close" title="Cerrar el panel de tareas"></button>
     </div>
     <div class="task-opts">
       <label class="switch" title="Las tareas pendientes se ejecutan solas cuando hay cupo"><input type="checkbox" id="taskAuto" /> Ejecutar la cola</label>
@@ -83,19 +83,19 @@
     </div>
     <div class="task-auto"><span class="muted small">"auto" reparte entre:</span> <span id="taskAutoAgents" class="seg"></span></div>
     <div id="taskFilter" class="seg task-filter">
-      <button data-f="active" class="active">Activas</button><button data-f="all">Todas</button><button data-f="done">Hechas</button>
-      <span class="spacer"></span><button id="taskSummary" class="ghost" title="Copia en Markdown lo hecho hoy y lo pendiente">⧉ Resumen</button><button id="taskClear" class="ghost" title="Quitar las tareas hechas">Limpiar</button>
+      <button data-f="active" class="active" title="Ver las tareas en cola, en curso o por revisar">Activas</button><button data-f="all" title="Ver todas las tareas, incluidas las hechas">Todas</button><button data-f="done" title="Ver solo las tareas terminadas, las más recientes primero">Hechas</button>
+      <span class="spacer"></span><button id="taskSummary" class="ghost" data-icon="copy" title="Copiar un resumen en Markdown de lo hecho hoy y lo pendiente">Resumen</button><button id="taskClear" class="ghost" title="Quitar de la lista las tareas ya hechas">Limpiar</button>
     </div>
     <div id="taskList"></div>
     <div class="composer">
       <textarea id="taskInput" rows="3" placeholder="Un pendiente por línea · Enter agrega&#10;@claude  #grupo  +proyecto  ! ligero  !! potente"></textarea>
       <div class="composer-row">
-        <select id="taskAgent" title="Suscripción"></select>
-        <select id="taskProject" title="Proyecto"></select>
-        <label class="switch" title="Modelo barato de esa suscripción"><input type="checkbox" id="taskLight" /> !</label>
+        <select id="taskAgent" title="Suscripción que hará las tareas; Auto reparte entre las que tengas"></select>
+        <select id="taskProject" title="Proyecto donde se ejecutan las tareas"></select>
+        <label class="switch" title="Modo ligero: usa el modelo más barato de esa suscripción (igual que ! en el texto)"><input type="checkbox" id="taskLight" /> Ligero</label>
         <span class="spacer"></span>
-        <button id="taskPlan" class="ghost" title="Claude (haiku, una llamada corta) divide tu texto en tareas y sugiere a quién dárselas">✨</button>
-        <button id="taskAdd" class="primary">Agregar</button>
+        <button id="taskPlan" class="ghost" title="Dividir: Claude (haiku, una llamada corta) separa tu texto en tareas y sugiere a quién dárselas">Dividir</button>
+        <button id="taskAdd" class="primary" title="Agregar cada línea del texto como una tarea (Enter)">Agregar</button>
       </div>
     </div>
   </aside>
@@ -109,25 +109,25 @@
 
   <section id="flows" class="hidden">
     <aside class="fl-side">
-      <div class="side-head"><span class="eyebrow">Automatizaciones</span><button type="button" id="flNew" class="card-btn" title="Nueva automatización">＋</button></div>
+      <div class="side-head"><span class="eyebrow">Automatizaciones</span><button type="button" id="flNew" class="card-btn" data-icon="plus" title="Nueva automatización en blanco"></button></div>
       <div id="flList"></div>
-      <button type="button" id="flClose" class="fl-back" title="Volver al tablero (Esc)">← Volver al tablero</button>
+      <button type="button" id="flClose" class="fl-back" data-icon="back" title="Volver al tablero (Esc)">Volver al tablero</button>
     </aside>
     <div class="fl-center">
       <div id="flEmpty" class="dg-empty">
         <h2>Automatiza con tus agentes.</h2>
         <p>Dibuja un flujo como en n8n — disparador, agentes, comandos, decisiones — y AgentBoard lo ejecuta con tus suscripciones.
           O descríbelo y la IA lo diseña por ti.</p>
-        <p><button type="button" id="flEmptyAI" class="primary">✨ Diseñar con IA</button> <button type="button" id="flEmptyNew">＋ Empezar en blanco</button></p>
+        <p><button type="button" id="flEmptyAI" class="primary" title="Describe lo que quieres y la IA arma el diagrama">Diseñar con IA</button> <button type="button" id="flEmptyNew" title="Empezar con un disparador y agregar pasos a mano">Empezar en blanco</button></p>
       </div>
       <div id="flMain" class="hidden">
         <div class="fl-bar">
           <input id="flName" placeholder="Nombre" />
           <div id="flAdd" class="seg fl-add"></div>
           <span class="spacer"></span>
-          <button type="button" id="flDesign" title="Describe lo que quieres y la IA arma (o cambia) el diagrama">✨ Diseñar con IA</button>
-          <button type="button" id="flExplain" title="La IA explica cómo se ejecutará, qué falta y cómo mejorarla">💬 Cómo ejecutarla</button>
-          <button type="button" id="flRun" class="primary">▶ Ejecutar</button>
+          <button type="button" id="flDesign" data-icon="wand" title="Describe lo que quieres y la IA arma o cambia el diagrama">Diseñar con IA</button>
+          <button type="button" id="flExplain" data-icon="chat" title="La IA explica cómo se ejecutará, qué puede fallar y cómo mejorarla">Explicar ejecución</button>
+          <button type="button" id="flRun" class="primary" title="Ejecutar ahora; las ramas independientes corren en paralelo">Ejecutar</button>
         </div>
         <div id="flCanvas"><svg id="flEdges"></svg><div id="flNodes"></div></div>
       </div>
@@ -142,7 +142,7 @@
       <span class="spacer"></span>
       <label class="switch"><input type="checkbox" id="dgShowTasks" checked /> Colas de tareas</label>
       <label class="switch"><input type="checkbox" id="dgShowIdle" checked /> Agentes inactivos</label>
-      <button id="dgClose">Volver al tablero</button>
+      <button id="dgClose" data-icon="back" title="Cerrar el diagrama y volver al tablero (Esc)">Volver al tablero</button>
     </div>
     <div id="dgCanvas"><svg id="dgEdges"></svg><div id="dgContent"></div></div>
   </section>
@@ -155,13 +155,13 @@
     <form method="dialog" id="settingsForm">
       <nav class="set-nav">
         <span class="set-title">Configuración</span>
-        <button type="button" data-sec="general" class="active">⚙︎ General</button>
-        <button type="button" data-sec="appearance">◐ Apariencia</button>
-        <button type="button" data-sec="agents">◎ Agentes</button>
-        <button type="button" data-sec="keys">⌘ Atajos</button>
-        <button type="button" data-sec="projects">▤ Proyectos</button>
-        <button type="button" data-sec="tasks">☑ Tareas</button>
-        <button type="button" data-sec="advanced">{ } Avanzado</button>
+        <button type="button" data-sec="general" class="active" data-icon="gear" title="Nombre del equipo, shell, atajo global y segundo plano">General</button>
+        <button type="button" data-sec="appearance" data-icon="sun" title="Tema, color de acento, tipografía y terminales">Apariencia</button>
+        <button type="button" data-sec="agents" data-icon="agent" title="Comandos y argumentos de cada agente">Agentes</button>
+        <button type="button" data-sec="keys" data-icon="keyboard" title="Ver y cambiar los atajos de teclado">Atajos</button>
+        <button type="button" data-sec="projects" data-icon="folder" title="Renombrar o quitar proyectos">Proyectos</button>
+        <button type="button" data-sec="tasks" data-icon="tasks" title="Cola, paralelismo y worktrees de las tareas">Tareas</button>
+        <button type="button" data-sec="advanced" data-icon="code" title="Editar todos los ajustes como JSON">Avanzado</button>
       </nav>
       <div class="set-body">
         <section data-sec="general">
@@ -182,16 +182,16 @@
           <h2>Apariencia</h2>
           <div class="set-group">
             <div class="set-row">Tema
-              <div class="seg" id="themeSeg"><button type="button" data-v="auto">Automático</button><button type="button" data-v="light">Claro</button><button type="button" data-v="dark">Oscuro</button></div></div>
+              <div class="seg" id="themeSeg"><button type="button" data-v="auto" title="Sigue el modo claro u oscuro de macOS">Automático</button><button type="button" data-v="light">Claro</button><button type="button" data-v="dark">Oscuro</button></div></div>
             <div class="set-row">Color de acento <div id="accentSwatches" class="swatches"></div></div>
             <label class="set-row">Tamaño del texto de la interfaz <span class="range"><input name="uiSize" type="range" min="11" max="16" step="0.5" /><output id="uiSizeOut"></output></span></label>
             <div class="set-row">Tipografía
-              <div class="seg" id="fontSeg"><button type="button" data-v="system">Sistema (SF Pro)</button><button type="button" data-v="geist">Geist</button></div></div>
+              <div class="seg" id="fontSeg"><button type="button" data-v="system" title="La tipografía del sistema: SF Pro en Mac, Segoe UI en Windows">Sistema (SF Pro)</button><button type="button" data-v="geist" title="Geist y Geist Mono, incluidas con la app">Geist</button></div></div>
           </div>
           <div class="set-group">
             <label class="set-row">Tamaño de letra de las terminales <span class="range"><input name="fontSize" type="range" min="9" max="22" step="0.5" /><output id="fontSizeOut"></output></span></label>
             <div class="set-row">Tema de las terminales
-              <div class="seg" id="termSeg"><button type="button" data-v="auto">Como la app</button><button type="button" data-v="light">Claro</button><button type="button" data-v="dark">Oscuro</button></div></div>
+              <div class="seg" id="termSeg"><button type="button" data-v="auto" title="Las terminales usan el mismo tema que la app">Como la app</button><button type="button" data-v="light">Claro</button><button type="button" data-v="dark">Oscuro</button></div></div>
             <label class="set-row">Alto de línea en terminales <span class="range"><input name="lineHeight" type="range" min="1" max="1.6" step="0.05" /><output id="lineHeightOut"></output></span></label>
           </div>
           <p class="set-note">Los cambios se ven al instante; se guardan con "Guardar".</p>
@@ -201,14 +201,14 @@
           <h2>Agentes</h2>
           <p class="set-note">Color · nombre · comando · args al reanudar · args ligero (<code>!</code>) · args potente (<code>!!</code>)</p>
           <div id="agentRows"></div>
-          <button type="button" id="addAgent" class="ghost">＋ Agente personalizado</button>
+          <button type="button" id="addAgent" class="ghost" data-icon="plus" title="Agregar cualquier CLI como agente (aider, opencode, ollama…)">Agente personalizado</button>
         </section>
 
         <section data-sec="keys" class="hidden">
           <h2>Atajos de teclado</h2>
           <p class="set-note">Haz clic en un atajo y presiona la combinación nueva. <kbd>⌫</kbd> lo quita, <kbd>Esc</kbd> cancela.</p>
           <div id="keyRows"></div>
-          <div class="row-end"><button type="button" id="keysReset" class="ghost">Restaurar todos</button></div>
+          <div class="row-end"><button type="button" id="keysReset" class="ghost" title="Volver a los atajos de fábrica (se aplica al guardar)">Restaurar todos</button></div>
           <h3>Dentro del tablero</h3>
           <div class="set-group static-keys">
             <div class="set-row">Moverse por el tablero <span class="muted">arrastrar el fondo · rueda · botón del medio</span></div>
@@ -239,13 +239,13 @@
           <h2>Avanzado</h2>
           <p class="set-note">Todos los ajustes como JSON: agrega, cambia o quita claves y aplica. Las tarjetas, tareas y automatizaciones no aparecen aquí (se editan desde la app).</p>
           <textarea id="cfgJson" spellcheck="false"></textarea>
-          <div class="row-end"><span id="cfgJsonError" class="form-error"></span><button type="button" id="cfgJsonApply">Aplicar JSON</button></div>
+          <div class="row-end"><span id="cfgJsonError" class="form-error"></span><button type="button" id="cfgJsonApply" title="Guardar este JSON como tus ajustes y recargar la ventana">Aplicar JSON</button></div>
           <p class="set-note">Archivo: <code id="cfgPath"></code> <a href="#" id="revealCfg">Mostrar en el Finder</a></p>
         </section>
       </div>
       <div class="actions set-actions">
         <button value="cancel" class="ghost">Cancelar</button>
-        <button value="ok" id="saveSettings" class="primary">Guardar</button>
+        <button value="ok" id="saveSettings" class="primary" title="Guardar los cambios de todas las secciones">Guardar</button>
       </div>
     </form>
   </dialog>
@@ -274,13 +274,13 @@
       <p class="muted small">¿Tienes más de una suscripción de Claude (personal y del trabajo, o dos planes)? Agrégalas: cada una usa su propia carpeta y sesión,
         y la cola de tareas reparte entre ellas — si una llega a su límite de uso, sigue con la otra.</p>
       <div id="claudeAccounts" class="rows"></div>
-      <div class="pull-row"><input id="claudeAccountName" placeholder="Nombre de la cuenta (ej. Trabajo)" /><button type="button" id="addClaudeAccount">＋ Agregar cuenta</button></div>
+      <div class="pull-row"><input id="claudeAccountName" placeholder="Nombre de la cuenta (ej. Trabajo)" /><button type="button" id="addClaudeAccount" data-icon="plus" title="Crea una cuenta de Claude separada, con su propio login">Agregar cuenta</button></div>
 
       <h3>Modelos locales</h3>
       <div id="localRows" class="rows"></div>
 
       <div class="actions">
-        <button type="button" id="accountsRefresh" class="ghost">↻ Revisar</button>
+        <button type="button" id="accountsRefresh" class="ghost" data-icon="refresh" title="Volver a revisar qué está instalado y con sesión">Revisar</button>
         <button value="ok" class="primary">Listo</button>
       </div>
     </form>
@@ -292,10 +292,10 @@
       <span class="eyebrow">Todo lo que saben tus agentes</span>
       <h2>Skills y agentes</h2>
       <div class="tabs" role="tablist">
-        <button type="button" data-tab="skills" class="active">Skills</button>
-        <button type="button" data-tab="agents">Mis agentes</button>
-        <button type="button" data-tab="connect">Conexión entre agentes</button>
-        <button type="button" data-tab="saving">Ahorro de tokens</button>
+        <button type="button" data-tab="skills" class="active" title="Skills, comandos y extensiones de cada CLI en este equipo">Skills</button>
+        <button type="button" data-tab="agents" title="Crear y editar subagentes de Claude Code">Mis agentes</button>
+        <button type="button" data-tab="connect" title="Conectar tus suscripciones para que los agentes se hablen entre sí">Conexión entre agentes</button>
+        <button type="button" data-tab="saving" title="Skills incluidas que reducen el uso de tokens y contexto">Ahorro de tokens</button>
       </div>
 
       <section data-pane="skills">
@@ -327,10 +327,10 @@
           <div class="row-end">
             <span id="agentFormError" class="form-error"></span>
             <button type="button" id="agentFormCancel" class="ghost">Cancelar</button>
-            <button type="button" id="agentFormSave" class="primary">Guardar agente</button>
+            <button type="button" id="agentFormSave" class="primary" title="Guardar el subagente en su carpeta">Guardar agente</button>
           </div>
         </div>
-        <button type="button" id="newAgentDef" class="ghost">＋ Nuevo agente</button>
+        <button type="button" id="newAgentDef" class="ghost" data-icon="plus" title="Crear un subagente de Claude Code con sus instrucciones">Nuevo agente</button>
       </section>
 
       <section data-pane="connect" class="hidden">
@@ -347,7 +347,7 @@
         <p class="muted small">Skills incluidas con AgentBoard para que cada suscripción gaste menos tokens y contexto.
           Se instalan como <code>SKILL.md</code> en la carpeta de skills de cada CLI; puedes editarlas o borrarlas cuando quieras.</p>
         <div id="packRows" class="rows"></div>
-        <div class="row-end"><button type="button" id="packInstall" class="primary">Instalar / actualizar en todas</button></div>
+        <div class="row-end"><button type="button" id="packInstall" class="primary" title="Copiar las skills de ahorro a Claude Code, Codex y Gemini (y a tus cuentas extra de Claude)">Instalar o actualizar en todas</button></div>
         <h3>Qué más hace AgentBoard para ahorrar</h3>
         <ul class="tips">
           <li><b>Una sesión nueva por tarea</b>: cada ToDo parte con contexto limpio, sin arrastrar conversaciones largas.</li>
@@ -359,7 +359,7 @@
       </section>
 
       <div class="actions">
-        <button type="button" id="skillsRefresh" class="ghost">↻ Revisar</button>
+        <button type="button" id="skillsRefresh" class="ghost" data-icon="refresh" title="Volver a leer las skills y agentes del disco">Revisar</button>
         <button value="ok" class="primary">Listo</button>
       </div>
     </form>
@@ -368,6 +368,7 @@
   <script src="../../node_modules/@xterm/xterm/lib/xterm.js"></script>
   <script src="../../node_modules/@xterm/addon-fit/lib/addon-fit.js"></script>
   <script src="../../node_modules/@xterm/addon-web-links/lib/addon-web-links.js"></script>
+  <script src="icons.js"></script>
   <script src="app.js"></script>
   <script src="tasks.js"></script>
   <script src="diagram.js"></script>

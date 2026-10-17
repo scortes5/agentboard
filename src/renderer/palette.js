@@ -10,24 +10,24 @@ let palSel = 0;
 
 function palCommands() {
   const cmds = [
-    { icon: '☑', label: 'Tareas', hint: '⇧⌘T', run: () => openTasks() },
-    { icon: '◇', label: 'Diagrama', hint: '⇧⌘D', run: () => toggleDiagram(true) },
-    { icon: '⟴', label: 'Automatizaciones', hint: '⇧⌘F', run: () => toggleFlows(true) },
-    { icon: '⌘', label: 'Atajos de teclado', hint: '⌘/', run: () => openSettings('keys') },
-    { icon: '◐', label: 'Apariencia', run: () => openSettings('appearance') },
-    { icon: '▢', label: 'Nuevo grupo', hint: '⇧⌘G', run: () => newGroup() },
-    { icon: '✎', label: 'Nueva nota', hint: '⇧⌘N', run: () => newCard('note') },
-    { icon: '▦', label: 'Ordenar tarjetas', hint: '⇧⌘O', run: () => arrange() },
-    { icon: '⤢', label: 'Ver todo', hint: '⌘0', run: () => fitAll() },
-    { icon: '◎', label: 'Suscripciones y cuentas', run: () => openAccounts() },
-    { icon: '✦', label: 'Skills y ahorro de tokens', run: () => openSkills('saving') },
-    { icon: '⚙', label: 'Ajustes', hint: '⌘,', run: () => openSettings() },
+    { icon: 'tasks', label: 'Tareas', hint: '⇧⌘T', run: () => openTasks() },
+    { icon: 'diagram', label: 'Diagrama', hint: '⇧⌘D', run: () => toggleDiagram(true) },
+    { icon: 'flows', label: 'Automatizaciones', hint: '⇧⌘F', run: () => toggleFlows(true) },
+    { icon: 'keyboard', label: 'Atajos de teclado', hint: '⌘/', run: () => openSettings('keys') },
+    { icon: 'sun', label: 'Apariencia', run: () => openSettings('appearance') },
+    { icon: 'group', label: 'Nuevo grupo', hint: '⇧⌘G', run: () => newGroup() },
+    { icon: 'note', label: 'Nueva nota', hint: '⇧⌘N', run: () => newCard('note') },
+    { icon: 'grid', label: 'Ordenar tarjetas', hint: '⇧⌘O', run: () => arrange() },
+    { icon: 'fit', label: 'Ver todo', hint: '⌘0', run: () => fitAll() },
+    { icon: 'agent', label: 'Suscripciones y cuentas', run: () => openAccounts() },
+    { icon: 'layers', label: 'Skills y ahorro de tokens', run: () => openSkills('saving') },
+    { icon: 'gear', label: 'Configuración', hint: '⌘,', run: () => openSettings() },
   ];
-  for (const p of cfg.projects) cmds.push({ icon: '▤', label: `Ir al proyecto ${p.name}`, sub: 'proyecto', run: () => switchSpace(p.path) });
-  for (const f of cfg.flows || []) cmds.push({ icon: '⟴', label: `Ejecutar "${f.name}"`, sub: 'automatización', run: () => runFlow(f) });
+  for (const p of cfg.projects) cmds.push({ icon: 'folder', label: `Ir al proyecto ${p.name}`, sub: 'proyecto', run: () => switchSpace(p.path) });
+  for (const f of cfg.flows || []) cmds.push({ icon: 'play', label: `Ejecutar "${f.name}"`, sub: 'automatización', run: () => runFlow(f) });
   for (const [k, a] of Object.entries(cfg.agents)) {
     if (a.hidden) continue;
-    cmds.push({ icon: '＋', label: `Abrir ${a.label}`, sub: basename(cfg.selectedProject) || '', color: a.color, run: () => newCard('term', k) });
+    cmds.push({ icon: 'plus', label: `Abrir ${a.label}`, sub: basename(cfg.selectedProject) || '', color: a.color, run: () => newCard('term', k) });
   }
   return cmds;
 }
@@ -35,18 +35,18 @@ function palCommands() {
 function palCandidates() {
   const items = [];
   for (const c of cfg.cards) {
-    if (c.type === 'group') { items.push({ icon: '▢', label: c.title, sub: 'grupo', run: () => { toggleDiagram(false); focusCardView(c); } }); continue; }
+    if (c.type === 'group') { items.push({ icon: 'group', label: c.title, sub: 'grupo', run: () => { toggleDiagram(false); focusCardView(c); } }); continue; }
     const a = agentOf(c);
     const st = runtime.get(c.id)?.status;
     items.push({
-      icon: c.type === 'note' ? '✎' : '●', color: c.type === 'note' ? null : a.color, label: c.title,
+      icon: c.type === 'note' ? 'note' : 'dot', color: c.type === 'note' ? null : a.color, label: c.title,
       sub: [c.type === 'note' ? 'nota' : a.label, basename(c.cwd), STATUS_LABEL[st]].filter(Boolean).join(' · '),
       run: () => { if (diagramOpen()) toggleDiagram(false); focusCardView(c); focusCard(c.id); },
     });
   }
   for (const t of cfg.tasks || []) {
     if (t.status === 'hecho') continue;
-    items.push({ icon: '☐', label: t.text, sub: `tarea · ${t.status.replace('_', ' ')}`, run: () => openTasks() });
+    items.push({ icon: 'tasks', label: t.text, sub: `tarea · ${t.status.replace('_', ' ')}`, run: () => openTasks() });
   }
   return [...items, ...palCommands()];
 }
@@ -68,10 +68,10 @@ function renderPalette() {
   const q = $('#palInput').value.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
   palItems = palCandidates().map((it) => ({ it, s: palScore(it, q) })).filter((x) => x.s > 0)
     .sort((a, b) => b.s - a.s).slice(0, 40).map((x) => x.it);
-  if (q) palItems.push({ icon: '↵', label: `Agregar tarea: "${$('#palInput').value.trim()}"`, sub: 'usa @agente #grupo ! !!', addTask: true });
+  if (q) palItems.push({ icon: 'plus', label: `Agregar tarea: "${$('#palInput').value.trim()}"`, sub: 'usa @agente #grupo ! !!', addTask: true });
   palSel = Math.min(palSel, palItems.length - 1);
   $('#palList').innerHTML = palItems.map((it, i) => `<button type="button" class="pal-item ${i === palSel ? 'sel' : ''}" data-i="${i}">
-    <span class="pal-icon" ${it.color ? `style="color:${esc(it.color)}"` : ''}>${esc(it.icon)}</span>
+    <span class="pal-icon" ${it.color ? `style="color:${esc(it.color)}"` : ''}>${icon(it.icon, 15)}</span>
     <span class="pal-label">${esc(it.label)}</span>
     ${it.sub ? `<span class="pal-sub">${esc(it.sub)}</span>` : ''}
     ${it.hint ? `<kbd>${esc(it.hint)}</kbd>` : ''}</button>`).join('') || '<div class="pal-empty">Nada coincide.</div>';

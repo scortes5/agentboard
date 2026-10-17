@@ -235,11 +235,11 @@ function mountCard(c, { resume }) {
       ${c.type === 'term' ? `<span class="proj" title="${esc(c.cwd || 'Carpeta personal')}">${esc(basename(c.cwd) || '~')}</span>` : ''}
       <span class="spacer"></span>
       ${c.type === 'term' ? `<span class="gitpill hidden"></span>
-        <button class="card-btn" data-act="open" title="Abrir carpeta">⌂</button>
-        <button class="card-btn" data-act="restart" title="Reiniciar">↻</button>` : ''}
-      <button class="card-btn" data-act="edit" title="Editar agente">⋯</button>
-      <button class="card-btn" data-act="zoom" title="Enfocar">⤢</button>
-      <button class="card-btn" data-act="close" title="Cerrar">✕</button>
+        <button class="card-btn" data-act="open" title="Abrir la carpeta del proyecto en el Finder">${icon('folder', 14)}</button>
+        <button class="card-btn" data-act="restart" title="Reiniciar el agente (retoma su sesión)">${icon('refresh', 14)}</button>` : ''}
+      <button class="card-btn" data-act="edit" title="${c.type === 'term' ? 'Cambiar nombre, agente, proyecto o argumentos; pasar contexto a otro agente' : 'Editar o duplicar la nota'}">${icon('more', 14)}</button>
+      <button class="card-btn" data-act="zoom" title="Enfocar esta tarjeta (llena la vista)">${icon('focus', 14)}</button>
+      <button class="card-btn" data-act="close" title="Cerrar la tarjeta y detener su proceso">${icon('close', 14)}</button>
     </div>
     <div class="card-body"></div>
     <div class="resize"></div>`;
@@ -381,7 +381,7 @@ function showOverlay(c, msg) {
   $('.overlay', rt.el)?.remove();
   const ov = document.createElement('div');
   ov.className = 'overlay';
-  ov.innerHTML = `<div>${esc(msg)}</div><button class="primary">↻ Reiniciar</button>`;
+  ov.innerHTML = `<div>${esc(msg)}</div><button class="primary" title="Volver a abrir el agente en esta tarjeta">Reiniciar</button>`;
   $('button', ov).onclick = () => restartCard(c);
   $('.card-body', rt.el).appendChild(ov);
 }
@@ -587,9 +587,9 @@ function mountGroup(c) {
       <span class="frame-title">${esc(c.title)}</span>
       <span class="frame-meta"></span>
       <span class="spacer"></span>
-      <button class="card-btn" data-act="task" title="Nueva tarea para este grupo">＋ Tarea</button>
-      <button class="card-btn" data-act="edit" title="Editar grupo">⋯</button>
-      <button class="card-btn" data-act="close" title="Quitar el grupo (las tarjetas se quedan)">✕</button>
+      <button class="card-btn" data-act="task" title="Nueva tarea para este grupo: su agente se abrirá dentro del marco">${icon('plus', 13)} Tarea</button>
+      <button class="card-btn" data-act="edit" title="Cambiar nombre o color, o ajustar el marco a sus tarjetas">${icon('more', 14)}</button>
+      <button class="card-btn" data-act="close" title="Quitar el grupo (las tarjetas se quedan en el tablero)">${icon('close', 14)}</button>
     </div>
     <div class="resize"></div>`;
   world.prepend(el);
@@ -757,8 +757,8 @@ async function refreshGit() {
     const g = results[c.cwd];
     if (!g) { rt.gitEl.classList.add('hidden'); continue; }
     rt.gitEl.classList.remove('hidden');
-    rt.gitEl.innerHTML = `⎇ ${esc(g.branch)}`
-      + (g.changes ? ` <span class="dirty">●${g.changes}</span>` : '')
+    rt.gitEl.innerHTML = `${icon('branch', 12)} ${esc(g.branch)}`
+      + (g.changes ? ` <span class="dirty">${g.changes} cambio${g.changes === 1 ? '' : 's'}</span>` : '')
       + (g.ahead ? ` <span class="ab">↑${g.ahead}</span>` : '')
       + (g.behind ? ` <span class="ab">↓${g.behind}</span>` : '');
     rt.gitEl.title = `${g.changes} cambios sin commit · ${g.ahead} adelante · ${g.behind} atrás — clic para cambiar de rama`;
@@ -772,7 +772,7 @@ async function branchMenu(c, anchor) {
   const pop = document.createElement('div');
   pop.className = 'popover';
   pop.innerHTML = branches.map((b) =>
-    `<button data-b="${esc(b)}" class="${b === status?.branch ? 'current' : ''}">${b === status?.branch ? '● ' : '  '}${esc(b)}</button>`).join('')
+    `<button data-b="${esc(b)}" class="${b === status?.branch ? 'current' : ''}">${esc(b)}${b === status?.branch ? ' (actual)' : ''}</button>`).join('')
     + '<hr/><input id="newBranch" placeholder="Nueva rama… (Enter)" style="width:100%;background:var(--card);border:1px solid var(--border);border-radius:5px;padding:5px 8px;color:var(--text);font:12px var(--font-mono)"/>';
   const r = anchor.getBoundingClientRect();
   pop.style.left = Math.min(r.left, innerWidth - 230) + 'px';
@@ -997,7 +997,7 @@ function renderSidebar() {
       if (gname !== lastGroup && (gname || lastGroup)) {
         const sub = document.createElement('div');
         sub.className = 'side-sub';
-        sub.textContent = gname ? '▢ ' + gname : 'Sin grupo';
+        sub.textContent = gname || 'Sin grupo';
         list.appendChild(sub);
       }
       lastGroup = gname;
@@ -1007,6 +1007,7 @@ function renderSidebar() {
       b.style.setProperty('--agent', c.type === 'note' ? 'var(--warn)' : a.color);
       b.innerHTML = (c.type === 'term' ? `<span class="status ${st}" title="${STATUS_LABEL[st] || ''}"></span>` : '')
         + `<span class="name">${esc(c.title)}</span><span class="kind">${c.type === 'note' ? 'nota' : esc(a.label)}</span>`;
+      b.title = c.type === 'note' ? 'Ir a la nota' : `Ir a la tarjeta de ${c.title} (${a.label})`;
       b.onclick = () => { focusCardView(c); focusCard(c.id); };
       list.appendChild(b);
       sideItems.set(c.id, b);
@@ -1162,7 +1163,7 @@ async function renderClaudeAccounts() {
     ...extra.map(([k, a]) => `<div class="hub-row" data-k="${esc(k)}"><span class="dot" style="background:${esc(a.color)};color:${esc(a.color)}"></span>
       <span class="meta"><strong>${esc(a.label)}</strong><small><code>${esc(a.env.CLAUDE_CONFIG_DIR)}</code></small></span>
       <span class="badge ${status[a.env.CLAUDE_CONFIG_DIR] ? 'ok' : 'no'}">${status[a.env.CLAUDE_CONFIG_DIR] ? 'En uso' : 'Falta iniciar sesión'}</span>
-      <span class="acts"><button type="button" data-x="login">Abrir / iniciar sesión</button><button type="button" data-x="remove" title="Quitar de AgentBoard (no borra la carpeta)">✕</button></span></div>`),
+      <span class="acts"><button type="button" data-x="login" title="Abrir esta cuenta en una tarjeta; la primera vez, inicia sesión con /login">Abrir o iniciar sesión</button><button type="button" class="icon" data-x="remove" title="Quitar de AgentBoard (no borra la carpeta ni la sesión)">${icon('close', 13)}</button></span></div>`),
   ].join('');
 }
 
@@ -1223,7 +1224,7 @@ function renderCatalog() {
       <span class="badge ${cls}">${badge}</span>
       <span class="acts">
         <label class="pin" title="Mostrar en la barra de abajo"><input type="checkbox" ${pinned ? 'checked' : ''}/> barra</label>
-        <button type="button">${action}</button>
+        <button type="button" title="${action === 'Instalar' ? 'Abrir una terminal con el comando de instalación' : action === 'Iniciar sesión' ? 'Abrir el CLI para iniciar sesión con tu cuenta' : 'Abrir este agente en el proyecto actual'}">${action}</button>
       </span>`;
     $('input', row).onchange = (e) => setPinned(item, e.target.checked);
     $('button', row).onclick = () => {
@@ -1477,7 +1478,7 @@ function renderPack(pack) {
 $('#packInstall').onclick = async () => {
   const r = await ab.packInstall(Object.keys(PROVIDERS));
   if (!r.ok) return toast(`No pude instalar: ${esc(r.error)}`);
-  toast(`Skills de ahorro instaladas (${r.value.length}). Reinicia (↻) los agentes abiertos para que las vean.`, 5000);
+  toast(`Skills de ahorro instaladas (${r.value.length}). Reinicia los agentes abiertos para que las vean.`, 5000);
   renderPack(await ab.packStatus());
 };
 
@@ -1521,7 +1522,7 @@ function skillRow(s) {
     <span class="acts">
       ${s.kind === 'skill' ? `<select class="copy" title="Copiar esta skill a otra suscripción">
         <option value="">Copiar a…</option>${others.map((p) => `<option value="${p}">${esc(PROVIDERS[p].label)}</option>`).join('')}</select>` : ''}
-      <button type="button" class="icon" title="Mostrar en el Finder">↗</button>
+      <button type="button" class="icon" title="Mostrar en el Finder">${icon('folder', 14)}</button>
     </span>`;
   $('button', row).onclick = () => ab.skillsReveal(s.path);
   const sel = $('select', row);
@@ -1544,7 +1545,7 @@ $('#skillFilter').addEventListener('input', renderSkillList);
 
 function renderAgentDefs() {
   const box = $('#agentDefRows');
-  box.innerHTML = agentDefs.length ? '' : '<div class="empty-note">Aún no tienes agentes propios. Crea uno con <b>＋ Nuevo agente</b>.</div>';
+  box.innerHTML = agentDefs.length ? '' : '<div class="empty-note">Aún no tienes agentes propios. Crea uno con <b>Nuevo agente</b>.</div>';
   for (const a of agentDefs) {
     const row = document.createElement('div');
     row.className = 'hub-row skill';
@@ -1553,7 +1554,7 @@ function renderAgentDefs() {
       <span class="meta"><strong>${esc(a.name)}${a.model ? `<span class="tag">${esc(a.model)}</span>` : ''}</strong>
         <span class="desc">${esc(a.description) || '<i>Sin descripción</i>'}</span></span>
       <span class="badge">${esc(a.scope)}</span>
-      <span class="acts"><button type="button" data-a="edit">Editar</button><button type="button" data-a="del" class="icon" title="Mover a la papelera">✕</button></span>`;
+      <span class="acts"><button type="button" data-a="edit">Editar</button><button type="button" data-a="del" class="icon" title="Mover a la papelera">${icon('trash', 14)}</button></span>`;
     row.addEventListener('click', async (e) => {
       const act = e.target.closest('[data-a]')?.dataset.a;
       if (act === 'edit') openAgentForm(a);
@@ -1621,7 +1622,7 @@ function renderConnect(bridge) {
     $('button', row).onclick = () => {
       $('#skills').close();
       newCard('term', 'shell', { cwd: null, title: `${on ? 'Desconectar' : 'Conectar'} ${PROVIDERS[key].label}`, startCmd: bridge.commands[key][on ? 'remove' : 'add'] });
-      toast(on ? 'Desconectando…' : 'Conectando… Reinicia (↻) los agentes que ya estaban abiertos para que vean la conexión.', 5000);
+      toast(on ? 'Desconectando…' : 'Conectando… Reinicia los agentes que ya estaban abiertos para que vean la conexión.', 5000);
     };
     box.appendChild(row);
   }
@@ -1797,7 +1798,7 @@ function agentRow(key, a) {
     <input name="resumeArgs" value="${esc(a.resumeArgs)}" placeholder="args al reanudar" ${key === 'shell' ? 'disabled' : ''}/>
     <input name="lightArgs" value="${esc(a.lightArgs || '')}" placeholder="args ligero (!)" title="Tareas marcadas con ! (modelo más barato)" ${key === 'shell' ? 'disabled' : ''}/>
     <input name="heavyArgs" value="${esc(a.heavyArgs || '')}" placeholder="args potente (!!)" title="Tareas marcadas con !! (modelo más capaz)" ${key === 'shell' ? 'disabled' : ''}/>
-    ${builtin ? '<span></span>' : '<button type="button" class="card-btn" title="Eliminar">✕</button>'}`;
+    ${builtin ? '<span></span>' : `<button type="button" class="card-btn" title="Eliminar este agente personalizado">${icon('close', 13)}</button>`}`;
   row.querySelector('button')?.addEventListener('click', () => row.remove());
   return row;
 }
@@ -1807,7 +1808,7 @@ function projectRow(p) {
   row.className = 'project-row';
   row.dataset.path = p.path;
   row.innerHTML = `<input name="name" value="${esc(p.name)}" /><span class="path" title="${esc(p.path)}">${esc(p.path)}</span>
-    <button type="button" class="card-btn" title="Quitar de la lista">✕</button>`;
+    <button type="button" class="card-btn" title="Quitar el proyecto de la lista (no borra la carpeta)">${icon('close', 13)}</button>`;
   row.querySelector('button').addEventListener('click', () => row.remove());
   return row;
 }
@@ -1902,7 +1903,7 @@ function renderKeyRows() {
   box.innerHTML = sections.map((sec) => `<h3>${esc(sec)}</h3><div class="set-group">${shortcutDefs.filter((d) => d.section === sec).map((d) => {
     const key = d.id in draftKeys ? draftKeys[d.id] : d.key;
     const clash = key && used[key].length > 1;
-    return `<div class="set-row">${esc(d.label)}<span class="key-cell">${key !== d.key ? `<button type="button" class="card-btn" data-reset="${esc(d.id)}" title="Restaurar ${esc(prettyKey(d.key))}">↺</button>` : ''}
+    return `<div class="set-row">${esc(d.label)}<span class="key-cell">${key !== d.key ? `<button type="button" class="card-btn" data-reset="${esc(d.id)}" title="Restaurar ${esc(prettyKey(d.key))}">${icon('refresh', 13)}</button>` : ''}
       <button type="button" class="keycap ${clash ? 'clash' : ''}" data-key="${esc(d.id)}" title="${clash ? 'También lo usa: ' + esc(used[key].filter((l) => l !== d.label).join(', ')) : 'Clic para cambiar'}">${esc(prettyKey(key))}</button></span></div>`;
   }).join('')}</div>`).join('');
 }
