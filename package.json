@@ -1,7 +1,7 @@
 {
   "name": "agentboard",
   "productName": "AgentBoard",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Tablero infinito con terminales reales para Claude Code, Codex y Gemini CLI. Mac y Windows.",
   "author": "Sergio Cortés",
   "license": "MIT",
