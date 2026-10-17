@@ -8,7 +8,7 @@ Tablero infinito con **terminales reales** para correr Claude Code, Codex y Gemi
 - Notas en el mismo tablero.
 - **Panel de agentes** (⇧⌘A): todos tus agentes agrupados por proyecto, con su estado en vivo; clic para ir a la tarjeta.
 - **Minimapa** abajo a la derecha: clic o arrastra para moverte por el tablero.
-- **Menú ⋯ de cada tarjeta**: cambia nombre, agente, proyecto y argumentos (ej. `--model opus`) y reinicia; o duplícala.
+- **Menú de opciones de cada tarjeta** (tres puntos): cambia nombre, agente, proyecto y argumentos (ej. `--model opus`) y reinicia; o duplícala.
 - Al reabrir la app vuelven todas las tarjetas y cada agente se relanza con su comando de reanudar (`claude --continue`, `codex resume --last`).
 - No usa API keys ni manda nada a ningún servidor: corre los binarios que ya tienes en el PATH.
 - **App de escritorio con ícono**: `npm run app` la instala en Aplicaciones (Mac) o genera el instalador (Windows). Se abre con un clic desde Launchpad, Spotlight, el Dock o el menú inicio.
@@ -64,12 +64,12 @@ nuevo botón de exportar
 - **Varias a la vez**: *En paralelo* (total) y *por suscripción*. Con *Ejecutar la cola* activo, cada tarea pendiente arranca sola cuando hay cupo.
 - **Worktree por tarea** (opcional): cada tarea trabaja en `.agentboard/worktrees/<tarea>` en su propia rama `agentboard/<tarea>`, así los agentes no se pisan en el mismo repo. Al terminar, **Ver cambios** muestra lo que hizo y te deja **Fusionar** (commitea lo pendiente, hace merge en tu rama actual y borra el worktree; si hay conflictos no toca nada) o **Descartar**.
 - Cada tarea corre en una **sesión nueva** y se marca sola: *Hecho* cuando el agente escribe `HECHO: …` (o llama `complete_task`), *Necesita revisión* si queda esperando (permiso, pregunta), *Bloqueado* con `BLOQUEADO: …`.
-- La primera vez que un CLI abre una carpeta (o un worktree nuevo) puede preguntar si confías en ella: la tarea queda en *Necesita revisión* hasta que respondas en su tarjeta (⤢ te lleva ahí), y luego sigue sola.
+- La primera vez que un CLI abre una carpeta (o un worktree nuevo) puede preguntar si confías en ella: la tarea queda en *Necesita revisión* hasta que respondas en su tarjeta (el botón "Ir a la tarjeta" te lleva ahí), y luego sigue sola.
 - Los agentes conectados también pueden usar la lista: `list_tasks`, `add_task` (repartir trabajo a otras suscripciones) y `complete_task`.
 
 ## Varias cuentas de Claude
 
-¿Tienes más de una suscripción de Claude (personal y del trabajo, o dos planes)? **Suscripciones → Cuentas de Claude → ＋ Agregar cuenta**. Cada cuenta usa su propia carpeta (`~/.claude-<nombre>`, vía `CLAUDE_CONFIG_DIR`) con su login, historial y skills; inicias sesión una vez en la tarjeta que se abre (`/login`). Desde ahí aparece en la barra y en "auto": la cola reparte entre tus cuentas y, si una llega a su límite, sigue con la otra.
+¿Tienes más de una suscripción de Claude (personal y del trabajo, o dos planes)? **Suscripciones → Cuentas de Claude → Agregar cuenta**. Cada cuenta usa su propia carpeta (`~/.claude-<nombre>`, vía `CLAUDE_CONFIG_DIR`) con su login, historial y skills; inicias sesión una vez en la tarjeta que se abre (`/login`). Desde ahí aparece en la barra y en "auto": la cola reparte entre tus cuentas y, si una llega a su límite, sigue con la otra.
 
 ## Más rápido
 
@@ -80,7 +80,7 @@ nuevo botón de exportar
 
 ## Grupos y diagrama
 
-- **Grupo** (⇧⌘G): un marco en el tablero para un equipo de agentes (ej. *backend*, *frontend*). Las tarjetas cuyo centro queda dentro son del grupo; al mover el marco se mueven con él. ⋯ para nombre, color o ajustarlo a sus tarjetas. **Ordenar** respeta los grupos.
+- **Grupo** (⇧⌘G): un marco en el tablero para un equipo de agentes (ej. *backend*, *frontend*). Las tarjetas cuyo centro queda dentro son del grupo; al mover el marco se mueven con él. El menú de opciones (tres puntos) cambia nombre, color o ajustarlo a sus tarjetas. **Ordenar** respeta los grupos.
 - **Diagrama** (⇧⌘D): vista tipo UML de componentes: un paquete por **proyecto**, dentro sus **grupos**, y en cada uno los **agentes** con su suscripción, tarea, estado, tiempo trabajando, rama git y última línea de salida; notas con la **cola** de tareas pendientes; y flechas de quién le pasó trabajo a quién. Pestañas para ver un proyecto o todos.
 
 ## ¿Mis suscripciones quedan guardadas al cerrar?
@@ -104,7 +104,7 @@ Y por diseño: una sesión nueva por tarea, modo ligero por tarea, reparto entre
 
 ## Agentes y modelos
 
-Botón **Agentes y modelos** (o **＋** en la barra de abajo):
+Botón **Agentes y modelos** (o el botón **+** de la barra de abajo):
 
 - **Suscripciones y CLIs**: Claude Code, Codex, Gemini CLI, Copilot CLI, Cursor CLI, Qwen Code, OpenCode, Aider y Amp. Muestra cuáles están instalados y, para Claude, Codex y Gemini, si hay sesión iniciada. Desde ahí puedes instalarlos, iniciar sesión o agregarlos a la barra de abajo.
 - **Modelos locales**: detecta [Ollama](https://ollama.com) (puerto 11434) y el servidor de [LM Studio](https://lmstudio.ai) (puerto 1234), lista tus modelos y los abre como chat (`ollama run`), con Codex (`codex --oss -m <modelo>`) o con Aider. También puedes encender Ollama y descargar modelos (`ollama pull`).
@@ -125,9 +125,9 @@ Botón **Skills y agentes**:
   - `read_agent_output`: leer lo que respondió.
   - `start_agent`: abrir un agente nuevo (ej. un Codex en el mismo proyecto) con una tarea.
 
-  Ejemplo, en Claude: *"pregúntale a Codex qué opina de este diff y resume sus comentarios"*. Reinicia (↻) los agentes que ya estaban abiertos después de conectar.
+  Ejemplo, en Claude: *"pregúntale a Codex qué opina de este diff y resume sus comentarios"*. Reinicia los agentes que ya estaban abiertos después de conectar.
 
-**Pasar a…** (menú ⋯ de una tarjeta): envía la selección o las últimas líneas de un agente a otro, o a uno nuevo, con una instrucción.
+**Pasar a…** (menú de opciones de una tarjeta): envía la selección o las últimas líneas de un agente a otro, o a uno nuevo, con una instrucción.
 
 **Seguridad del puente**: es un socket local (o named pipe en Windows) con un token aleatorio en `bridge.json`, ambos solo legibles por tu usuario, y se borran al cerrar la app. Solo se puede escribir a tarjetas que corren un agente, nunca a una terminal normal; cada tarjeta puede desactivar "Otros agentes pueden escribirle"; hay un límite de mensajes por minuto.
 
@@ -201,7 +201,7 @@ o en **Configuración → General → Shell** pon `cmd.exe`.
 | Copiar / pegar en terminal | ⌘C / ⌘V | Ctrl+C con selección / Ctrl+V (o Ctrl+Shift+C/V) |
 | Configuración | ⌘, | Ctrl+, |
 
-- Doble clic en el título: renombrar. Doble clic en la cabecera: enfocar la tarjeta. **⋯** para editar o duplicar.
+- Doble clic en el título: renombrar. Doble clic en la cabecera: enfocar la tarjeta. El menú de opciones (tres puntos) sirve para editar o duplicar.
 - El proyecto seleccionado arriba es donde se abre el próximo agente.
 - **Configuración** permite cambiar comandos y args (ej. `claude --model opus`), agregar agentes personalizados (cualquier CLI: `aider`, `opencode`, `ollama run qwen3`…), cambiar el shell y la fuente.
 
@@ -253,5 +253,5 @@ scripts/agentboard-mcp.js   servidor MCP que registran los CLIs para hablar entr
 ## Limitaciones conocidas
 
 - "Trabajando / esperando" se estima por la salida reciente de la terminal, no por la API del agente.
-- Si no hay sesión previa, el comando de reanudar puede fallar; la tarjeta queda en un shell normal y basta con ↻ Reiniciar.
+- Si no hay sesión previa, el comando de reanudar puede fallar; la tarjeta queda en un shell normal y basta con Reiniciar.
 - El tablero no se sincroniza entre computadores (es intencional). Para copiar uno, copia el `board.json`.
