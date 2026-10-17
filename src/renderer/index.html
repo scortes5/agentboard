@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:" />
+  <title>AgentBoard</title>
+  <link rel="stylesheet" href="../../node_modules/@xterm/xterm/css/xterm.css" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header id="topbar">
+    <div class="brand">
+      <span class="logo">◆</span>
+      <span>AgentBoard</span>
+      <span id="machine" class="machine" title="Este tablero es solo de este computador"></span>
+    </div>
+
+    <div class="group">
+      <label class="lbl" for="project">Proyecto</label>
+      <select id="project"></select>
+      <button id="addProject" class="ghost" title="Agregar carpeta de proyecto">＋</button>
+    </div>
+
+    <div class="group" id="agentButtons"><!-- botones generados --></div>
+
+    <div class="group right">
+      <button id="addNote" class="ghost" title="Nueva nota (⇧⌘N / Ctrl+Shift+N)">✎ Nota</button>
+      <button id="arrange" class="ghost" title="Ordenar tarjetas">▦</button>
+      <button id="fit" class="ghost" title="Ver todo">⤢</button>
+      <span id="zoomLabel" class="zoom">100%</span>
+      <button id="settingsBtn" class="ghost" title="Ajustes">⚙</button>
+    </div>
+  </header>
+
+  <main id="board">
+    <div id="world"></div>
+    <div id="empty" class="empty hidden">
+      <h2>Tablero vacío</h2>
+      <p>Elige un proyecto arriba y abre un agente.<br/>
+        <kbd>⇧⌘1</kbd> Claude · <kbd>⇧⌘2</kbd> Codex · <kbd>⇧⌘3</kbd> Gemini · <kbd>⇧⌘4</kbd> Terminal
+        <span class="muted">(Ctrl+Shift en Windows)</span></p>
+      <p class="muted">Arrastra el fondo para moverte · ⌘/Ctrl + rueda para zoom</p>
+    </div>
+  </main>
+
+  <!-- Ajustes -->
+  <dialog id="settings">
+    <form method="dialog" id="settingsForm">
+      <h2>Ajustes de este computador</h2>
+      <label>Nombre de la máquina <input name="machineName" /></label>
+      <label>Shell <input name="shell" placeholder="Automático (zsh / PowerShell)" />
+        <small>Ej: <code>pwsh</code>, <code>/bin/bash -l</code>, <code>cmd.exe</code></small></label>
+      <label>Tamaño de fuente <input name="fontSize" type="number" min="9" max="24" /></label>
+      <label class="check"><input name="resumeOnOpen" type="checkbox" /> Reanudar la sesión del agente al reabrir la app</label>
+
+      <h3>Agentes</h3>
+      <div id="agentRows"></div>
+      <button type="button" id="addAgent" class="ghost">＋ Agente personalizado</button>
+
+      <h3>Proyectos guardados</h3>
+      <div id="projectRows"></div>
+
+      <p class="muted small">Config guardada en <code id="cfgPath"></code>
+        <a href="#" id="revealCfg">Mostrar</a></p>
+
+      <div class="actions">
+        <button value="cancel" class="ghost">Cancelar</button>
+        <button value="ok" id="saveSettings" class="primary">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="../../node_modules/@xterm/xterm/lib/xterm.js"></script>
+  <script src="../../node_modules/@xterm/addon-fit/lib/addon-fit.js"></script>
+  <script src="../../node_modules/@xterm/addon-web-links/lib/addon-web-links.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

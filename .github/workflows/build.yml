@@ -1,0 +1,31 @@
+# Genera los instaladores en GitHub (Mac .dmg y Windows .exe).
+# Se ejecuta al crear un tag v* (ej: git tag v0.1.0 && git push --tags) o a mano desde Actions.
+name: build
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx electron-builder --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: agentboard-${{ matrix.os }}
+          path: |
+            dist/*.dmg
+            dist/*.exe
