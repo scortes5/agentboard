@@ -32,6 +32,7 @@ nuevo botón de exportar
 - **Varias a la vez**: *En paralelo* (total) y *por suscripción*. Con *Ejecutar la cola* activo, cada tarea pendiente arranca sola cuando hay cupo.
 - **Worktree por tarea** (opcional): cada tarea trabaja en `.agentboard/worktrees/<tarea>` en su propia rama `agentboard/<tarea>`, así los agentes no se pisan en el mismo repo.
 - Cada tarea corre en una **sesión nueva** y se marca sola: *Hecho* cuando el agente escribe `HECHO: …` (o llama `complete_task`), *Necesita revisión* si queda esperando (permiso, pregunta), *Bloqueado* con `BLOQUEADO: …`.
+- La primera vez que un CLI abre una carpeta (o un worktree nuevo) puede preguntar si confías en ella: la tarea queda en *Necesita revisión* hasta que respondas en su tarjeta (⤢ te lleva ahí), y luego sigue sola.
 - Los agentes conectados también pueden usar la lista: `list_tasks`, `add_task` (repartir trabajo a otras suscripciones) y `complete_task`.
 
 ## Grupos y diagrama

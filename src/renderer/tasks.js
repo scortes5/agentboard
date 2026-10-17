@@ -127,7 +127,8 @@ function findMarker(c) {
   const lines = terminalTail(c, 30).split('\n').reverse();
   for (const line of lines) {
     const m = line.match(/(?:^|[\s●⏺•>*✦│])(HECHO|BLOQUEADO):\s*(.+?)\s*$/);
-    if (!m || m[2].startsWith('…') || m[2].includes('»') || m[2].length < 3) continue;
+    // el eco de nuestra propia instrucción dice «HECHO: …»: se ignora por el "…"
+    if (!m || m[2].startsWith('…') || m[2].length < 3) continue;
     return { status: m[1] === 'HECHO' ? 'hecho' : 'bloqueado', text: m[2].slice(0, 300) };
   }
   return null;
