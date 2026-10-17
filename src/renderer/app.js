@@ -29,10 +29,12 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 
 let saveTimer = null;
 function save() {
+  syncGroups();
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => ab.saveConfig(cfg), 400);
 }
 function saveNow() {
+  syncGroups();
   clearTimeout(saveTimer);
   return ab.saveConfig(cfg);
 }
@@ -53,8 +55,8 @@ function paintBackground() {
 // Zona del tablero que no tapan la barra, el dock ni el panel (los paneles flotan encima).
 function visibleRect() {
   const r = board.getBoundingClientRect();
-  const left = cfg.sidebarOpen ? 276 : 0, top = 68, bottom = 72;
-  return { left, top, width: r.width - left, height: r.height - top - bottom };
+  const left = cfg.sidebarOpen ? 276 : 0, top = 68, bottom = 72, right = cfg.tasksOpen ? 372 : 0;
+  return { left, top, width: r.width - left - right, height: r.height - top - bottom };
 }
 
 function applyViewport() {
@@ -121,17 +123,33 @@ function focusCardView(c) {
   applyViewport(); save();
 }
 
-function arrange() {
-  const n = cfg.cards.length;
-  if (!n) return;
-  const cols = Math.ceil(Math.sqrt(n));
+// Ordena en grilla. Con grupos: cada grupo ordena sus tarjetas adentro y se ajusta
+// a ellas; los grupos van en fila y las tarjetas sueltas debajo.
+function gridLayout(cards, x0, y0, cols) {
   const gap = 28;
-  const colW = Math.max(...cfg.cards.map((c) => c.w));
-  const rowH = Math.max(...cfg.cards.map((c) => c.h));
-  cfg.cards.forEach((c, i) => {
-    c.x = (i % cols) * (colW + gap);
-    c.y = Math.floor(i / cols) * (rowH + gap);
-  });
+  const colW = Math.max(...cards.map((c) => c.w)), rowH = Math.max(...cards.map((c) => c.h));
+  cards.forEach((c, i) => { c.x = x0 + (i % cols) * (colW + gap); c.y = y0 + Math.floor(i / cols) * (rowH + gap); });
+  return { w: Math.min(cols, cards.length) * (colW + gap) - gap, h: Math.ceil(cards.length / cols) * (rowH + gap) - gap };
+}
+
+function arrange() {
+  const groups = cfg.cards.filter((c) => c.type === 'group');
+  const items = cfg.cards.filter((c) => c.type !== 'group');
+  if (!items.length && !groups.length) return;
+  syncGroups();
+  let x = 0, maxH = 0;
+  for (const g of groups) {
+    const members = items.filter((c) => c.groupId === g.id);
+    const pad = 24, head = 18;
+    g.x = x; g.y = 0;
+    if (members.length) {
+      const size = gridLayout(members, x + pad, head + 6, Math.ceil(Math.sqrt(members.length)));
+      g.w = size.w + pad * 2; g.h = size.h + head + 6 + pad;
+    }
+    x += g.w + 60; maxH = Math.max(maxH, g.h);
+  }
+  const loose = items.filter((c) => !groups.length || !c.groupId);
+  if (loose.length) gridLayout(loose, 0, groups.length ? maxH + 90 : 0, Math.ceil(Math.sqrt(loose.length)));
   fitAll();
 }
 
@@ -164,11 +182,12 @@ function newCard(type, agentKey, opts = {}) {
   const r = { width: v.left * 2 + v.width, height: v.top * 2 + v.height }; // centro del área visible
   const vp = cfg.viewport;
   const offset = (cfg.cards.length % 8) * 30;
-  const w = opts.w || (type === 'note' ? 360 : DEFAULT_W), h = opts.h || (type === 'note' ? 280 : DEFAULT_H);
+  const w = opts.w || (type === 'note' ? 360 : type === 'group' ? DEFAULT_W * 2 + 76 : DEFAULT_W);
+  const h = opts.h || (type === 'note' ? 280 : type === 'group' ? DEFAULT_H + 76 : DEFAULT_H);
   const c = {
     id: uid(), type, agent: agentKey || 'shell',
     cwd: type === 'term' ? ('cwd' in opts ? opts.cwd : cfg.selectedProject) : null,
-    title: opts.title || (type === 'note' ? 'Nota' : (cfg.agents[agentKey] || cfg.agents.shell).label),
+    title: opts.title || (type === 'note' ? 'Nota' : type === 'group' ? 'Grupo' : (cfg.agents[agentKey] || cfg.agents.shell).label),
     args: opts.args || '',
     env: opts.env || null,
     startCmd: opts.startCmd || '',
@@ -176,9 +195,13 @@ function newCard(type, agentKey, opts = {}) {
     y: opts.y ?? (r.height / 2 - vp.y) / vp.zoom - h / 2 + offset,
     w, h, text: opts.text || '',
   };
+  if (type === 'group') c.color = opts.color || GROUP_COLORS[cfg.cards.filter((x) => x.type === 'group').length % GROUP_COLORS.length];
+  if (type === 'term' && isClaude(cfg.agents[c.agent])) c.sessionId = newSessionId();
+  if (opts.prompt) c.prompt = opts.prompt;
+  if (opts.taskId) c.taskId = opts.taskId;
   cfg.cards.push(c);
   mountCard(c, { resume: false });
-  focusCard(c.id);
+  if (!opts.noFocus) focusCard(c.id);
   save();
   updateEmpty();
   renderSidebar();
@@ -193,6 +216,9 @@ function duplicateCard(c) {
 }
 
 function mountCard(c, { resume }) {
+  if (c.type === 'group') return mountGroup(c);
+  // Sin "reanudar al abrir": cada tarjeta de Claude parte una sesión nueva
+  if (resume && !cfg.resumeOnOpen && c.sessionId) { c.sessionId = newSessionId(); c.sessionUsed = false; }
   const agent = agentOf(c);
   const el = document.createElement('div');
   el.className = 'card' + (c.type === 'note' ? ' note-card' : '');
@@ -259,12 +285,48 @@ function mountCard(c, { resume }) {
   wireCard(c, el);
 }
 
+// ---------- Comando de cada tarjeta ----------
+// Cada tarjeta de Claude tiene su propio id de sesión: al reabrir la app o reiniciar
+// la tarjeta vuelve a SU conversación (--resume <id>), aunque haya varios Claude en
+// el mismo proyecto. Las demás usan su "args al reanudar" (ej. codex resume --last).
+const isClaude = (a) => !!a && /(^|[\\/])claude(\.cmd|\.exe)?$/i.test((a.command || '').trim().split(/\s+/)[0] || '');
+function newSessionId() {
+  if (crypto.randomUUID) return crypto.randomUUID();
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  b[6] = (b[6] & 0x0f) | 0x40; b[8] = (b[8] & 0x3f) | 0x80;
+  const h = [...b].map((x) => x.toString(16).padStart(2, '0')).join('');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+const usesPowerShell = () => platform === 'win32' && (!cfg.shell || /pwsh|powershell/i.test(cfg.shell));
+const usesCmd = () => platform === 'win32' && /(^|\\)cmd(\.exe)?(\s|$)/i.test(cfg.shell || '');
+function shellQuote(s) {
+  if (usesPowerShell()) return "'" + s.replace(/'/g, "''") + "'";
+  return "'" + s.replace(/'/g, "'\\''") + "'";
+}
+function orElse(a, b) { return usesPowerShell() ? `${a}; if (-not $?) { ${b} }` : `${a} || ${b}`; }
+// Cómo recibe un agente la tarea inicial: como argumento (no depende de cuándo
+// termina de arrancar la TUI) o pegada en la terminal (CLIs desconocidos, cmd.exe).
+function promptMode(a) {
+  if (usesCmd()) return 'paste';
+  return a.taskPrompt || ({ claude: 'arg', codex: 'arg', gemini: '-i' })[(a.command || '').trim().split(/\s+/)[0]] || 'paste';
+}
+
 function commandFor(c, resume) {
   if (c.startCmd) return resume ? '' : c.startCmd; // ej. tarjeta de login: no se repite al reabrir
   const a = agentOf(c);
   if (!a.command) return '';
-  const args = [c.args, resume && cfg.resumeOnOpen ? a.resumeArgs : ''].filter(Boolean).join(' ');
-  return args ? `${a.command} ${args}` : a.command;
+  const session = c.sessionId && isClaude(a);
+  const parts = [a.command, c.args];
+  if (session) parts.push(c.sessionUsed ? `--resume ${c.sessionId}` : `--session-id ${c.sessionId}`);
+  else if (resume && cfg.resumeOnOpen) parts.push(a.resumeArgs);
+  const mode = promptMode(a);
+  if (c.prompt && !c.promptSent && mode !== 'paste') {
+    parts.push((mode === 'arg' ? '' : mode + ' ') + shellQuote(c.prompt.replace(/\s*\n\s*/g, ' ').trim()));
+  }
+  const cmd = parts.filter(Boolean).join(' ');
+  // si la sesión guardada ya no existe (nunca se escribió nada), abre una nueva con el mismo id
+  if (session && c.sessionUsed) return orElse(cmd, [a.command, c.args, `--session-id ${c.sessionId}`].filter(Boolean).join(' '));
+  return cmd;
 }
 
 async function startPty(c, resume) {
@@ -272,11 +334,35 @@ async function startPty(c, resume) {
   if (!rt) return;
   try { rt.fit.fit(); } catch {}
   $('.overlay', rt.el)?.remove();
-  const res = await ab.ptyCreate({ id: c.id, cwd: c.cwd, command: commandFor(c, resume), env: c.env || undefined, cols: rt.term.cols, rows: rt.term.rows });
+  const command = commandFor(c, resume);
+  const res = await ab.ptyCreate({ id: c.id, cwd: c.cwd, command, env: c.env || undefined, cols: rt.term.cols, rows: rt.term.rows });
   if (!res.ok) { showOverlay(c, res.error); return; }
   rt.alive = true;
   rt.lastData = Date.now();
   if (focusedId === c.id) rt.term.focus();
+  let dirty = false;
+  if (c.sessionId && !c.sessionUsed && isClaude(agentOf(c))) { c.sessionUsed = true; dirty = true; }
+  if (c.prompt && !c.promptSent) {
+    c.promptSent = true; dirty = true;
+    if (promptMode(agentOf(c)) === 'paste') {
+      await waitReady(c.id);
+      await ab.ptyPaste(c.id, c.prompt);
+    }
+  }
+  if (dirty) save();
+}
+
+// Espera a que el CLI termine de arrancar: salida y luego ~1,5 s de silencio.
+async function waitReady(id, maxMs = 20000) {
+  await waitAlive(id);
+  const t0 = Date.now();
+  await new Promise((r) => setTimeout(r, 2500));
+  while (Date.now() - t0 < maxMs) {
+    const rt = runtime.get(id);
+    if (!rt) return;
+    if (Date.now() - rt.lastData > 1500) return;
+    await new Promise((r) => setTimeout(r, 250));
+  }
 }
 
 function restartCard(c) {
@@ -302,7 +388,7 @@ function showOverlay(c, msg) {
 function closeCard(c) {
   const rt = runtime.get(c.id);
   if (rt?.alive && !confirm(`¿Cerrar "${c.title}"? Se terminará el proceso.`)) return;
-  ab.ptyKill(c.id);
+  if (c.type !== 'group') ab.ptyKill(c.id);
   rt?.term?.dispose();
   rt?.el.remove();
   runtime.delete(c.id);
@@ -361,7 +447,7 @@ function wireCard(c, el) {
       c.y = start.cy + (ev.clientY - start.y) / cfg.viewport.zoom;
       layoutCard(c);
     };
-    const up = () => { head.removeEventListener('pointermove', move); head.removeEventListener('pointerup', up); save(); focusCard(c.id); };
+    const up = () => { head.removeEventListener('pointermove', move); head.removeEventListener('pointerup', up); save(); renderSidebar(); focusCard(c.id); };
     head.addEventListener('pointermove', move);
     head.addEventListener('pointerup', up);
   });
@@ -415,6 +501,197 @@ function wireCard(c, el) {
   });
 }
 
+// ---------- Grupos (secciones del tablero) ----------
+// Un grupo es un marco detrás de las tarjetas. Una tarjeta pertenece al grupo que
+// contiene su centro; al mover el marco se mueven sus tarjetas.
+const GROUP_COLORS = ['#ff6b3d', '#6c9cf5', '#3fbf8f', '#c49cf0', '#e7b05a', '#5fd0c8', '#f06a8a'];
+const groupsList = () => cfg.cards.filter((c) => c.type === 'group');
+const centerIn = (c, g) => { const x = c.x + c.w / 2, y = c.y + c.h / 2; return x >= g.x && x <= g.x + g.w && y >= g.y && y <= g.y + g.h; };
+function groupAt(c) {
+  let best = null;
+  for (const g of groupsList()) if (centerIn(c, g) && (!best || g.w * g.h < best.w * best.h)) best = g;
+  return best;
+}
+const membersOf = (g) => cfg.cards.filter((c) => c.type !== 'group' && c.groupId === g.id);
+function syncGroups() {
+  if (!cfg) return;
+  for (const c of cfg.cards) if (c.type !== 'group') c.groupId = groupAt(c)?.id || null;
+}
+function groupName(c) { const g = c.groupId && cardData(c.groupId); return g ? g.title : ''; }
+
+// Proyecto al que pertenece una ruta (los worktrees de tareas cuentan como su proyecto).
+function projectOfPath(p) {
+  if (!p) return '';
+  const norm = (x) => x.replace(/[\\/]+$/, '');
+  let best = null;
+  for (const pr of cfg.projects) {
+    const root = norm(pr.path);
+    if ((p === root || p.startsWith(root + '/') || p.startsWith(root + '\\')) && (!best || root.length > best.length)) best = root;
+  }
+  return best ? cfg.projects.find((x) => norm(x.path) === best).path : p;
+}
+
+function newGroup(opts = {}) {
+  const n = groupsList().length + 1;
+  return newCard('group', null, { title: opts.title || `Grupo ${n}`, noFocus: true, ...opts });
+}
+
+// Busca un grupo por nombre o lo crea a la derecha de todo lo que hay.
+function ensureGroup(name) {
+  const g = groupsList().find((x) => x.title.toLowerCase() === name.toLowerCase());
+  if (g) return g;
+  const right = cfg.cards.length ? Math.max(...cfg.cards.map((c) => c.x + c.w)) + 80 : 0;
+  const top = cfg.cards.length ? Math.min(...cfg.cards.map((c) => c.y)) : 0;
+  return newGroup({ title: name, x: right, y: top });
+}
+
+// Lugar para una tarjeta suelta que no caiga dentro de un grupo.
+function looseSpot(w = DEFAULT_W, h = DEFAULT_H) {
+  const groups = groupsList();
+  if (!groups.length) return {};
+  const others = cfg.cards.filter((c) => c.type !== 'group' && !c.groupId);
+  const y = Math.max(...groups.map((g) => g.y + g.h)) + 90;
+  const x0 = Math.min(...groups.map((g) => g.x));
+  const x = others.filter((c) => c.y >= y - 1).reduce((m, c) => Math.max(m, c.x + c.w + 28), x0);
+  return { x, y };
+}
+
+// Primer hueco libre dentro del grupo; si no cabe, el grupo crece hacia abajo.
+function slotIn(g, w = DEFAULT_W, h = DEFAULT_H) {
+  const pad = 24, head = 24, gap = 24;
+  const cols = Math.max(1, Math.floor((g.w - pad * 2 + gap) / (w + gap)));
+  const members = membersOf(g);
+  const overlaps = (x, y) => members.some((m) => x < m.x + m.w && x + w > m.x && y < m.y + m.h && y + h > m.y);
+  for (let i = 0; i < 200; i++) {
+    const x = g.x + pad + (i % cols) * (w + gap), y = g.y + head + Math.floor(i / cols) * (h + gap);
+    if (overlaps(x, y)) continue;
+    if (y + h + pad > g.y + g.h) { g.h = y + h + pad - g.y; layoutCard(g); }
+    return { x, y };
+  }
+  return { x: g.x + pad, y: g.y + head };
+}
+
+function mountGroup(c) {
+  const el = document.createElement('div');
+  el.className = 'frame';
+  el.style.setProperty('--gcolor', c.color || GROUP_COLORS[0]);
+  el.style.zIndex = 0;
+  el.innerHTML = `
+    <div class="frame-head">
+      <span class="frame-title">${esc(c.title)}</span>
+      <span class="frame-meta"></span>
+      <span class="spacer"></span>
+      <button class="card-btn" data-act="task" title="Nueva tarea para este grupo">＋ Tarea</button>
+      <button class="card-btn" data-act="edit" title="Editar grupo">⋯</button>
+      <button class="card-btn" data-act="close" title="Quitar el grupo (las tarjetas se quedan)">✕</button>
+    </div>
+    <div class="resize"></div>`;
+  world.prepend(el);
+  runtime.set(c.id, { el, metaEl: $('.frame-meta', el) });
+  layoutCard(c);
+  wireGroup(c, el);
+}
+
+function wireGroup(c, el) {
+  const head = $('.frame-head', el);
+  const titleEl = $('.frame-title', el);
+  head.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0 || e.target.closest('button') || titleEl.isContentEditable) return;
+    e.preventDefault();
+    syncGroups();
+    const members = membersOf(c).map((m) => ({ m, x: m.x, y: m.y }));
+    const start = { x: e.clientX, y: e.clientY, cx: c.x, cy: c.y };
+    head.setPointerCapture(e.pointerId);
+    const move = (ev) => {
+      const dx = (ev.clientX - start.x) / cfg.viewport.zoom, dy = (ev.clientY - start.y) / cfg.viewport.zoom;
+      c.x = start.cx + dx; c.y = start.cy + dy; layoutCard(c);
+      for (const o of members) { o.m.x = o.x + dx; o.m.y = o.y + dy; layoutCard(o.m); }
+    };
+    const up = () => { head.removeEventListener('pointermove', move); head.removeEventListener('pointerup', up); save(); renderSidebar(); };
+    head.addEventListener('pointermove', move);
+    head.addEventListener('pointerup', up);
+  });
+  titleEl.addEventListener('dblclick', () => {
+    titleEl.contentEditable = 'true'; titleEl.focus(); document.getSelection().selectAllChildren(titleEl);
+  });
+  titleEl.addEventListener('blur', () => {
+    titleEl.contentEditable = 'false';
+    c.title = titleEl.textContent.trim() || c.title; titleEl.textContent = c.title;
+    save(); renderSidebar();
+  });
+  titleEl.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); titleEl.blur(); } });
+  const handle = $('.resize', el);
+  handle.addEventListener('pointerdown', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    const start = { x: e.clientX, y: e.clientY, w: c.w, h: c.h };
+    handle.setPointerCapture(e.pointerId);
+    const move = (ev) => {
+      c.w = Math.max(320, start.w + (ev.clientX - start.x) / cfg.viewport.zoom);
+      c.h = Math.max(200, start.h + (ev.clientY - start.y) / cfg.viewport.zoom);
+      layoutCard(c);
+    };
+    const up = () => { handle.removeEventListener('pointermove', move); handle.removeEventListener('pointerup', up); save(); renderSidebar(); };
+    handle.addEventListener('pointermove', move);
+    handle.addEventListener('pointerup', up);
+  });
+  el.addEventListener('click', (e) => {
+    const act = e.target.closest('[data-act]')?.dataset.act;
+    if (act === 'close') closeCard(c);
+    else if (act === 'edit') groupMenu(c, e.target.closest('button'));
+    else if (act === 'task') openTasks(`#${c.title.replace(/\s+/g, '-')} `);
+  });
+}
+
+function groupMenu(c, anchor) {
+  closePopover();
+  const pop = document.createElement('div');
+  pop.className = 'popover edit';
+  pop.innerHTML = `
+    <label>Nombre <input name="title" value="${esc(c.title)}" /></label>
+    <label>Color <div class="swatches">${GROUP_COLORS.map((col) => `<button type="button" data-col="${col}" class="${col === c.color ? 'on' : ''}" style="background:${col}"></button>`).join('')}</div></label>
+    <div class="hint">Las tarjetas cuyo centro queda dentro del marco son del grupo. Escribe <code>#${esc(c.title.replace(/\s+/g, '-'))}</code> en una tarea para que su agente se abra aquí.</div>
+    <div class="row"><button data-x="fit">Ajustar a sus tarjetas</button><button data-x="ok" class="primary">Aplicar</button></div>`;
+  openPopover(pop, anchor, 290);
+  let color = c.color;
+  pop.addEventListener('click', (e) => {
+    const col = e.target.closest('[data-col]')?.dataset.col;
+    if (col) { color = col; pop.querySelectorAll('[data-col]').forEach((b) => b.classList.toggle('on', b.dataset.col === col)); return; }
+    const x = e.target.closest('[data-x]')?.dataset.x;
+    if (x === 'fit') {
+      const m = membersOf(c);
+      if (m.length) {
+        const pad = 24, head = 24;
+        const x0 = Math.min(...m.map((q) => q.x)), y0 = Math.min(...m.map((q) => q.y));
+        const x1 = Math.max(...m.map((q) => q.x + q.w)), y1 = Math.max(...m.map((q) => q.y + q.h));
+        Object.assign(c, { x: x0 - pad, y: y0 - head, w: x1 - x0 + pad * 2, h: y1 - y0 + head + pad });
+      }
+    }
+    if (x === 'ok' || x === 'fit') {
+      c.title = $('[name=title]', pop).value.trim() || c.title;
+      c.color = color;
+      const rt = runtime.get(c.id);
+      $('.frame-title', rt.el).textContent = c.title;
+      rt.el.style.setProperty('--gcolor', c.color);
+      layoutCard(c); closePopover(); save(); renderSidebar();
+    }
+  });
+  $('[name=title]', pop).focus();
+}
+
+function updateGroupMeta() {
+  for (const g of groupsList()) {
+    const rt = runtime.get(g.id);
+    if (!rt) continue;
+    const m = membersOf(g).filter((c) => c.type === 'term');
+    const busy = m.filter((c) => runtime.get(c.id)?.status === 'busy').length;
+    const queued = (cfg.tasks || []).filter((t) => t.status === 'pendiente' && t.group && t.group.toLowerCase() === g.title.toLowerCase()).length;
+    const txt = m.length ? `${m.length} agente${m.length === 1 ? '' : 's'}${busy ? ` · ${busy} trabajando` : ''}` : 'vacío';
+    const full = queued ? `${txt} · ${queued} en cola` : txt;
+    if (rt.metaEl.textContent !== full) rt.metaEl.textContent = full;
+    rt.el.classList.toggle('busy', busy > 0);
+  }
+}
+
 // ---------- Datos de los PTY ----------
 ab.onPtyData((id, data) => {
   const rt = runtime.get(id);
@@ -435,6 +712,7 @@ ab.onPtyExit((id, code) => {
 
 // Estado: trabajando / esperando / terminado + aviso cuando un agente termina
 setInterval(() => {
+  if (!cfg) return;
   const now = Date.now();
   for (const c of cfg.cards) {
     const rt = runtime.get(c.id);
@@ -453,15 +731,19 @@ setInterval(() => {
       try { new Notification(`${c.title} terminó`, { body: basename(c.cwd), silent: false }); } catch {}
     }
   }
+  updateGroupMeta();
   updateSideCounts();
   drawMinimap();
 }, 500);
 
 // ---------- Git ----------
+const gitCache = {}; // cwd -> último estado (lo usa también el diagrama)
 async function refreshGit() {
+  if (!cfg) return;
   const cwds = [...new Set(cfg.cards.filter((c) => c.type === 'term').map((c) => c.cwd))];
   const results = {};
   await Promise.all(cwds.map(async (cwd) => { results[cwd] = await ab.gitStatus(cwd); }));
+  Object.assign(gitCache, results);
   for (const c of cfg.cards) {
     const rt = runtime.get(c.id);
     if (!rt || !rt.gitEl) continue;
@@ -623,7 +905,10 @@ function editMenu(c, anchor) {
       if (restart) {
         // si tenía el nombre por defecto, sigue al nuevo agente
         if (title === agentOf(c).label && d.agent !== c.agent) title = cfg.agents[d.agent].label;
+        const newSession = d.agent !== c.agent || d.cwd !== c.cwd;
         Object.assign(c, d, { startCmd: '' });
+        if (!isClaude(agentOf(c))) { delete c.sessionId; delete c.sessionUsed; }
+        else if (newSession || !c.sessionId) { c.sessionId = newSessionId(); c.sessionUsed = false; }
       }
       if (field('bridge')) c.bridge = field('bridge').checked;
     }
@@ -675,9 +960,10 @@ function renderSidebar() {
 
   const groups = new Map();
   for (const c of cfg.cards) {
+    if (c.type === 'group') continue;
     const a = agentOf(c);
-    if (q && !`${c.title} ${a.label} ${c.cwd || ''}`.toLowerCase().includes(q)) continue;
-    const key = c.type === 'note' ? NOTES_KEY : (c.cwd || '');
+    if (q && !`${c.title} ${a.label} ${c.cwd || ''} ${groupName(c)}`.toLowerCase().includes(q)) continue;
+    const key = c.type === 'note' ? NOTES_KEY : projectOfPath(c.cwd);
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(c);
   }
@@ -688,15 +974,26 @@ function renderSidebar() {
   }
 
   const projName = (p) => cfg.projects.find((x) => x.path === p)?.name || basename(p) || 'Carpeta personal';
-  const entries = [...groups].sort(([a], [b]) => (a === NOTES_KEY) - (b === NOTES_KEY));
+  const projOrder = (p) => { const i = cfg.projects.findIndex((x) => x.path === p); return i < 0 ? 999 : i; };
+  const entries = [...groups].sort(([a], [b]) => (a === NOTES_KEY) - (b === NOTES_KEY) || projOrder(a) - projOrder(b));
   for (const [key, cards] of entries) {
     const h = document.createElement('div');
     h.className = 'side-group';
     h.textContent = key === NOTES_KEY ? 'Notas' : projName(key);
     if (key !== NOTES_KEY) h.title = key || 'Carpeta personal';
     list.appendChild(h);
+    cards.sort((x, y) => groupName(x).localeCompare(groupName(y)));
+    let lastGroup = null;
     for (const c of cards) {
       const a = agentOf(c);
+      const gname = groupName(c);
+      if (gname !== lastGroup && (gname || lastGroup)) {
+        const sub = document.createElement('div');
+        sub.className = 'side-sub';
+        sub.textContent = gname ? '▢ ' + gname : 'Sin grupo';
+        list.appendChild(sub);
+      }
+      lastGroup = gname;
       const st = runtime.get(c.id)?.status || '';
       const b = document.createElement('button');
       b.className = 'side-item';
@@ -765,6 +1062,11 @@ function drawMinimap() {
   mctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   mctx.clearRect(0, 0, W, H);
   for (const c of cfg.cards) {
+    if (c.type === 'group') {
+      mctx.globalAlpha = 0.7; mctx.strokeStyle = c.color || '#ff6b3d'; mctx.lineWidth = 1;
+      mctx.strokeRect(t.ox + c.x * t.s + 0.5, t.oy + c.y * t.s + 0.5, c.w * t.s, c.h * t.s);
+      continue;
+    }
     const st = runtime.get(c.id)?.status;
     mctx.globalAlpha = c.id === focusedId ? 1 : st === 'dead' ? 0.3 : 0.65;
     mctx.fillStyle = c.type === 'note' ? '#d29922' : agentOf(c).color;
@@ -1033,8 +1335,10 @@ function handoffMenu(c, anchor) {
       await ab.ptyPaste(target.id, text);
       ping(target.id);
       toast(`${esc(c.title)} <b>→</b> ${esc(target.title)}`);
+      addLink(c.id, target.id, 'pasó contexto');
     } else {
       const target = newCard('term', to.slice(4), { cwd: c.cwd, x: c.x + c.w + 28, y: c.y });
+      addLink(c.id, target.id, 'pasó contexto');
       toast(`Abriendo ${esc(target.title)} y enviándole el contexto…`);
       await waitAlive(target.id);
       await new Promise((r) => setTimeout(r, 3500)); // que el CLI termine de arrancar
@@ -1091,7 +1395,26 @@ async function refreshSkills() {
   const [items, defs, bridge, avail] = await Promise.all([ab.skillsScan(), ab.agentsList(), ab.bridgeStatus(), ab.checkAgents()]);
   skillItems = items; agentDefs = defs; agentAvailable = avail;
   renderSkillList(); renderAgentDefs(); renderConnect(bridge);
+  renderPack(await ab.packStatus());
 }
+
+// Skills de ahorro de tokens incluidas con AgentBoard
+function renderPack(pack) {
+  const label = { ok: 'instalada', old: 'desactualizada' };
+  $('#packRows').innerHTML = pack.map((p) => `
+    <div class="hub-row skill">
+      <span class="dot" style="background:var(--accent);color:var(--accent)"></span>
+      <div class="meta"><strong>${esc(p.name)}</strong><span class="desc">${esc(p.description)}</span></div>
+      <div class="acts">${Object.keys(PROVIDERS).map((k) => `<span class="badge ${p.installed[k] === 'ok' ? 'ok' : 'no'}" title="${esc(PROVIDERS[k].label)}">${esc(PROVIDERS[k].label)}: ${label[p.installed[k]] || 'no'}</span>`).join('')}</div>
+      <span></span>
+    </div>`).join('') || '<div class="empty-note">No encontré la carpeta skills-pack.</div>';
+}
+$('#packInstall').onclick = async () => {
+  const r = await ab.packInstall(Object.keys(PROVIDERS));
+  if (!r.ok) return toast(`No pude instalar: ${esc(r.error)}`);
+  toast(`Skills de ahorro instaladas (${r.value.length}). Reinicia (↻) los agentes abiertos para que las vean.`, 5000);
+  renderPack(await ab.packStatus());
+};
 
 function renderSkillList() {
   const count = (p) => skillItems.filter((x) => p === 'all' || x.provider === p).length;
@@ -1305,6 +1628,9 @@ function updateEmpty() { $('#empty').classList.toggle('hidden', cfg.cards.length
 $('#project').addEventListener('change', (e) => { cfg.selectedProject = e.target.value || null; save(); });
 $('#addProject').onclick = addProject;
 $('#addNote').onclick = () => newCard('note');
+$('#addGroup').onclick = () => newGroup();
+$('#tasksBtn').onclick = () => toggleTasks();
+$('#diagramBtn').onclick = () => toggleDiagram();
 $('#arrange').onclick = arrange;
 $('#fit').onclick = fitAll;
 $('#settingsBtn').onclick = openSettings;
@@ -1313,6 +1639,7 @@ ab.onMenu((action) => {
   if (action.startsWith('new:')) {
     const k = action.slice(4);
     if (k === 'note') newCard('note');
+    else if (k === 'group') newGroup();
     else if (cfg.agents[k]) newCard('term', k);
   } else if (action === 'arrange') arrange();
   else if (action === 'fit') fitAll();
@@ -1322,6 +1649,8 @@ ab.onMenu((action) => {
   else if (action === 'sidebar') toggleSidebar();
   else if (action === 'accounts') openAccounts();
   else if (action === 'skills') openSkills();
+  else if (action === 'tasks') toggleTasks();
+  else if (action === 'diagram') toggleDiagram();
 });
 
 // ---------- Ajustes ----------
@@ -1335,6 +1664,7 @@ function agentRow(key, a) {
     <input name="label" value="${esc(a.label)}" placeholder="Nombre" />
     <input name="command" value="${esc(a.command)}" placeholder="${key === 'shell' ? '(solo shell)' : 'comando'}" ${key === 'shell' ? 'disabled' : ''}/>
     <input name="resumeArgs" value="${esc(a.resumeArgs)}" placeholder="args al reanudar" ${key === 'shell' ? 'disabled' : ''}/>
+    <input name="lightArgs" value="${esc(a.lightArgs || '')}" placeholder="args modo ligero" title="Se usan en tareas marcadas como ligeras (modelo más barato)" ${key === 'shell' ? 'disabled' : ''}/>
     ${builtin ? '<span></span>' : '<button type="button" class="card-btn" title="Eliminar">✕</button>'}`;
   row.querySelector('button')?.addEventListener('click', () => row.remove());
   return row;
@@ -1357,6 +1687,7 @@ async function openSettings() {
   f.shell.value = cfg.shell;
   f.fontSize.value = cfg.fontSize;
   f.resumeOnOpen.checked = cfg.resumeOnOpen;
+  f.keepRunning.checked = cfg.keepRunning !== false;
   const rows = $('#agentRows'); rows.innerHTML = '';
   for (const [k, a] of Object.entries(cfg.agents)) rows.appendChild(agentRow(k, a));
   const prow = $('#projectRows'); prow.innerHTML = '';
@@ -1377,14 +1708,14 @@ $('#settings').addEventListener('close', async () => {
   cfg.shell = f.shell.value.trim();
   cfg.fontSize = clamp(+f.fontSize.value || 13, 9, 24);
   cfg.resumeOnOpen = f.resumeOnOpen.checked;
+  cfg.keepRunning = f.keepRunning.checked;
 
   const agents = {};
   for (const row of document.querySelectorAll('#agentRows .agent-row')) {
     const get = (n) => row.querySelector(`[name=${n}]`).value.trim();
     const key = row.dataset.key;
     if (key !== 'shell' && !get('command')) continue;
-    agents[key] = { label: get('label') || get('command') || key, command: key === 'shell' ? '' : get('command'), resumeArgs: key === 'shell' ? '' : get('resumeArgs'), color: get('color') };
-    if (cfg.agents[key]?.hidden) agents[key].hidden = true;
+    agents[key] = { ...(cfg.agents[key] || {}), label: get('label') || get('command') || key, command: key === 'shell' ? '' : get('command'), resumeArgs: key === 'shell' ? '' : get('resumeArgs'), lightArgs: key === 'shell' ? '' : get('lightArgs'), color: get('color') };
   }
   if (!agents.shell) agents.shell = { label: 'Terminal', command: '', resumeArgs: '', color: '#8a8f98' };
   cfg.agents = agents;
@@ -1406,6 +1737,8 @@ $('#settings').addEventListener('close', async () => {
 // ---------- Arranque ----------
 (async function init() {
   const res = await ab.loadConfig();
+  // tasks.js y diagram.js se cargan después de este archivo
+  if (document.readyState === 'loading') await new Promise((r) => document.addEventListener('DOMContentLoaded', r, { once: true }));
   cfg = res.config;
   platform = res.platform;
   document.body.classList.toggle('mac', isMac());
@@ -1420,10 +1753,13 @@ $('#settings').addEventListener('close', async () => {
   if (!isMac()) $('#empty').innerHTML = $('#empty').innerHTML.replace(/⇧⌘/g, 'Ctrl+Shift+');
 
   document.body.classList.toggle('sidebar-open', !!cfg.sidebarOpen);
-  for (const c of cfg.cards) mountCard(c, { resume: true });
+  // los grupos primero: quedan detrás de las tarjetas
+  for (const c of [...cfg.cards].sort((a, b) => (b.type === 'group') - (a.type === 'group'))) mountCard(c, { resume: true });
   applyViewport();
   updateEmpty();
   renderSidebar();
+  initTasks();
+  initDiagram();
   refreshGit();
   if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission();
 })();

@@ -1,7 +1,7 @@
 {
   "name": "agentboard",
   "productName": "AgentBoard",
-  "version": "0.0.2",
+  "version": "0.1.0",
   "description": "Tablero infinito con terminales reales para Claude Code, Codex y Gemini CLI. Mac y Windows.",
   "author": "Sergio Cortés",
   "license": "MIT",
@@ -10,9 +10,12 @@
   "scripts": {
     "start": "electron .",
     "check": "node scripts/check-agents.js",
+    "app": "node scripts/install-app.js",
+    "icon": "python3 scripts/make-icon.py",
     "dist": "electron-builder",
     "dist:mac": "electron-builder --mac",
-    "dist:win": "electron-builder --win"
+    "dist:win": "electron-builder --win",
+    "postinstall": "node scripts/fix-pty.js"
   },
   "dependencies": {
     "@xterm/addon-fit": "^0.11.0",
@@ -29,11 +32,13 @@
     "appId": "cl.scortes.agentboard",
     "productName": "AgentBoard",
     "directories": {
-      "output": "dist"
+      "output": "dist",
+      "buildResources": "build"
     },
     "files": [
       "src/**/*",
       "scripts/agentboard-mcp.js",
+      "skills-pack/**/*",
       "package.json",
       "node_modules/**/*"
     ],
@@ -53,7 +58,8 @@
         }
       ],
       "category": "public.app-category.developer-tools",
-      "identity": null
+      "identity": null,
+      "icon": "build/icon.icns"
     },
     "win": {
       "target": [
@@ -63,7 +69,8 @@
             "x64"
           ]
         }
-      ]
+      ],
+      "icon": "build/icon.ico"
     },
     "nsis": {
       "oneClick": false,

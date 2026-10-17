@@ -8,7 +8,7 @@ const net = require('net');
 const os = require('os');
 const path = require('path');
 
-const VERSION = '0.0.2';
+const VERSION = '0.1.0';
 
 function dataDir() {
   if (process.env.AGENTBOARD_DATA) return process.env.AGENTBOARD_DATA;
@@ -83,6 +83,39 @@ const TOOLS = [
         message: { type: 'string', description: 'Tarea inicial (opcional).' },
       },
       required: ['agent_type'],
+    },
+  },
+  {
+    name: 'list_tasks',
+    description: 'Lista las tareas (ToDo) del usuario en AgentBoard: texto, estado (pendiente/en_curso/revisar/hecho/bloqueado), agente asignado y proyecto.',
+    inputSchema: { type: 'object', properties: { status: { type: 'string', description: 'Filtrar por estado (opcional).' } } },
+  },
+  {
+    name: 'add_task',
+    description: 'Agrega una tarea a la cola del usuario. AgentBoard la ejecuta en una sesión nueva con la suscripción indicada (o la menos ocupada con "auto"), en paralelo con otras. Úsalo para repartir trabajo independiente entre Claude, Codex y Gemini.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        text: { type: 'string', description: 'Instrucción autocontenida: qué hacer, en qué archivos y cómo saber que está listo.' },
+        agent: { type: 'string', description: '"auto" (por defecto), "claude", "codex", "gemini" u otro configurado.' },
+        project: { type: 'string', description: 'Nombre del proyecto (opcional; por defecto el del agente que llama).' },
+        group: { type: 'string', description: 'Grupo/sección del tablero donde ubicar al agente (opcional).' },
+        light: { type: 'boolean', description: 'true para tareas simples: usa el modelo barato de esa suscripción.' },
+      },
+      required: ['text'],
+    },
+  },
+  {
+    name: 'complete_task',
+    description: 'Marca como terminada la tarea de AgentBoard asignada a ti, con un resumen de una línea. Llámalo al terminar una tarea que te llegó desde la lista de AgentBoard.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        summary: { type: 'string', description: 'Qué hiciste, en una línea.' },
+        blocked: { type: 'boolean', description: 'true si no pudiste terminar y necesitas al usuario.' },
+        task_id: { type: 'string', description: 'Id de la tarea (opcional; por defecto la tuya).' },
+      },
+      required: ['summary'],
     },
   },
 ];

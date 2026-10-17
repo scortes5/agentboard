@@ -46,6 +46,7 @@ function parentPid(pid) {
  * deps: {
  *   dataDir, ptys: Map<id, IPty>, loadConfig(), notify(event),
  *   requestNewCard({ agent, cwd, title }) -> Promise<id|null>
+ *   askRenderer(kind, payload) -> Promise<any>   (tareas: las guarda la UI)
  * }
  */
 function createBridge(deps) {
@@ -68,6 +69,7 @@ function createBridge(deps) {
     lastData.set(id, Date.now());
   }
   function forget(id) { out.delete(id); lastData.delete(id); }
+  const busyIds = () => [...deps.ptys.keys()].filter((id) => Date.now() - (lastData.get(id) || 0) < 1500);
 
   // Pegado "bracketed": la TUI lo recibe como un bloque y no lo envía línea por línea.
   function paste(id, text) {
@@ -87,6 +89,8 @@ function createBridge(deps) {
       id: c.id, name: c.title, agent: agent.label || c.agent,
       project: proj ? proj.name : (c.cwd ? path.basename(c.cwd) : '~'),
       status: !alive ? 'terminado' : busy ? 'trabajando' : 'esperando',
+      group: cfg.cards.find((g) => g.type === 'group' && g.id === c.groupId)?.title || '',
+      task: (cfg.tasks || []).find((t) => t.cardId === c.id && t.status !== 'hecho')?.text || '',
       accepts_messages: canReceive(cfg, c),
     };
   }
@@ -183,6 +187,40 @@ function createBridge(deps) {
       }
       return `Abrí un agente ${cfg.agents[key].label} (id ${id}).${args.message ? ' Le envié la tarea.' : ''} Usa read_agent_output con ese id para seguir su avance.`;
     },
+
+    // ---- Lista de tareas (ToDo) del usuario ----
+    async list_tasks(args) {
+      const cfg = deps.loadConfig();
+      const want = String(args.status || '').toLowerCase();
+      const tasks = (cfg.tasks || []).filter((t) => !want || t.status === want).map((t) => ({
+        id: t.id, text: t.text.length > 300 ? t.text.slice(0, 300) + '…' : t.text, status: t.status,
+        agent: t.agent, project: cfg.projects.find((p) => p.path === t.cwd)?.name || (t.cwd ? path.basename(t.cwd) : ''),
+        group: t.group || '', card: t.cardId || null, summary: t.summary || '',
+      }));
+      return tasks.length ? JSON.stringify(tasks, null, 2) : 'No hay tareas.';
+    },
+
+    async add_task(args, ctx) {
+      const text = String(args.text || '').trim();
+      if (!text) throw new Error('La tarea está vacía.');
+      if (text.length > 8000) throw new Error('Tarea demasiado larga (máx. 8.000 caracteres).');
+      if (!rateOk(ctx.from || 'desconocido')) throw new Error('Demasiadas acciones seguidas; espera un minuto.');
+      const r = await deps.askRenderer('task-add', {
+        text, agent: args.agent ? String(args.agent) : 'auto', project: args.project ? String(args.project) : '',
+        group: args.group ? String(args.group).slice(0, 40) : '', light: !!args.light, from: ctx.from,
+      });
+      if (!r || r.error) throw new Error(r?.error || 'AgentBoard no respondió.');
+      return `Tarea agregada (id ${r.id}). Se ejecutará con ${r.agent} cuando haya un cupo libre.`;
+    },
+
+    async complete_task(args, ctx) {
+      const r = await deps.askRenderer('task-done', {
+        id: args.task_id ? String(args.task_id) : null, card: ctx.from,
+        summary: String(args.summary || '').slice(0, 500), blocked: !!args.blocked,
+      });
+      if (!r || r.error) throw new Error(r?.error || 'No encontré una tarea asignada a este agente.');
+      return `Tarea "${r.text.slice(0, 80)}" marcada como ${r.status}.`;
+    },
   };
 
   function handle(sock) {
@@ -231,7 +269,7 @@ function createBridge(deps) {
     if (!IS_WIN) { try { fs.unlinkSync(socketPath); } catch {} }
   }
 
-  return { start, stop, record, forget, paste, tools, readableTail };
+  return { start, stop, record, forget, paste, tools, readableTail, busyIds };
 }
 
 module.exports = { createBridge, readableTail, stripAnsi };

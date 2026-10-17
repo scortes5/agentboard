@@ -34,6 +34,14 @@ contextBridge.exposeInMainWorld('ab', {
   onBridgeEvent: (cb) => ipcRenderer.on('bridge:event', (_e, ev) => cb(ev)),
   onBridgeNewCard: (cb) => ipcRenderer.on('bridge:new-card', (_e, req) => cb(req)),
   bridgeCardCreated: (reqId, id) => ipcRenderer.send('bridge:card-created', reqId, id),
+  onBridgeAsk: (cb) => ipcRenderer.on('bridge:ask', (_e, req) => cb(req)),
+  bridgeAnswer: (reqId, value) => ipcRenderer.send('bridge:answer', reqId, value),
+
+  // Tareas, worktrees y skills de ahorro
+  planTasks: (text, opts) => ipcRenderer.invoke('tasks:plan', text, opts),
+  gitWorktree: (cwd, slug) => ipcRenderer.invoke('git:worktree', cwd, slug),
+  packStatus: () => ipcRenderer.invoke('pack:status'),
+  packInstall: (providers) => ipcRenderer.invoke('pack:install', providers),
   localModels: () => ipcRenderer.invoke('local:models'),
   pickFolder: () => ipcRenderer.invoke('dialog:pickFolder'),
   openPath: (p) => ipcRenderer.invoke('shell:openPath', p),

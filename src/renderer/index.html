@@ -34,6 +34,11 @@
       <button id="addProject" class="icon" title="Agregar carpeta de proyecto">＋</button>
     </div>
 
+    <div class="group">
+      <button id="tasksBtn" title="Tus tareas: escríbelas y se reparten entre tus suscripciones (⇧⌘T / Ctrl+Shift+T)">☑ Tareas <span id="tasksBadge" class="badge-n hidden"></span></button>
+      <button id="diagramBtn" title="Diagrama: qué hace cada grupo de agentes, por proyecto (⇧⌘D / Ctrl+Shift+D)">◇ Diagrama</button>
+    </div>
+
     <div class="group right">
       <button id="skillsBtn" title="Skills, tus agentes y la conexión entre agentes">Skills y agentes</button>
       <button id="accountsBtn" title="Suscripciones, CLIs y modelos locales">Suscripciones</button>
@@ -55,10 +60,55 @@
     <button id="moreAgents" class="chip ghost" title="Agregar agentes o modelos locales">＋</button>
     <span class="dock-sep"></span>
     <button id="addNote" class="chip ghost" title="Nueva nota (⇧⌘N / Ctrl+Shift+N)">✎ Nota</button>
+    <button id="addGroup" class="chip ghost" title="Nuevo grupo: una sección del tablero para un equipo de agentes (⇧⌘G / Ctrl+Shift+G)">▢ Grupo</button>
     <button id="arrange" class="chip ghost icon" title="Ordenar tarjetas (⇧⌘O)">▦</button>
     <button id="fit" class="chip ghost icon" title="Ver todo (⌘0)">⤢</button>
     <span id="zoomLabel" class="zoom">100%</span>
   </nav>
+
+  <aside id="tasks" class="glass">
+    <div class="side-head">
+      <span class="eyebrow">Tareas</span>
+      <span id="taskCounts" class="muted small"></span>
+      <span class="spacer"></span>
+      <button id="tasksClose" class="card-btn" title="Cerrar">✕</button>
+    </div>
+    <div class="task-opts">
+      <label class="switch" title="Las tareas pendientes se ejecutan solas cuando hay cupo"><input type="checkbox" id="taskAuto" /> Ejecutar la cola</label>
+      <label class="num" title="Tareas corriendo a la vez, entre todas las suscripciones">En paralelo <input id="taskParallel" type="number" min="1" max="12" /></label>
+      <label class="num" title="Máximo por suscripción">por suscripción <input id="taskPerAgent" type="number" min="1" max="6" /></label>
+      <label class="switch" title="Cada tarea trabaja en su propio git worktree y rama (agentboard/…): los agentes no se pisan"><input type="checkbox" id="taskWorktree" /> Worktree por tarea</label>
+    </div>
+    <div class="task-auto"><span class="muted small">"auto" reparte entre:</span> <span id="taskAutoAgents" class="seg"></span></div>
+    <div id="taskFilter" class="seg task-filter">
+      <button data-f="active" class="active">Activas</button><button data-f="all">Todas</button><button data-f="done">Hechas</button>
+      <span class="spacer"></span><button id="taskClear" class="ghost" title="Quitar las tareas hechas">Limpiar hechas</button>
+    </div>
+    <div id="taskList"></div>
+    <div class="composer">
+      <textarea id="taskInput" rows="3" placeholder="Escribe tus pendientes, uno por línea. Enter agrega · Shift+Enter nueva línea&#10;@codex @claude @gemini  ·  #grupo  ·  +proyecto  ·  ! = ligero"></textarea>
+      <div class="composer-row">
+        <select id="taskAgent" title="Suscripción"></select>
+        <select id="taskProject" title="Proyecto"></select>
+        <label class="switch" title="Modelo barato de esa suscripción"><input type="checkbox" id="taskLight" /> Ligero</label>
+        <span class="spacer"></span>
+        <button id="taskPlan" class="ghost" title="Claude (haiku, una llamada corta) divide tu texto en tareas y sugiere a quién dárselas">✨ Dividir</button>
+        <button id="taskAdd" class="primary">Agregar</button>
+      </div>
+    </div>
+  </aside>
+
+  <section id="diagram" class="hidden">
+    <div class="dg-bar glass">
+      <span class="eyebrow">Diagrama</span>
+      <div id="dgTabs" class="seg"></div>
+      <span class="spacer"></span>
+      <label class="switch"><input type="checkbox" id="dgShowTasks" checked /> Colas de tareas</label>
+      <label class="switch"><input type="checkbox" id="dgShowIdle" checked /> Agentes inactivos</label>
+      <button id="dgClose">Volver al tablero</button>
+    </div>
+    <div id="dgCanvas"><svg id="dgEdges"></svg><div id="dgContent"></div></div>
+  </section>
 
   <canvas id="minimap" class="glass" width="200" height="130" title="Clic o arrastra para moverte"></canvas>
   <div id="toasts"></div>
@@ -73,6 +123,8 @@
         <small>Ej: <code>pwsh</code>, <code>/bin/bash -l</code>, <code>cmd.exe</code></small></label>
       <label>Tamaño de fuente <input name="fontSize" type="number" min="9" max="24" /></label>
       <label class="check"><input name="resumeOnOpen" type="checkbox" /> Reanudar la sesión del agente al reabrir la app</label>
+      <label class="check"><input name="keepRunning" type="checkbox" /> Al cerrar la ventana, seguir en segundo plano (los agentes siguen trabajando)</label>
+      <small>Tus suscripciones quedan con la sesión iniciada aunque cierres la app: cada CLI guarda su login en este computador. Lo que se detiene al salir son los procesos; al reabrir se reanudan.</small>
 
       <h3>Agentes</h3>
       <div id="agentRows"></div>
@@ -121,6 +173,7 @@
         <button type="button" data-tab="skills" class="active">Skills</button>
         <button type="button" data-tab="agents">Mis agentes</button>
         <button type="button" data-tab="connect">Conexión entre agentes</button>
+        <button type="button" data-tab="saving">Ahorro de tokens</button>
       </div>
 
       <section data-pane="skills">
@@ -168,6 +221,21 @@
         <div id="boardAgentRows" class="rows"></div>
       </section>
 
+      <section data-pane="saving" class="hidden">
+        <p class="muted small">Skills incluidas con AgentBoard para que cada suscripción gaste menos tokens y contexto.
+          Se instalan como <code>SKILL.md</code> en la carpeta de skills de cada CLI; puedes editarlas o borrarlas cuando quieras.</p>
+        <div id="packRows" class="rows"></div>
+        <div class="row-end"><button type="button" id="packInstall" class="primary">Instalar / actualizar en todas</button></div>
+        <h3>Qué más hace AgentBoard para ahorrar</h3>
+        <ul class="tips">
+          <li><b>Una sesión nueva por tarea</b>: cada ToDo parte con contexto limpio, sin arrastrar conversaciones largas.</li>
+          <li><b>Modo ligero</b> (<code>!</code> en la tarea): usa el modelo barato de esa suscripción (<code>--model haiku</code>, razonamiento bajo en Codex, Flash en Gemini). Se edita en Ajustes → Agentes.</li>
+          <li><b>Dividir con IA</b> usa <code>claude -p --model haiku --tools ""</code>: una sola llamada corta, sin herramientas (prompt de sistema mínimo), sin terminal ni leer el repo.</li>
+          <li><b>Reparto entre suscripciones</b>: "auto" manda cada tarea a la suscripción con menos trabajo, así no agotas el límite de una sola.</li>
+          <li><b>Traspasos compactos</b>: "Pasar a…" y <code>send_to_agent</code> envían un resumen, no el historial.</li>
+        </ul>
+      </section>
+
       <div class="actions">
         <button type="button" id="skillsRefresh" class="ghost">↻ Revisar</button>
         <button value="ok" class="primary">Listo</button>
@@ -179,5 +247,7 @@
   <script src="../../node_modules/@xterm/addon-fit/lib/addon-fit.js"></script>
   <script src="../../node_modules/@xterm/addon-web-links/lib/addon-web-links.js"></script>
   <script src="app.js"></script>
+  <script src="tasks.js"></script>
+  <script src="diagram.js"></script>
 </body>
 </html>

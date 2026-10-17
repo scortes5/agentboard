@@ -7,6 +7,9 @@ on:
     tags: ['v*']
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     strategy:
@@ -27,5 +30,12 @@ jobs:
         with:
           name: agentboard-${{ matrix.os }}
           path: |
+            dist/*.dmg
+            dist/*.exe
+      - name: Publicar en el Release del tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
             dist/*.dmg
             dist/*.exe
