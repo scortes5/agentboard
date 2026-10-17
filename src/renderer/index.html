@@ -88,13 +88,13 @@
     </div>
     <div id="taskList"></div>
     <div class="composer">
-      <textarea id="taskInput" rows="3" placeholder="Escribe tus pendientes, uno por línea. Enter agrega · Shift+Enter nueva línea&#10;@claude @codex  ·  #grupo  ·  +proyecto  ·  ! ligero  ·  !! potente"></textarea>
+      <textarea id="taskInput" rows="3" placeholder="Un pendiente por línea · Enter agrega&#10;@claude  #grupo  +proyecto  ! ligero  !! potente"></textarea>
       <div class="composer-row">
         <select id="taskAgent" title="Suscripción"></select>
         <select id="taskProject" title="Proyecto"></select>
-        <label class="switch" title="Modelo barato de esa suscripción"><input type="checkbox" id="taskLight" /> Ligero</label>
+        <label class="switch" title="Modelo barato de esa suscripción"><input type="checkbox" id="taskLight" /> !</label>
         <span class="spacer"></span>
-        <button id="taskPlan" class="ghost" title="Claude (haiku, una llamada corta) divide tu texto en tareas y sugiere a quién dárselas">✨ Dividir</button>
+        <button id="taskPlan" class="ghost" title="Claude (haiku, una llamada corta) divide tu texto en tareas y sugiere a quién dárselas">✨</button>
         <button id="taskAdd" class="primary">Agregar</button>
       </div>
     </div>

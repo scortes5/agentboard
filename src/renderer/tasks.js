@@ -449,9 +449,9 @@ async function planWithAI() {
   const text = input.value.trim();
   if (!text) return toast('Escribe tus pendientes primero; Claude (haiku) los divide en tareas.');
   const btn = $('#taskPlan');
-  btn.disabled = true; btn.textContent = '✨ Dividiendo…';
+  btn.disabled = true; btn.textContent = '…';
   const r = await ab.planTasks(text, { agents: subscriptions().map(([k]) => k), projects: cfg.projects.map((p) => p.name) });
-  btn.disabled = false; btn.textContent = '✨ Dividir';
+  btn.disabled = false; btn.textContent = '✨';
   if (!r.ok) return toast(`No pude dividir con Claude: ${esc(r.error)}`, 6000);
   const d = composerDefaults();
   for (const x of r.value) {

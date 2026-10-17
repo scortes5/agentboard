@@ -385,7 +385,8 @@ body.tasks-open #dock { max-width: calc(100% - 700px); }
 #taskInput { width: 100%; resize: none; background: var(--fill); border: none; box-shadow: inset 0 0 0 1px var(--line-hi); border-radius: 10px; padding: 9px 11px; color: var(--text); font: 12.5px/1.5 var(--font-ui); outline: none; }
 #taskInput:focus { box-shadow: inset 0 0 0 1px var(--accent); }
 .composer-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.composer-row select { max-width: 104px; font-size: 12px; padding: 4px 7px; }
+.composer-row { flex-wrap: nowrap; }
+.composer-row select { max-width: 92px; min-width: 0; font-size: 12px; padding: 4px 6px; }
 .composer-row button { padding: 5px 9px; }
 
 /* ---------- Diagrama ---------- */
