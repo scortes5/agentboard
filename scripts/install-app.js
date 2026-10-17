@@ -34,7 +34,7 @@ if (process.platform === 'darwin') {
   const exe = fs.readdirSync(path.join(ROOT, 'dist')).find((f) => /^AgentBoard Setup .*\.exe$/.test(f));
   if (!exe) { console.error('No encontré el instalador en dist/'); process.exit(1); }
   console.log(`\n✓ Instalador listo: dist\\${exe}. Abriéndolo…`);
-  execFileSync('cmd.exe', ['/c', 'start', '""', path.join(ROOT, 'dist', exe)]);
+  execFileSync(path.join(ROOT, 'dist', exe), [], { stdio: 'inherit', windowsHide: true });
 } else {
   run('npx electron-builder --linux AppImage --publish never');
 }
