@@ -27,13 +27,26 @@ nuevo botón de exportar
 
 - `@claude` `@codex` `@gemini` elige la suscripción; sin `@` es **auto**: va a la suscripción con menos tareas corriendo (eliges cuáles participan).
 - `#grupo` abre al agente dentro de ese grupo del tablero (lo crea si no existe). Una línea con solo `#grupo` o `@agente` aplica a las siguientes.
-- `+proyecto` elige el proyecto. `!` = **modo ligero** (modelo barato de esa suscripción).
+- `+proyecto` elige el proyecto. `!` = **modo ligero** (modelo barato, ej. haiku) y `!!` = **modo potente** (ej. opus). Se editan en Ajustes → Agentes.
+- **▲** sube una tarea al primer lugar de la cola. **⧉ Resumen** copia en Markdown lo hecho hoy y lo pendiente (para una daily, un correo o un commit).
+- **Límite de uso**: si una suscripción avisa que llegó a su límite ("usage limit reached… resets 5pm"), la tarea vuelve a la cola y la toma otra suscripción; la agotada no recibe tareas hasta la hora de renovación (se ve tachada en "auto reparte entre").
+- **Confiar y seguir**: si el CLI pregunta si confías en la carpeta, la tarea lo muestra con un botón que responde por ti.
 - **✨ Dividir**: pega un texto libre y Claude (haiku, una llamada corta y sin herramientas) lo separa en tareas y sugiere a quién dárselas.
 - **Varias a la vez**: *En paralelo* (total) y *por suscripción*. Con *Ejecutar la cola* activo, cada tarea pendiente arranca sola cuando hay cupo.
-- **Worktree por tarea** (opcional): cada tarea trabaja en `.agentboard/worktrees/<tarea>` en su propia rama `agentboard/<tarea>`, así los agentes no se pisan en el mismo repo.
+- **Worktree por tarea** (opcional): cada tarea trabaja en `.agentboard/worktrees/<tarea>` en su propia rama `agentboard/<tarea>`, así los agentes no se pisan en el mismo repo. Al terminar, **±** muestra sus cambios y te deja **Fusionar** (commitea lo pendiente, hace merge en tu rama actual y borra el worktree; si hay conflictos no toca nada) o **Descartar**.
 - Cada tarea corre en una **sesión nueva** y se marca sola: *Hecho* cuando el agente escribe `HECHO: …` (o llama `complete_task`), *Necesita revisión* si queda esperando (permiso, pregunta), *Bloqueado* con `BLOQUEADO: …`.
 - La primera vez que un CLI abre una carpeta (o un worktree nuevo) puede preguntar si confías en ella: la tarea queda en *Necesita revisión* hasta que respondas en su tarjeta (⤢ te lleva ahí), y luego sigue sola.
 - Los agentes conectados también pueden usar la lista: `list_tasks`, `add_task` (repartir trabajo a otras suscripciones) y `complete_task`.
+
+## Varias cuentas de Claude
+
+¿Tienes más de una suscripción de Claude (personal y del trabajo, o dos planes)? **Suscripciones → Cuentas de Claude → ＋ Agregar cuenta**. Cada cuenta usa su propia carpeta (`~/.claude-<nombre>`, vía `CLAUDE_CONFIG_DIR`) con su login, historial y skills; inicias sesión una vez en la tarjeta que se abre (`/login`). Desde ahí aparece en la barra y en "auto": la cola reparte entre tus cuentas y, si una llega a su límite, sigue con la otra.
+
+## Más rápido
+
+- **Atajo global** `Control+Alt+Space` (configurable en Ajustes): desde cualquier app abre AgentBoard con el panel de Tareas listo para escribir.
+- **Paleta** ⇧⌘P / Ctrl+Shift+P (o ⌕ arriba): busca un agente, grupo o tarea y salta a él, ejecuta acciones, o escribe algo nuevo y Enter lo agrega como tarea.
+- **Insignia en el Dock** con las tareas que esperan tu revisión.
 
 ## Grupos y diagrama
 
@@ -146,6 +159,8 @@ o en **Ajustes → Shell** pon `cmd.exe`.
 | Nueva nota | ⇧⌘N | Ctrl+Shift+N |
 | Nuevo grupo | ⇧⌘G | Ctrl+Shift+G |
 | Tareas / Diagrama | ⇧⌘T / ⇧⌘D | Ctrl+Shift+T / Ctrl+Shift+D |
+| Paleta (buscar o ejecutar) | ⇧⌘P | Ctrl+Shift+P |
+| Anotar tarea desde cualquier app | ⌃⌥Espacio | Ctrl+Alt+Espacio |
 | Panel de agentes | ⇧⌘A | Ctrl+Shift+A |
 | Ver todo / ordenar | ⌘0 / ⇧⌘O | Ctrl+0 / Ctrl+Shift+O |
 | Zoom | ⌘ + rueda, pinch | Ctrl + rueda |
@@ -193,6 +208,7 @@ src/
     app.js          tablero: pan/zoom, tarjetas, grupos, xterm, git pill, ajustes
     tasks.js        lista de tareas: cola, reparto entre suscripciones, paralelo
     diagram.js      vista de diagrama por proyecto → grupo → agente
+    palette.js      paleta de comandos (⇧⌘P)
 skills-pack/        skills de ahorro de tokens que se instalan en cada CLI
 build/              íconos (icon.png / .icns / .ico), generados por scripts/make-icon.py
 scripts/check-agents.js     scripts/install-app.js (npm run app)     scripts/fix-pty.js (postinstall)

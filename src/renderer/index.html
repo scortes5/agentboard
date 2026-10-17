@@ -36,6 +36,7 @@
 
     <div class="group">
       <button id="tasksBtn" title="Tus tareas: escríbelas y se reparten entre tus suscripciones (⇧⌘T / Ctrl+Shift+T)">☑ Tareas <span id="tasksBadge" class="badge-n hidden"></span></button>
+      <button id="paletteBtn" class="icon" title="Buscar o ejecutar: agentes, tareas, acciones (⇧⌘P / Ctrl+Shift+P)">⌕</button>
       <button id="diagramBtn" title="Diagrama: qué hace cada grupo de agentes, por proyecto (⇧⌘D / Ctrl+Shift+D)">◇ Diagrama</button>
     </div>
 
@@ -82,11 +83,11 @@
     <div class="task-auto"><span class="muted small">"auto" reparte entre:</span> <span id="taskAutoAgents" class="seg"></span></div>
     <div id="taskFilter" class="seg task-filter">
       <button data-f="active" class="active">Activas</button><button data-f="all">Todas</button><button data-f="done">Hechas</button>
-      <span class="spacer"></span><button id="taskClear" class="ghost" title="Quitar las tareas hechas">Limpiar hechas</button>
+      <span class="spacer"></span><button id="taskSummary" class="ghost" title="Copia en Markdown lo hecho hoy y lo pendiente">⧉ Resumen</button><button id="taskClear" class="ghost" title="Quitar las tareas hechas">Limpiar</button>
     </div>
     <div id="taskList"></div>
     <div class="composer">
-      <textarea id="taskInput" rows="3" placeholder="Escribe tus pendientes, uno por línea. Enter agrega · Shift+Enter nueva línea&#10;@codex @claude @gemini  ·  #grupo  ·  +proyecto  ·  ! = ligero"></textarea>
+      <textarea id="taskInput" rows="3" placeholder="Escribe tus pendientes, uno por línea. Enter agrega · Shift+Enter nueva línea&#10;@claude @codex  ·  #grupo  ·  +proyecto  ·  ! ligero  ·  !! potente"></textarea>
       <div class="composer-row">
         <select id="taskAgent" title="Suscripción"></select>
         <select id="taskProject" title="Proyecto"></select>
@@ -97,6 +98,13 @@
       </div>
     </div>
   </aside>
+
+  <div id="palette" class="hidden">
+    <div class="pal glass">
+      <input id="palInput" placeholder="Busca un agente, una tarea o una acción…  (↑↓ Enter · Esc)" autocomplete="off" />
+      <div id="palList"></div>
+    </div>
+  </div>
 
   <section id="diagram" class="hidden">
     <div class="dg-bar glass">
@@ -114,7 +122,7 @@
   <div id="toasts"></div>
 
   <!-- Ajustes -->
-  <dialog id="settings">
+  <dialog id="settings" class="wide">
     <form method="dialog" id="settingsForm">
       <span class="eyebrow">Este computador</span>
       <h2>Ajustes</h2>
@@ -124,6 +132,8 @@
       <label>Tamaño de fuente <input name="fontSize" type="number" min="9" max="24" /></label>
       <label class="check"><input name="resumeOnOpen" type="checkbox" /> Reanudar la sesión del agente al reabrir la app</label>
       <label class="check"><input name="keepRunning" type="checkbox" /> Al cerrar la ventana, seguir en segundo plano (los agentes siguen trabajando)</label>
+      <label>Atajo global para anotar una tarea <input name="quickKey" placeholder="Control+Alt+Space (vacío = desactivado)" />
+        <small>Funciona desde cualquier app: abre AgentBoard con el panel de Tareas listo para escribir.</small></label>
       <small>Tus suscripciones quedan con la sesión iniciada aunque cierres la app: cada CLI guarda su login en este computador. Lo que se detiene al salir son los procesos; al reabrir se reanudan.</small>
 
       <h3>Agentes</h3>
@@ -153,6 +163,12 @@
 
       <h3>Suscripciones y CLIs</h3>
       <div id="catalogRows" class="rows"></div>
+
+      <h3>Cuentas de Claude</h3>
+      <p class="muted small">¿Tienes más de una suscripción de Claude (personal y del trabajo, o dos planes)? Agrégalas: cada una usa su propia carpeta y sesión,
+        y la cola de tareas reparte entre ellas — si una llega a su límite de uso, sigue con la otra.</p>
+      <div id="claudeAccounts" class="rows"></div>
+      <div class="pull-row"><input id="claudeAccountName" placeholder="Nombre de la cuenta (ej. Trabajo)" /><button type="button" id="addClaudeAccount">＋ Agregar cuenta</button></div>
 
       <h3>Modelos locales</h3>
       <div id="localRows" class="rows"></div>
@@ -249,5 +265,6 @@
   <script src="app.js"></script>
   <script src="tasks.js"></script>
   <script src="diagram.js"></script>
+  <script src="palette.js"></script>
 </body>
 </html>

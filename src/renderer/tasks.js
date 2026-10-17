@@ -2,7 +2,7 @@
 // Cada tarea corre en una sesión nueva de un agente (contexto limpio = menos tokens),
 // varias a la vez, y se marca sola cuando el agente avisa "HECHO:" o llama complete_task.
 'use strict';
-/* global ab, cfg, $, esc, uid, basename, clamp, isMac, runtime, cardData, agentOf, newCard, focusCardView, focusCard,
+/* global ab, cfg, $, esc, uid, basename, clamp, isMac, runtime, cardData, agentOf, newCard, focusCardView, focusCard, closeCard, closePopover, openPopover,
    ensureGroup, slotIn, looseSpot, terminalTail, toast, save, agentAvailable, visibleRect, applyViewport, drawMinimap, projectOfPath */
 
 const STATUS = {
@@ -37,16 +37,17 @@ function projectFrom(word) {
   return cfg.projects.find((p) => slug(p.name) === w || slug(basename(p.path)) === w) || null;
 }
 
-// "@codex arreglar login #backend +web !"  →  { text, agent, group, cwd, light }
+// "@codex arreglar login #backend +web !"  →  { text, agent, group, cwd, light, heavy }
 function parseLine(line, defaults) {
-  const t = { agent: defaults.agent, cwd: defaults.cwd, light: defaults.light, group: defaults.group || '' };
+  const t = { agent: defaults.agent, cwd: defaults.cwd, light: defaults.light, heavy: defaults.heavy, group: defaults.group || '' };
   const words = [];
   for (const w of line.trim().split(/\s+/)) {
     let m;
     if ((m = w.match(/^@([\w.-]+)$/)) && agentKeyFrom(m[1])) t.agent = agentKeyFrom(m[1]);
     else if ((m = w.match(/^#([\p{L}\p{N}_-]+)$/u))) t.group = m[1].replace(/-/g, ' ');
     else if ((m = w.match(/^\+([\p{L}\p{N}._-]+)$/u)) && projectFrom(m[1])) t.cwd = projectFrom(m[1]).path;
-    else if (w === '!' || /^!(ligero|light|rapido|rápido)$/i.test(w)) t.light = true;
+    else if (w === '!' || /^!(ligero|light|rapido|rápido)$/i.test(w)) { t.light = true; t.heavy = false; }
+    else if (w === '!!' || /^!(potente|heavy|fuerte)$/i.test(w)) { t.heavy = true; t.light = false; }
     else words.push(w);
   }
   t.text = words.join(' ').replace(/^[-*•]\s+|^\[\s?\]\s+|^\d+[.)]\s+/, '').trim();
@@ -56,7 +57,7 @@ function parseLine(line, defaults) {
 function addTask(fields) {
   const t = {
     id: uid(), text: fields.text, status: 'pendiente', agent: fields.agent || 'auto',
-    cwd: fields.cwd ?? cfg.selectedProject ?? null, group: fields.group || '', light: !!fields.light,
+    cwd: fields.cwd ?? cfg.selectedProject ?? null, group: fields.group || '', light: !!fields.light, heavy: !!fields.heavy && !fields.light,
     worktree: fields.worktree ?? null, from: fields.from || null, createdAt: Date.now(),
   };
   tasks().push(t);
@@ -67,12 +68,20 @@ function addTask(fields) {
 // ---------- Reparto ----------
 // Suscripción para una tarea: la elegida, o en "auto" la con menos tareas corriendo
 // (desempata la que lleva más tiempo sin recibir una). Respeta el cupo por suscripción.
+// Suscripciones que llegaron a su límite de uso: no reciben tareas hasta que se renueve.
+function exhaustedUntil(key) {
+  const until = cfg.exhausted?.[key];
+  if (!until) return 0;
+  if (Date.now() > until) { delete cfg.exhausted[key]; save(); return 0; }
+  return until;
+}
+
 function pickAgent(t) {
   const per = cfg.perAgentParallel || 2;
   if (t.agent && t.agent !== 'auto') {
-    return cfg.agents[t.agent]?.command && runningOf(t.agent) < per ? t.agent : null;
+    return cfg.agents[t.agent]?.command && runningOf(t.agent) < per && !exhaustedUntil(t.agent) ? t.agent : null;
   }
-  const cands = autoAgents().filter((k) => runningOf(k) < per);
+  const cands = autoAgents().filter((k) => runningOf(k) < per && !exhaustedUntil(k));
   if (!cands.length) return null;
   cands.sort((a, b) => runningOf(a) - runningOf(b) || (lastAssigned[a] || 0) - (lastAssigned[b] || 0));
   return cands[0];
@@ -101,7 +110,7 @@ async function startTask(t, key) {
   const pos = g ? slotIn(g) : looseSpot();
   const title = t.text.length > 34 ? t.text.slice(0, 32).trim() + '…' : t.text;
   const card = newCard('term', key, {
-    cwd, title, args: t.light ? (a.lightArgs || '') : '', prompt: taskPrompt(t), taskId: t.id, noFocus: true, ...pos,
+    cwd, title, args: t.light ? (a.lightArgs || '') : t.heavy ? (a.heavyArgs || '') : '', prompt: taskPrompt(t), taskId: t.id, noFocus: true, ...pos,
   });
   if (!card) { t.status = 'pendiente'; taskRt.delete(t.id); save(); renderTasks(); return; }
   t.cardId = card.id;
@@ -134,6 +143,45 @@ function findMarker(c) {
   return null;
 }
 
+// "Claude usage limit reached… resets 3pm", "You've hit your usage limit… try again in 2 hours"
+const LIMIT_RE = /(usage limit|limit reached|hit your (usage )?limit|rate limit exceeded|quota exceeded|out of (credits|quota))/i;
+function findLimit(c) {
+  const text = terminalTail(c, 20);
+  const line = text.split('\n').reverse().find((l) => LIMIT_RE.test(l) && /(reset|try again|vuelve|renew|in \d)/i.test(l));
+  if (!line) return null;
+  let until = Date.now() + 60 * 60_000; // sin hora: reintenta en 1 h
+  let m;
+  if ((m = line.match(/in\s+(\d+)\s*(h|hours?|m|min|minutes?)\b/i))) {
+    until = Date.now() + (+m[1]) * (/^h/i.test(m[2]) ? 3_600_000 : 60_000);
+  } else if ((m = line.match(/reset[s]?\s+(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i))) {
+    const d = new Date();
+    let h = +m[1] % 12 + (/pm/i.test(m[3] || '') ? 12 : 0);
+    if (!m[3]) h = +m[1];
+    d.setHours(h, +(m[2] || 0), 0, 0);
+    if (d.getTime() < Date.now()) d.setDate(d.getDate() + 1);
+    until = d.getTime();
+  }
+  return { until, line: line.trim().slice(0, 160) };
+}
+
+// Pregunta de confianza de carpeta (primera vez que un CLI abre un proyecto o worktree)
+const TRUST_RE = /(trust (this folder|the files)|one you trust|Do you trust|confías en)/i;
+
+// Responde "sí, confío" moviendo la selección hasta la opción afirmativa.
+async function acceptTrust(t) {
+  const c = t.cardId && cardData(t.cardId);
+  if (!c) return;
+  for (let i = 0; i < 4; i++) {
+    const lines = terminalTail(c, 12).split('\n');
+    const sel = lines.find((l) => /^\s*[❯>]/.test(l)) || '';
+    if (/yes|sí|trust|proceed/i.test(sel)) { ab.ptyWrite(c.id, '\r'); break; }
+    ab.ptyWrite(c.id, '\x1b[B');
+    await new Promise((r) => setTimeout(r, 300));
+  }
+  t.needsTrust = false;
+  renderTasks();
+}
+
 function finishTask(t, status, summary) {
   t.status = status; t.summary = summary || t.summary || ''; t.finishedAt = Date.now();
   taskRt.delete(t.id);
@@ -158,6 +206,18 @@ function tickTasks() {
     if (st.dispatching) continue;
     const m = findMarker(c);
     if (m) { finishTask(t, m.status, m.text); changed = true; continue; }
+    const lim = findLimit(c);
+    if (lim && t.assigned) {
+      // la suscripción se quedó sin cupo: vuelve a la cola para que la tome otra
+      cfg.exhausted = { ...(cfg.exhausted || {}), [t.assigned]: lim.until };
+      const label = cfg.agents[t.assigned]?.label || t.assigned;
+      toast(`${esc(label)} llegó a su límite (hasta ${new Date(lim.until).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}). Reasigno la tarea.`, 6000);
+      Object.assign(t, { status: 'pendiente', cardId: null, assigned: t.agent === 'auto' ? null : t.assigned, summary: `${label}: ${lim.line}` });
+      taskRt.delete(t.id);
+      changed = true; continue;
+    }
+    const trust = TRUST_RE.test(terminalTail(c, 14));
+    if (trust !== !!t.needsTrust) { t.needsTrust = trust; changed = true; }
     if (rt.status === 'busy') {
       st.lastBusy = now;
       if (t.status === 'revisar') { t.status = 'en_curso'; changed = true; }
@@ -178,6 +238,7 @@ function updateBadge() {
   b.textContent = review ? `${n} · ${review}!` : String(n);
   b.classList.toggle('hidden', !n && !review);
   b.classList.toggle('warn', review > 0);
+  ab.setBadge(review);
 }
 
 function renderTaskOptions() {
@@ -187,8 +248,8 @@ function renderTaskOptions() {
   $('#taskWorktree').checked = !!cfg.taskWorktrees;
   const auto = new Set(autoAgents());
   $('#taskAutoAgents').innerHTML = subscriptions().map(([k, a]) =>
-    `<button type="button" data-k="${esc(k)}" class="${auto.has(k) ? 'active' : ''}" title="${agentAvailable[k] === false ? 'No instalado' : ''}">
-      <span class="dot" style="background:${esc(a.color)}"></span>${esc(a.label)}</button>`).join('');
+    `<button type="button" data-k="${esc(k)}" class="${auto.has(k) ? 'active' : ''} ${exhaustedUntil(k) ? 'spent' : ''}" title="${agentAvailable[k] === false ? 'No instalado' : exhaustedUntil(k) ? 'Llegó a su límite de uso; vuelve a recibir tareas a esa hora' : ''}">
+      <span class="dot" style="background:${esc(a.color)}"></span>${esc(a.label)}${exhaustedUntil(k) ? ` <em>hasta ${new Date(exhaustedUntil(k)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</em>` : ''}</button>`).join('');
   const sel = $('#taskAgent');
   const prevAgent = sel.value || 'auto';
   sel.innerHTML = '<option value="auto">Auto (reparte)</option>'
@@ -231,15 +292,17 @@ function renderTasks() {
       chip(esc(projName(t.cwd))),
       t.group ? chip('▢ ' + esc(t.group)) : '',
       t.light ? chip('ligero', 'light') : '',
+      t.heavy ? chip('potente', 'heavy') : '',
       t.branch ? chip('⎇ ' + esc(t.branch.replace(/^agentboard\//, '')), '', '') : '',
       t.from ? chip('de ' + esc(cardData(t.from)?.title || 'un agente')) : '',
     ].join('');
+    const wt = t.workdir && t.branch ? '<button data-a="diff" title="Ver cambios de su worktree">±</button>' : '';
     const acts = {
-      pendiente: '<button data-a="run" title="Ejecutar ahora">▶</button><button data-a="del" title="Borrar">✕</button>',
+      pendiente: '<button data-a="top" title="Subir al primer lugar de la cola">▲</button><button data-a="run" title="Ejecutar ahora">▶</button><button data-a="del" title="Borrar">✕</button>',
       en_curso: '<button data-a="go" title="Ir al agente">⤢</button><button data-a="done" title="Marcar hecha">✓</button>',
-      revisar: '<button data-a="go" title="Ir al agente">⤢</button><button data-a="done" title="Marcar hecha">✓</button>',
+      revisar: wt + '<button data-a="go" title="Ir al agente">⤢</button><button data-a="done" title="Marcar hecha">✓</button>',
       bloqueado: '<button data-a="go" title="Ir al agente">⤢</button><button data-a="retry" title="Volver a la cola">↻</button><button data-a="done" title="Marcar hecha">✓</button>',
-      hecho: '<button data-a="retry" title="Volver a la cola">↻</button><button data-a="del" title="Borrar">✕</button>',
+      hecho: wt + '<button data-a="retry" title="Volver a la cola">↻</button><button data-a="del" title="Borrar">✕</button>',
     }[t.status];
     return `<div class="task st-${t.status}" data-id="${esc(t.id)}">
       <span class="tdot" title="${STATUS[t.status]}"></span>
@@ -247,7 +310,8 @@ function renderTasks() {
         <div class="ttext" title="Doble clic para editar">${esc(t.text)}</div>
         <div class="tmeta">${meta}</div>
         ${t.summary ? `<div class="tsum">${esc(t.summary)}</div>` : ''}
-        ${t.status === 'revisar' ? '<div class="tsum warn">El agente está esperando: revisa si terminó o si te preguntó algo.</div>' : ''}
+        ${t.needsTrust ? '<div class="tsum warn">Pregunta si confías en la carpeta. <button class="inline" data-a="trust">Confiar y seguir</button></div>'
+          : t.status === 'revisar' ? '<div class="tsum warn">El agente está esperando: revisa si terminó o si te preguntó algo.</div>' : ''}
       </div>
       <div class="tacts">${acts}</div>
     </div>`;
@@ -274,6 +338,12 @@ $('#taskList').addEventListener('click', (e) => {
     if (c) { if (diagramOpen()) toggleDiagram(false); focusCardView(c); focusCard(c.id); }
   } else if (act === 'done') {
     finishTask(t, 'hecho', t.summary || 'Marcada a mano.'); save(); renderTasks();
+  } else if (act === 'trust') {
+    acceptTrust(t);
+  } else if (act === 'top') {
+    cfg.tasks = [t, ...tasks().filter((x) => x !== t)]; save(); renderTasks();
+  } else if (act === 'diff') {
+    worktreeMenu(t, e.target.closest('button'));
   } else if (act === 'retry') {
     Object.assign(t, { status: 'pendiente', cardId: null, assigned: null, summary: '', finishedAt: null });
     save(); renderTasks();
@@ -290,6 +360,67 @@ $('#taskList').addEventListener('dblclick', (e) => {
   el.addEventListener('blur', done, { once: true });
   el.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === 'Escape') { ev.preventDefault(); el.blur(); } });
 });
+
+// Revisar lo que hizo una tarea en su worktree y fusionarlo (o descartarlo).
+async function worktreeMenu(t, anchor) {
+  closePopover();
+  const r = await ab.worktreeInfo(t.workdir, t.branch);
+  const pop = document.createElement('div');
+  pop.className = 'popover edit wt';
+  if (!r.ok) {
+    pop.innerHTML = `<div class="hint">${esc(r.error)}</div>`;
+    openPopover(pop, anchor, 300);
+    return;
+  }
+  const v = r.value;
+  const nothing = !v.commits && !v.uncommitted;
+  pop.innerHTML = `
+    <label>Rama <code>${esc(v.branch)}</code> → <code>${esc(v.base)}</code></label>
+    <div class="hint">${v.commits} commit${v.commits === 1 ? '' : 's'}${v.uncommitted ? ` · ${v.uncommitted} archivo${v.uncommitted === 1 ? '' : 's'} sin commit (se commitean al fusionar)` : ''}</div>
+    <pre class="stat">${esc(v.stat || 'Sin cambios.')}</pre>
+    <div class="row">
+      <button data-x="open">Abrir carpeta</button>
+      <button data-x="discard" title="Borra el worktree y su rama">Descartar</button>
+      <button data-x="merge" class="primary" ${nothing ? 'disabled' : ''}>Fusionar en ${esc(v.base)}</button>
+    </div>`;
+  openPopover(pop, anchor, 420);
+  pop.addEventListener('click', async (e) => {
+    const x = e.target.closest('[data-x]')?.dataset.x;
+    if (x === 'open') ab.openPath(t.workdir);
+    if (x === 'discard') {
+      if (!confirm(`¿Descartar el trabajo de "${t.text.slice(0, 60)}"? Se borra el worktree y la rama ${v.branch}.`)) return;
+      const d = await ab.worktreeDiscard(t.workdir, t.branch);
+      closePopover();
+      if (!d.ok) return toast(esc(d.error), 6000);
+      t.workdir = null; t.branch = null; save(); renderTasks();
+      toast('Worktree descartado.');
+    }
+    if (x === 'merge') {
+      const m = await ab.worktreeMerge(t.workdir, t.branch, `${t.text.slice(0, 120)}\n\nTarea de AgentBoard`);
+      closePopover();
+      if (!m.ok) return toast(esc(m.error), 8000);
+      const c = t.cardId && cardData(t.cardId);
+      if (c) closeCard(c);
+      t.workdir = null; t.mergedInto = m.value.base;
+      if (t.status !== 'hecho') finishTask(t, 'hecho', t.summary || 'Fusionado.');
+      save(); renderTasks();
+      toast(`✓ Fusionado en <b>${esc(m.value.base)}</b>`, 4000);
+    }
+  });
+}
+
+// Resumen en Markdown de lo hecho hoy, para pegar en una daily, un commit o un correo.
+function dailySummary() {
+  const start = new Date(); start.setHours(0, 0, 0, 0);
+  const done = tasks().filter((t) => t.status === 'hecho' && (t.finishedAt || 0) >= start.getTime());
+  const open = tasks().filter((t) => t.status !== 'hecho');
+  const projName = (p) => cfg.projects.find((x) => x.path === p)?.name || basename(p) || '~';
+  const line = (t) => `- ${t.status === 'hecho' ? '[x]' : '[ ]'} ${t.text}${t.summary ? ` — ${t.summary}` : ''} _(${[cfg.agents[t.assigned]?.label, projName(t.cwd), t.mergedInto ? `fusionado en ${t.mergedInto}` : t.branch].filter(Boolean).join(' · ')})_`;
+  const md = [`## ${start.toLocaleDateString()} — AgentBoard`, '', `### Hecho (${done.length})`, ...done.map(line),
+    '', `### Pendiente (${open.length})`, ...open.map(line)].join('\n');
+  ab.copy(md);
+  toast(`Resumen copiado: ${done.length} hechas, ${open.length} pendientes.`);
+}
 
 function composerDefaults() {
   return { agent: $('#taskAgent').value || 'auto', cwd: $('#taskProject').value || null, light: $('#taskLight').checked };
@@ -413,5 +544,6 @@ function initTasks() {
     }
   });
   $('#taskClear').onclick = () => { cfg.tasks = tasks().filter((t) => t.status !== 'hecho'); save(); renderTasks(); };
+  $('#taskSummary').onclick = dailySummary;
   $('#project').addEventListener('change', () => { $('#taskProject').value = cfg.selectedProject || ''; });
 }

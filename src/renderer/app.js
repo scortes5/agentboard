@@ -335,7 +335,8 @@ async function startPty(c, resume) {
   try { rt.fit.fit(); } catch {}
   $('.overlay', rt.el)?.remove();
   const command = commandFor(c, resume);
-  const res = await ab.ptyCreate({ id: c.id, cwd: c.cwd, command, env: c.env || undefined, cols: rt.term.cols, rows: rt.term.rows });
+  const env = { ...(agentOf(c).env || {}), ...(c.env || {}) }; // ej. CLAUDE_CONFIG_DIR de una cuenta extra
+  const res = await ab.ptyCreate({ id: c.id, cwd: c.cwd, command, env: Object.keys(env).length ? env : undefined, cols: rt.term.cols, rows: rt.term.rows });
   if (!res.ok) { showOverlay(c, res.error); return; }
   rt.alive = true;
   rt.lastData = Date.now();
@@ -425,7 +426,7 @@ function clipboardKeys(e, term) {
     if (term.hasSelection()) { ab.copy(term.getSelection()); term.clearSelection(); }
     return false;
   }
-  if (e.ctrlKey && e.shiftKey && k === 'v') { e.preventDefault(); term.paste(ab.paste()); return false; }
+  if (e.ctrlKey && e.shiftKey && k === 'v') { e.preventDefault(); ab.paste().then((t) => term.paste(t)); return false; }
   if (e.ctrlKey && k === 'v') return false; // deja pasar el paste nativo
   return true;
 }
@@ -1136,7 +1137,65 @@ async function renderAccounts() {
   renderAgentButtons();
   renderCatalog();
   renderLocal(local);
+  renderClaudeAccounts();
 }
+
+// ---------- Varias cuentas de Claude ----------
+// Cada cuenta extra es un agente con su propio CLAUDE_CONFIG_DIR: su login, historial
+// y skills por separado. La cola de tareas las trata como suscripciones distintas.
+const ACCOUNT_COLORS = ['#f0a070', '#d97757', '#f4c77d', '#e8875f', '#c96442'];
+async function renderClaudeAccounts() {
+  const box = $('#claudeAccounts');
+  const extra = Object.entries(cfg.agents).filter(([, a]) => isClaude(a) && a.env?.CLAUDE_CONFIG_DIR);
+  const status = await ab.claudeAccountStatus(extra.map(([, a]) => a.env.CLAUDE_CONFIG_DIR));
+  const main = catalog.find((i) => i.key === 'claude');
+  box.innerHTML = [
+    `<div class="hub-row"><span class="dot" style="background:${esc(cfg.agents.claude?.color || '#e8875f')};color:${esc(cfg.agents.claude?.color || '#e8875f')}"></span>
+      <span class="meta"><strong>${esc(cfg.agents.claude?.label || 'Claude')}</strong><small>Cuenta principal · <code>~/.claude</code></small></span>
+      <span class="badge ${main?.loggedIn ? 'ok' : 'no'}">${main?.loggedIn ? 'Sesión iniciada' : 'Sin sesión'}</span><span></span></div>`,
+    ...extra.map(([k, a]) => `<div class="hub-row" data-k="${esc(k)}"><span class="dot" style="background:${esc(a.color)};color:${esc(a.color)}"></span>
+      <span class="meta"><strong>${esc(a.label)}</strong><small><code>${esc(a.env.CLAUDE_CONFIG_DIR)}</code></small></span>
+      <span class="badge ${status[a.env.CLAUDE_CONFIG_DIR] ? 'ok' : 'no'}">${status[a.env.CLAUDE_CONFIG_DIR] ? 'En uso' : 'Falta iniciar sesión'}</span>
+      <span class="acts"><button type="button" data-x="login">Abrir / iniciar sesión</button><button type="button" data-x="remove" title="Quitar de AgentBoard (no borra la carpeta)">✕</button></span></div>`),
+  ].join('');
+}
+
+$('#claudeAccounts').addEventListener('click', (e) => {
+  const row = e.target.closest('[data-k]');
+  const x = e.target.closest('[data-x]')?.dataset.x;
+  if (!row || !x) return;
+  const k = row.dataset.k;
+  if (x === 'login') { $('#accounts').close(); newCard('term', k, { title: `${cfg.agents[k].label}` }); }
+  if (x === 'remove' && confirm(`¿Quitar "${cfg.agents[k].label}" de AgentBoard? La carpeta y su sesión quedan en el disco.`)) {
+    delete cfg.agents[k];
+    cfg.autoAgents = (cfg.autoAgents || []).filter((a) => a !== k);
+    save(); renderAgentButtons(); renderClaudeAccounts();
+  }
+});
+
+$('#addClaudeAccount').onclick = async () => {
+  const input = $('#claudeAccountName');
+  const name = input.value.trim();
+  if (!name) return input.focus();
+  const r = await ab.claudeAccountDir(name);
+  if (!r.ok) return toast(esc(r.error));
+  const key = `claude-${r.value.slug}`;
+  if (cfg.agents[key]) return toast('Ya existe una cuenta con ese nombre.');
+  const base = cfg.agents.claude || {};
+  const n = Object.values(cfg.agents).filter((a) => a.env?.CLAUDE_CONFIG_DIR).length;
+  cfg.agents[key] = {
+    label: `Claude · ${name}`, command: 'claude', resumeArgs: '--continue',
+    lightArgs: base.lightArgs || '--model haiku', heavyArgs: base.heavyArgs || '--model opus',
+    color: ACCOUNT_COLORS[n % ACCOUNT_COLORS.length], env: { CLAUDE_CONFIG_DIR: r.value.dir },
+  };
+  cfg.autoAgents = [...new Set([...(cfg.autoAgents || ['claude']), key])];
+  input.value = '';
+  await saveNow();
+  renderAgentButtons(); renderClaudeAccounts();
+  $('#accounts').close();
+  newCard('term', key, { title: `${cfg.agents[key].label} · iniciar sesión` });
+  toast(`Inicia sesión con tu otra cuenta en esta tarjeta (<code>/login</code>). Desde ahí, "auto" reparte entre tus cuentas.`, 7000);
+};
 
 function renderCatalog() {
   const box = $('#catalogRows');
@@ -1631,6 +1690,7 @@ $('#addNote').onclick = () => newCard('note');
 $('#addGroup').onclick = () => newGroup();
 $('#tasksBtn').onclick = () => toggleTasks();
 $('#diagramBtn').onclick = () => toggleDiagram();
+$('#paletteBtn').onclick = () => openPalette();
 $('#arrange').onclick = arrange;
 $('#fit').onclick = fitAll;
 $('#settingsBtn').onclick = openSettings;
@@ -1651,6 +1711,8 @@ ab.onMenu((action) => {
   else if (action === 'skills') openSkills();
   else if (action === 'tasks') toggleTasks();
   else if (action === 'diagram') toggleDiagram();
+  else if (action === 'palette') openPalette();
+  else if (action === 'quick-task') { if (diagramOpen()) toggleDiagram(false); openTasks(); }
 });
 
 // ---------- Ajustes ----------
@@ -1664,7 +1726,8 @@ function agentRow(key, a) {
     <input name="label" value="${esc(a.label)}" placeholder="Nombre" />
     <input name="command" value="${esc(a.command)}" placeholder="${key === 'shell' ? '(solo shell)' : 'comando'}" ${key === 'shell' ? 'disabled' : ''}/>
     <input name="resumeArgs" value="${esc(a.resumeArgs)}" placeholder="args al reanudar" ${key === 'shell' ? 'disabled' : ''}/>
-    <input name="lightArgs" value="${esc(a.lightArgs || '')}" placeholder="args modo ligero" title="Se usan en tareas marcadas como ligeras (modelo más barato)" ${key === 'shell' ? 'disabled' : ''}/>
+    <input name="lightArgs" value="${esc(a.lightArgs || '')}" placeholder="args ligero (!)" title="Tareas marcadas con ! (modelo más barato)" ${key === 'shell' ? 'disabled' : ''}/>
+    <input name="heavyArgs" value="${esc(a.heavyArgs || '')}" placeholder="args potente (!!)" title="Tareas marcadas con !! (modelo más capaz)" ${key === 'shell' ? 'disabled' : ''}/>
     ${builtin ? '<span></span>' : '<button type="button" class="card-btn" title="Eliminar">✕</button>'}`;
   row.querySelector('button')?.addEventListener('click', () => row.remove());
   return row;
@@ -1688,6 +1751,7 @@ async function openSettings() {
   f.fontSize.value = cfg.fontSize;
   f.resumeOnOpen.checked = cfg.resumeOnOpen;
   f.keepRunning.checked = cfg.keepRunning !== false;
+  f.quickKey.value = cfg.quickKey ?? 'Control+Alt+Space';
   const rows = $('#agentRows'); rows.innerHTML = '';
   for (const [k, a] of Object.entries(cfg.agents)) rows.appendChild(agentRow(k, a));
   const prow = $('#projectRows'); prow.innerHTML = '';
@@ -1709,13 +1773,14 @@ $('#settings').addEventListener('close', async () => {
   cfg.fontSize = clamp(+f.fontSize.value || 13, 9, 24);
   cfg.resumeOnOpen = f.resumeOnOpen.checked;
   cfg.keepRunning = f.keepRunning.checked;
+  cfg.quickKey = f.quickKey.value.trim();
 
   const agents = {};
   for (const row of document.querySelectorAll('#agentRows .agent-row')) {
     const get = (n) => row.querySelector(`[name=${n}]`).value.trim();
     const key = row.dataset.key;
     if (key !== 'shell' && !get('command')) continue;
-    agents[key] = { ...(cfg.agents[key] || {}), label: get('label') || get('command') || key, command: key === 'shell' ? '' : get('command'), resumeArgs: key === 'shell' ? '' : get('resumeArgs'), lightArgs: key === 'shell' ? '' : get('lightArgs'), color: get('color') };
+    agents[key] = { ...(cfg.agents[key] || {}), label: get('label') || get('command') || key, command: key === 'shell' ? '' : get('command'), resumeArgs: key === 'shell' ? '' : get('resumeArgs'), lightArgs: key === 'shell' ? '' : get('lightArgs'), heavyArgs: key === 'shell' ? '' : get('heavyArgs'), color: get('color') };
   }
   if (!agents.shell) agents.shell = { label: 'Terminal', command: '', resumeArgs: '', color: '#8a8f98' };
   cfg.agents = agents;
@@ -1725,6 +1790,7 @@ $('#settings').addEventListener('close', async () => {
   if (!cfg.projects.some((p) => p.path === cfg.selectedProject)) cfg.selectedProject = cfg.projects[0]?.path || null;
 
   await ab.saveConfig(cfg);
+  ab.applyQuickKey().then((r) => { if (!r.ok) toast(esc(r.error), 5000); });
   $('#machine').textContent = cfg.machineName;
   renderProjects();
   for (const c of cfg.cards) refreshCardHead(c);
