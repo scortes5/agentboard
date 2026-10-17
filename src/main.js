@@ -452,6 +452,26 @@ ipcMain.handle('tasks:plan', wrap(async (_e, text, opts = {}) => {
   return list.filter((t) => t && typeof t.text === 'string' && t.text.trim()).slice(0, 40);
 }));
 
+// ---------- Automatizaciones ----------
+// Pregunta corta a Claude sin terminal ni herramientas (diseñar un flujo, explicarlo, decidir SÍ/NO).
+ipcMain.handle('ai:ask', wrap(async (_e, prompt, model = 'haiku') => {
+  if (!['haiku', 'sonnet'].includes(model)) throw new Error('Modelo inválido.');
+  const out = await runHeadless(`claude -p --model ${model} --tools "" --no-session-persistence`, String(prompt).slice(0, 30000), 180_000);
+  return out.trim();
+}));
+
+// Paso "Comando" de una automatización: corre en el shell del usuario, dentro del proyecto.
+ipcMain.handle('flow:exec', wrap((_e, cmd, cwd) => new Promise((resolve) => {
+  const dir = cwd && fs.existsSync(cwd) ? cwd : os.homedir();
+  const child = IS_WIN ? spawn(String(cmd), { shell: true, cwd: dir, windowsHide: true }) : spawn(resolveShell(loadConfig()).file, ['-lc', String(cmd)], { cwd: dir });
+  let out = '';
+  const keep = (d) => { out = (out + d).slice(-8000); };
+  child.stdout.on('data', keep); child.stderr.on('data', keep);
+  const timer = setTimeout(() => { child.kill(); keep('\n[AgentBoard: se detuvo tras 10 minutos]'); }, 10 * 60_000);
+  child.on('error', (err) => { clearTimeout(timer); resolve({ code: -1, out: err.message }); });
+  child.on('close', (code) => { clearTimeout(timer); resolve({ code, out: out.trim() }); });
+})));
+
 // Worktree aislado para una tarea: <repo>/.agentboard/worktrees/<slug> en la rama agentboard/<slug>.
 function gitLong(cwd, args) {
   return new Promise((resolve) => {
@@ -625,37 +645,58 @@ function startBridge() {
 }
 
 // ---------- Ventana + menú ----------
+// Atajos: cada acción tiene uno por defecto; en Configuración → Atajos se cambian
+// (cfg.shortcuts = { acción: "CmdOrCtrl+Shift+X" }, vacío = sin atajo).
+const SHORTCUTS = [
+  { id: 'new:claude', label: 'Nuevo Claude', key: 'CmdOrCtrl+Shift+1', section: 'Agentes' },
+  { id: 'new:codex', label: 'Nuevo Codex', key: 'CmdOrCtrl+Shift+2', section: 'Agentes' },
+  { id: 'new:gemini', label: 'Nuevo Gemini', key: 'CmdOrCtrl+Shift+3', section: 'Agentes' },
+  { id: 'new:shell', label: 'Nueva terminal', key: 'CmdOrCtrl+Shift+4', section: 'Agentes' },
+  { id: 'new:note', label: 'Nueva nota', key: 'CmdOrCtrl+Shift+N', section: 'Tablero' },
+  { id: 'new:group', label: 'Nuevo grupo', key: 'CmdOrCtrl+Shift+G', section: 'Tablero' },
+  { id: 'tasks', label: 'Tareas', key: 'CmdOrCtrl+Shift+T', section: 'Paneles' },
+  { id: 'diagram', label: 'Diagrama', key: 'CmdOrCtrl+Shift+D', section: 'Paneles' },
+  { id: 'flows', label: 'Automatizaciones', key: 'CmdOrCtrl+Shift+F', section: 'Paneles' },
+  { id: 'palette', label: 'Buscar o ejecutar…', key: 'CmdOrCtrl+Shift+P', section: 'Paneles' },
+  { id: 'sidebar', label: 'Panel de agentes', key: 'CmdOrCtrl+Shift+A', section: 'Paneles' },
+  { id: 'space:next', label: 'Proyecto siguiente', key: 'CmdOrCtrl+Alt+Right', section: 'Proyectos' },
+  { id: 'space:prev', label: 'Proyecto anterior', key: 'CmdOrCtrl+Alt+Left', section: 'Proyectos' },
+  { id: 'space:all', label: 'Todos los proyectos', key: 'CmdOrCtrl+Alt+0', section: 'Proyectos' },
+  { id: 'arrange', label: 'Ordenar tarjetas', key: 'CmdOrCtrl+Shift+O', section: 'Tablero' },
+  { id: 'fit', label: 'Ver todo', key: 'CmdOrCtrl+0', section: 'Tablero' },
+  { id: 'zoom:in', label: 'Acercar', key: 'CmdOrCtrl+=', section: 'Tablero' },
+  { id: 'zoom:out', label: 'Alejar', key: 'CmdOrCtrl+-', section: 'Tablero' },
+  { id: 'shortcuts', label: 'Atajos de teclado…', key: 'CmdOrCtrl+/', section: 'Paneles' },
+  { id: 'settings', label: 'Configuración…', key: 'CmdOrCtrl+,', section: 'Paneles' },
+];
+ipcMain.handle('shortcuts:list', () => SHORTCUTS);
+ipcMain.on('menu:rebuild', () => { buildMenu(); registerQuickKey(); });
+
 function buildMenu() {
   const cmd = (action) => () => send('menu', action);
+  const over = loadConfig().shortcuts || {};
+  const item = (id) => {
+    const sc = SHORTCUTS.find((x) => x.id === id);
+    const key = id in over ? over[id] : sc.key;
+    return { label: sc.label, ...(key ? { accelerator: key } : {}), click: cmd(id) };
+  };
+  const sep = { type: 'separator' };
   const template = [
     ...(IS_MAC ? [{ role: 'appMenu' }] : []),
     {
       label: 'Tablero',
       submenu: [
-        { label: 'Nuevo Claude', accelerator: 'CmdOrCtrl+Shift+1', click: cmd('new:claude') },
-        { label: 'Nuevo Codex', accelerator: 'CmdOrCtrl+Shift+2', click: cmd('new:codex') },
-        { label: 'Nuevo Gemini', accelerator: 'CmdOrCtrl+Shift+3', click: cmd('new:gemini') },
-        { label: 'Nueva terminal', accelerator: 'CmdOrCtrl+Shift+4', click: cmd('new:shell') },
-        { label: 'Nueva nota', accelerator: 'CmdOrCtrl+Shift+N', click: cmd('new:note') },
-        { label: 'Nuevo grupo', accelerator: 'CmdOrCtrl+Shift+G', click: cmd('new:group') },
-        { type: 'separator' },
-        { label: 'Tareas', accelerator: 'CmdOrCtrl+Shift+T', click: cmd('tasks') },
-        { label: 'Diagrama', accelerator: 'CmdOrCtrl+Shift+D', click: cmd('diagram') },
-        { label: 'Buscar o ejecutar…', accelerator: 'CmdOrCtrl+Shift+P', click: cmd('palette') },
-        { type: 'separator' },
-        { label: 'Panel de agentes', accelerator: 'CmdOrCtrl+Shift+A', click: cmd('sidebar') },
+        item('new:claude'), item('new:codex'), item('new:gemini'), item('new:shell'), item('new:note'), item('new:group'), sep,
+        item('tasks'), item('diagram'), item('flows'), item('palette'), sep,
+        item('sidebar'),
         { label: 'Skills y agentes…', click: cmd('skills') },
-        { label: 'Suscripciones y modelos…', click: cmd('accounts') },
-        { type: 'separator' },
-        { label: 'Ordenar tarjetas', accelerator: 'CmdOrCtrl+Shift+O', click: cmd('arrange') },
-        { label: 'Ver todo', accelerator: 'CmdOrCtrl+0', click: cmd('fit') },
-        { label: 'Acercar', accelerator: 'CmdOrCtrl+=', click: cmd('zoom:in') },
-        { label: 'Alejar', accelerator: 'CmdOrCtrl+-', click: cmd('zoom:out') },
-        { type: 'separator' },
-        { label: 'Ajustes…', accelerator: 'CmdOrCtrl+,', click: cmd('settings') },
-        ...(IS_MAC ? [] : [{ type: 'separator' }, { role: 'quit', label: 'Salir' }]),
+        { label: 'Suscripciones y cuentas…', click: cmd('accounts') }, sep,
+        item('arrange'), item('fit'), item('zoom:in'), item('zoom:out'), sep,
+        item('shortcuts'), item('settings'),
+        ...(IS_MAC ? [] : [sep, { role: 'quit', label: 'Salir' }]),
       ],
     },
+    { label: 'Proyectos', submenu: [item('space:next'), item('space:prev'), item('space:all')] },
     // En Windows NO registramos el menú Editar: sus atajos Ctrl+C/Ctrl+V
     // le robarían el Ctrl+C (interrumpir) a las terminales. Ahí el
     // portapapeles lo maneja la UI.
@@ -667,12 +708,16 @@ function buildMenu() {
       // Recargar sin Ctrl+R en Windows (es la búsqueda del historial del shell)
       submenu: [
         IS_MAC ? { role: 'reload' } : { label: 'Recargar', click: () => win && win.reload() },
-        { role: 'toggleDevTools' }, { type: 'separator' }, { role: 'togglefullscreen' },
+        { role: 'toggleDevTools' }, sep, { role: 'togglefullscreen' },
       ],
     },
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
+
+// El tema de la ventana (semáforos, menús, diálogos) sigue al de la app.
+const { nativeTheme } = require('electron');
+ipcMain.on('app:theme', (_e, mode) => { nativeTheme.themeSource = ['light', 'dark'].includes(mode) ? mode : 'system'; });
 
 // ---------- Ícono, bandeja y segundo plano ----------
 // Cerrar la ventana solo la oculta (si hay agentes corriendo): siguen trabajando

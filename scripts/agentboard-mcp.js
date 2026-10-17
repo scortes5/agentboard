@@ -8,7 +8,7 @@ const net = require('net');
 const os = require('os');
 const path = require('path');
 
-const VERSION = '0.2.0';
+const VERSION = '0.3.0';
 
 function dataDir() {
   if (process.env.AGENTBOARD_DATA) return process.env.AGENTBOARD_DATA;

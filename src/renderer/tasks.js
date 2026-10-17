@@ -106,7 +106,7 @@ async function startTask(t, key) {
     if (r.ok) { cwd = r.value.dir; t.branch = r.value.branch; t.workdir = r.value.dir; }
     else toast(`Sin worktree para esta tarea (${esc(r.error)}); uso la carpeta del proyecto.`, 5000);
   }
-  const g = t.group ? ensureGroup(t.group) : null;
+  const g = t.group ? ensureGroup(t.group, projectOfPath(t.cwd || cfg.selectedProject || '')) : null;
   const pos = g ? slotIn(g) : looseSpot();
   const title = t.text.length > 34 ? t.text.slice(0, 32).trim() + '…' : t.text;
   const card = newCard('term', key, {
@@ -119,11 +119,12 @@ async function startTask(t, key) {
   toast(`Tarea → <b>${esc(a.label)}</b>${g ? ` en ${esc(g.title)}` : ''}: ${esc(title)}`);
 }
 
-function dispatchQueued() {
+// onlyFlows: con "Ejecutar la cola" apagado igual corren los pasos de automatizaciones
+function dispatchQueued(onlyFlows = false) {
   let slots = (cfg.maxParallel || 3) - tasks().filter((t) => t.status === 'en_curso').length;
   for (const t of tasks()) {
     if (slots <= 0) break;
-    if (t.status !== 'pendiente') continue;
+    if (t.status !== 'pendiente' || (onlyFlows && !t.flowRun)) continue;
     const key = pickAgent(t);
     if (!key) continue;
     slots--;
@@ -186,7 +187,7 @@ function finishTask(t, status, summary) {
   t.status = status; t.summary = summary || t.summary || ''; t.finishedAt = Date.now();
   taskRt.delete(t.id);
   const a = cfg.agents[t.assigned];
-  toast(`${status === 'hecho' ? '✓' : '⚠'} ${esc(a?.label || '')}: ${esc(t.text.slice(0, 60))}`, 4500);
+  toast(`${status === 'hecho' ? 'Hecho' : 'Bloqueado'} · ${esc(a?.label || '')}: ${esc(t.text.slice(0, 60))}`, 4500);
   if (!document.hasFocus()) {
     try { new Notification(status === 'hecho' ? 'Tarea hecha' : 'Tarea bloqueada', { body: `${t.text.slice(0, 80)}\n${t.summary}` }); } catch {}
   }
@@ -225,7 +226,7 @@ function tickTasks() {
       t.status = 'revisar'; changed = true; // terminó o espera algo (permiso, pregunta)
     }
   }
-  if (cfg.taskAuto) dispatchQueued();
+  dispatchQueued(!cfg.taskAuto);
   if (changed) { save(); renderTasks(); }
   updateBadge();
 }
@@ -248,7 +249,7 @@ function renderTaskOptions() {
   $('#taskWorktree').checked = !!cfg.taskWorktrees;
   const auto = new Set(autoAgents());
   $('#taskAutoAgents').innerHTML = subscriptions().map(([k, a]) =>
-    `<button type="button" data-k="${esc(k)}" class="${auto.has(k) ? 'active' : ''} ${exhaustedUntil(k) ? 'spent' : ''}" title="${agentAvailable[k] === false ? 'No instalado' : exhaustedUntil(k) ? 'Llegó a su límite de uso; vuelve a recibir tareas a esa hora' : ''}">
+    `<button type="button" data-k="${esc(k)}" class="${auto.has(k) ? 'active' : ''} ${exhaustedUntil(k) ? 'spent' : ''}" title="${agentAvailable[k] === false ? 'No instalado en este equipo' : exhaustedUntil(k) ? 'Llegó a su límite de uso; vuelve a recibir tareas a esa hora' : auto.has(k) ? 'Participa del reparto automático; clic para excluirla' : 'No participa del reparto automático; clic para incluirla'}">
       <span class="dot" style="background:${esc(a.color)}"></span>${esc(a.label)}${exhaustedUntil(k) ? ` <em>hasta ${new Date(exhaustedUntil(k)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</em>` : ''}</button>`).join('');
   const sel = $('#taskAgent');
   const prevAgent = sel.value || 'auto';
@@ -290,19 +291,25 @@ function renderTasks() {
     const meta = [
       who,
       chip(esc(projName(t.cwd))),
-      t.group ? chip('▢ ' + esc(t.group)) : '',
+      t.group ? chip(esc(t.group)) : '',
       t.light ? chip('ligero', 'light') : '',
       t.heavy ? chip('potente', 'heavy') : '',
-      t.branch ? chip('⎇ ' + esc(t.branch.replace(/^agentboard\//, '')), '', '') : '',
+      t.branch ? chip(icon('branch', 11) + ' ' + esc(t.branch.replace(/^agentboard\//, '')), 'branch') : '',
       t.from ? chip('de ' + esc(cardData(t.from)?.title || 'un agente')) : '',
+      t.flowRun ? chip('automatización') : '',
     ].join('');
-    const wt = t.workdir && t.branch ? '<button data-a="diff" title="Ver cambios de su worktree">±</button>' : '';
+    const B = (a, ic, tip) => `<button data-a="${a}" title="${tip}">${icon(ic, 14)}</button>`;
+    const wt = t.workdir && t.branch ? B('diff', 'diff', 'Ver los cambios de su worktree y fusionarlos o descartarlos') : '';
+    const go = B('go', 'focus', 'Ir a la tarjeta del agente');
+    const done = B('done', 'check', 'Marcar como hecha');
+    const retry = B('retry', 'refresh', 'Volver a ponerla en la cola');
+    const del = B('del', 'trash', 'Borrar la tarea');
     const acts = {
-      pendiente: '<button data-a="top" title="Subir al primer lugar de la cola">▲</button><button data-a="run" title="Ejecutar ahora">▶</button><button data-a="del" title="Borrar">✕</button>',
-      en_curso: '<button data-a="go" title="Ir al agente">⤢</button><button data-a="done" title="Marcar hecha">✓</button>',
-      revisar: wt + '<button data-a="go" title="Ir al agente">⤢</button><button data-a="done" title="Marcar hecha">✓</button>',
-      bloqueado: '<button data-a="go" title="Ir al agente">⤢</button><button data-a="retry" title="Volver a la cola">↻</button><button data-a="done" title="Marcar hecha">✓</button>',
-      hecho: wt + '<button data-a="retry" title="Volver a la cola">↻</button><button data-a="del" title="Borrar">✕</button>',
+      pendiente: B('top', 'up', 'Subir al primer lugar de la cola') + B('run', 'play', 'Ejecutar ahora, sin esperar la cola') + del,
+      en_curso: go + done,
+      revisar: wt + go + done,
+      bloqueado: go + retry + done,
+      hecho: wt + retry + del,
     }[t.status];
     return `<div class="task st-${t.status}" data-id="${esc(t.id)}">
       <span class="tdot" title="${STATUS[t.status]}"></span>
@@ -310,7 +317,7 @@ function renderTasks() {
         <div class="ttext" title="Doble clic para editar">${esc(t.text)}</div>
         <div class="tmeta">${meta}</div>
         ${t.summary ? `<div class="tsum">${esc(t.summary)}</div>` : ''}
-        ${t.needsTrust ? '<div class="tsum warn">Pregunta si confías en la carpeta. <button class="inline" data-a="trust">Confiar y seguir</button></div>'
+        ${t.needsTrust ? '<div class="tsum warn">Pregunta si confías en la carpeta. <button class="inline" data-a="trust" title="Responde que sí confías en esta carpeta y la tarea continúa">Confiar y seguir</button></div>'
           : t.status === 'revisar' ? '<div class="tsum warn">El agente está esperando: revisa si terminó o si te preguntó algo.</div>' : ''}
       </div>
       <div class="tacts">${acts}</div>
@@ -404,7 +411,7 @@ async function worktreeMenu(t, anchor) {
       t.workdir = null; t.mergedInto = m.value.base;
       if (t.status !== 'hecho') finishTask(t, 'hecho', t.summary || 'Fusionado.');
       save(); renderTasks();
-      toast(`✓ Fusionado en <b>${esc(m.value.base)}</b>`, 4000);
+      toast(`Fusionado en <b>${esc(m.value.base)}</b>`, 4000);
     }
   });
 }
@@ -440,7 +447,7 @@ function addFromComposer() {
     addTask(t); n++;
   }
   input.value = '';
-  toast(`${n} tarea${n === 1 ? '' : 's'} en cola${cfg.taskAuto ? '' : ' — activa "Ejecutar la cola" o usa ▶'}`);
+  toast(`${n} tarea${n === 1 ? '' : 's'} en cola${cfg.taskAuto ? '' : ' — activa "Ejecutar la cola" o ejecútalas una por una'}`);
   tickTasks();
 }
 
@@ -449,9 +456,9 @@ async function planWithAI() {
   const text = input.value.trim();
   if (!text) return toast('Escribe tus pendientes primero; Claude (haiku) los divide en tareas.');
   const btn = $('#taskPlan');
-  btn.disabled = true; btn.textContent = '…';
+  btn.disabled = true; btn.textContent = 'Dividiendo…';
   const r = await ab.planTasks(text, { agents: subscriptions().map(([k]) => k), projects: cfg.projects.map((p) => p.name) });
-  btn.disabled = false; btn.textContent = '✨';
+  btn.disabled = false; btn.textContent = 'Dividir';
   if (!r.ok) return toast(`No pude dividir con Claude: ${esc(r.error)}`, 6000);
   const d = composerDefaults();
   for (const x of r.value) {
@@ -545,5 +552,4 @@ function initTasks() {
   });
   $('#taskClear').onclick = () => { cfg.tasks = tasks().filter((t) => t.status !== 'hecho'); save(); renderTasks(); };
   $('#taskSummary').onclick = dailySummary;
-  $('#project').addEventListener('change', () => { $('#taskProject').value = cfg.selectedProject || ''; });
 }
