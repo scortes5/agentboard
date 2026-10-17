@@ -1,5 +1,5 @@
 // Puente seguro entre la UI y el proceso principal.
-const { contextBridge, ipcRenderer, clipboard } = require('electron');
+const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('ab', {
   // PTY
@@ -40,6 +40,13 @@ contextBridge.exposeInMainWorld('ab', {
   // Tareas, worktrees y skills de ahorro
   planTasks: (text, opts) => ipcRenderer.invoke('tasks:plan', text, opts),
   gitWorktree: (cwd, slug) => ipcRenderer.invoke('git:worktree', cwd, slug),
+  worktreeInfo: (dir, branch) => ipcRenderer.invoke('git:worktreeInfo', dir, branch),
+  worktreeMerge: (dir, branch, msg) => ipcRenderer.invoke('git:worktreeMerge', dir, branch, msg),
+  worktreeDiscard: (dir, branch) => ipcRenderer.invoke('git:worktreeDiscard', dir, branch),
+  claudeAccountDir: (name) => ipcRenderer.invoke('accounts:claudeDir', name),
+  claudeAccountStatus: (dirs) => ipcRenderer.invoke('accounts:claudeStatus', dirs),
+  setBadge: (n) => ipcRenderer.send('app:badge', n),
+  applyQuickKey: () => ipcRenderer.invoke('app:quickKey'),
   packStatus: () => ipcRenderer.invoke('pack:status'),
   packInstall: (providers) => ipcRenderer.invoke('pack:install', providers),
   localModels: () => ipcRenderer.invoke('local:models'),
@@ -48,6 +55,7 @@ contextBridge.exposeInMainWorld('ab', {
   onMenu: (cb) => ipcRenderer.on('menu', (_e, action) => cb(action)),
 
   // Portapapeles
-  copy: (text) => clipboard.writeText(text),
-  paste: () => clipboard.readText(),
+  // Electron 44 ya no expone `clipboard` en el preload: va por el proceso principal
+  copy: (text) => ipcRenderer.send('clip:write', String(text ?? '')),
+  paste: () => ipcRenderer.invoke('clip:read'), // asíncrono: macOS puede preguntar "¿Permitir pegar?"
 });

@@ -1,7 +1,7 @@
 // AgentBoard — proceso principal (Electron)
 // Maneja ventanas, PTYs reales, estado git y la config de esta máquina.
 
-const { app, BrowserWindow, ipcMain, dialog, shell, Menu, Tray, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, Menu, Tray, nativeImage, globalShortcut, clipboard } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -29,9 +29,9 @@ const CONFIG_PATH = () => path.join(app.getPath('userData'), 'board.json');
 
 // lightArgs: argumentos del "modo ahorro" (modelo más barato / menos razonamiento) para tareas simples.
 const DEFAULT_AGENTS = {
-  claude: { label: 'Claude', command: 'claude', resumeArgs: '--continue', lightArgs: '--model haiku', color: '#e8875f' },
-  codex:  { label: 'Codex',  command: 'codex',  resumeArgs: 'resume --last', lightArgs: '-c model_reasoning_effort=low', color: '#3fbf8f' },
-  gemini: { label: 'Gemini', command: 'gemini', resumeArgs: '', lightArgs: '-m gemini-2.5-flash', color: '#6c9cf5' },
+  claude: { label: 'Claude', command: 'claude', resumeArgs: '--continue', lightArgs: '--model haiku', heavyArgs: '--model opus', color: '#e8875f' },
+  codex:  { label: 'Codex',  command: 'codex',  resumeArgs: 'resume --last', lightArgs: '-c model_reasoning_effort=low', heavyArgs: '-c model_reasoning_effort=high', color: '#3fbf8f' },
+  gemini: { label: 'Gemini', command: 'gemini', resumeArgs: '', lightArgs: '-m gemini-2.5-flash', heavyArgs: '-m gemini-2.5-pro', color: '#6c9cf5' },
   shell:  { label: 'Terminal', command: '', resumeArgs: '', color: '#a89d8f' },
 };
 
@@ -62,6 +62,7 @@ function defaultConfig() {
     maxParallel: 3,          // tareas corriendo a la vez (todas las suscripciones)
     perAgentParallel: 2,     // tareas a la vez por suscripción
     taskWorktrees: false,    // cada tarea en su propio git worktree (no se pisan entre agentes)
+    quickKey: 'Control+Alt+Space', // atajo global: anotar una tarea desde cualquier app
     tasks: [],               // lista de ToDos: [{ id, text, status, agent, cwd, group, light, cardId, ... }]
     agents: DEFAULT_AGENTS,
     projects: [],            // [{ path, name }]
@@ -77,7 +78,9 @@ function loadConfig() {
     const raw = JSON.parse(fs.readFileSync(CONFIG_PATH(), 'utf8'));
     const base = defaultConfig();
     const agents = { ...base.agents, ...(raw.agents || {}) };
-    for (const [k, a] of Object.entries(base.agents)) if (agents[k].lightArgs == null && a.lightArgs) agents[k] = { ...agents[k], lightArgs: a.lightArgs };
+    for (const [k, a] of Object.entries(base.agents)) {
+      for (const f of ['lightArgs', 'heavyArgs']) if (agents[k][f] == null && a[f]) agents[k] = { ...agents[k], [f]: a[f] };
+    }
     return { ...base, ...raw, agents };
   } catch {
     return defaultConfig();
@@ -331,6 +334,8 @@ ipcMain.handle('dialog:pickFolder', async () => {
 });
 
 ipcMain.handle('shell:openPath', (_e, p) => shell.openPath(p));
+ipcMain.on('clip:write', (_e, text) => clipboard.writeText(String(text ?? '')));
+ipcMain.handle('clip:read', () => clipboard.readText());
 
 // ---------- Skills y agentes ----------
 const projectsOf = () => loadConfig().projects || [];
@@ -360,6 +365,8 @@ ipcMain.handle('skills:reveal', (_e, p) => {
 // cada CLI; el formato SKILL.md es el mismo en Claude Code, Codex y Gemini.
 const PACK_DIR = path.join(__dirname, '..', 'skills-pack');
 const PACK_ROOTS = { claude: () => path.join(skills.claudeDir(), 'skills'), codex: () => path.join(skills.codexDir(), 'skills'), gemini: () => path.join(skills.geminiDir(), 'skills') };
+// Carpetas de las cuentas extra de Claude (agentes con CLAUDE_CONFIG_DIR propio)
+const claudeAccountDirs = () => Object.values(loadConfig().agents || {}).map((a) => a.env?.CLAUDE_CONFIG_DIR).filter((d) => d && fs.existsSync(d));
 
 function packSkills() {
   let names = [];
@@ -387,6 +394,16 @@ ipcMain.handle('pack:install', wrap((_e, providers) => {
       // readFileSync funciona dentro de app.asar (cpSync no)
       fs.writeFileSync(path.join(dest, 'SKILL.md'), fs.readFileSync(path.join(PACK_DIR, name, 'SKILL.md')));
       done.push(`${k}/${name}`);
+    }
+    if (k === 'claude') {
+      for (const dir of claudeAccountDirs()) {
+        for (const { name } of packSkills()) {
+          const dest = path.join(dir, 'skills', name);
+          fs.mkdirSync(dest, { recursive: true });
+          fs.writeFileSync(path.join(dest, 'SKILL.md'), fs.readFileSync(path.join(PACK_DIR, name, 'SKILL.md')));
+          done.push(`${path.basename(dir)}/${name}`);
+        }
+      }
     }
   }
   return done;
@@ -461,6 +478,92 @@ ipcMain.handle('git:worktree', wrap(async (_e, cwd, slug) => {
   } catch {}
   return { dir, branch };
 }));
+
+// ---------- Cuentas extra de Claude ----------
+// Cada cuenta vive en su propia carpeta de configuración (CLAUDE_CONFIG_DIR),
+// con su login, historial y skills. Así una suscripción personal y una del
+// trabajo (o dos planes) se usan lado a lado y la cola reparte entre ellas.
+ipcMain.handle('accounts:claudeDir', wrap((_e, name) => {
+  const slug = String(name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30);
+  if (!slug) throw new Error('Nombre inválido.');
+  const dir = path.join(os.homedir(), `.claude-${slug}`);
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  return { dir, slug };
+}));
+// ¿Esa carpeta ya tiene una sesión? (solo existencia de archivos; nunca se leen tokens)
+ipcMain.handle('accounts:claudeStatus', (_e, dirs) => Object.fromEntries((dirs || []).map((d) => [d,
+  exists(d, '.credentials.json') || exists(d, 'projects')])));
+
+// ---------- Revisar y fusionar el trabajo de una tarea en worktree ----------
+async function worktreeTop(dir) {
+  const common = (await gitLong(dir, ['rev-parse', '--git-common-dir'])).out.trim();
+  if (!common) throw new Error('No es un worktree de git.');
+  return path.dirname(path.resolve(dir, common));
+}
+
+ipcMain.handle('git:worktreeInfo', wrap(async (_e, dir, branch) => {
+  if (!dir || !fs.existsSync(dir)) throw new Error('El worktree ya no existe.');
+  const top = await worktreeTop(dir);
+  const base = (await gitLong(top, ['rev-parse', '--abbrev-ref', 'HEAD'])).out.trim();
+  const [dirty, ahead, stat] = await Promise.all([
+    gitLong(dir, ['status', '--porcelain']),
+    gitLong(top, ['rev-list', '--count', `${base}..${branch}`]),
+    gitLong(top, ['diff', '--stat', `${base}...${branch}`]),
+  ]);
+  const wip = (await gitLong(dir, ['diff', '--stat', 'HEAD'])).out.trim();
+  return {
+    base, top, branch,
+    uncommitted: dirty.out.split('\n').filter(Boolean).length,
+    commits: parseInt(ahead.out, 10) || 0,
+    stat: [stat.out.trim(), dirty.out.trim() ? `Sin commit:\n${dirty.out.trimEnd()}${wip ? `\n\n${wip}` : ''}` : ''].filter(Boolean).join('\n\n').split('\n').slice(-40).join('\n'),
+  };
+}));
+
+// Fusiona la rama de la tarea en la rama actual del repo principal y borra el worktree.
+ipcMain.handle('git:worktreeMerge', wrap(async (_e, dir, branch, message) => {
+  const top = await worktreeTop(dir);
+  const mainDirty = (await gitLong(top, ['status', '--porcelain', '--untracked-files=no'])).out.trim();
+  if (mainDirty) throw new Error('El repo principal tiene cambios sin commit; haz commit o guárdalos antes de fusionar.');
+  if ((await gitLong(dir, ['status', '--porcelain'])).out.trim()) {
+    await gitLong(dir, ['add', '-A']);
+    const c = await gitLong(dir, ['commit', '-m', String(message || `AgentBoard: ${branch}`).slice(0, 200)]);
+    if (!c.ok) throw new Error('No pude hacer commit en el worktree: ' + c.err.trim());
+  }
+  const m = await gitLong(top, ['merge', '--no-ff', '--no-edit', branch]);
+  if (!m.ok) {
+    await gitLong(top, ['merge', '--abort']);
+    throw new Error('Hay conflictos; no fusioné nada. Resuélvelo en la tarjeta del agente. ' + m.err.trim().split('\n').slice(-2).join(' '));
+  }
+  await gitLong(top, ['worktree', 'remove', '--force', dir]);
+  await gitLong(top, ['branch', '-d', branch]);
+  return { base: (await gitLong(top, ['rev-parse', '--abbrev-ref', 'HEAD'])).out.trim() };
+}));
+
+// Descarta el trabajo: borra el worktree y su rama.
+ipcMain.handle('git:worktreeDiscard', wrap(async (_e, dir, branch) => {
+  const top = await worktreeTop(dir);
+  await gitLong(top, ['worktree', 'remove', '--force', dir]);
+  await gitLong(top, ['branch', '-D', branch]);
+  return true;
+}));
+
+// Insignia del Dock: tareas que esperan tu revisión.
+ipcMain.on('app:badge', (_e, n) => { if (IS_MAC) app.dock?.setBadge(n > 0 ? String(n) : ''); });
+
+// ---------- Atajo global: anotar una tarea desde cualquier app ----------
+let quickKey = null;
+function registerQuickKey() {
+  const want = loadConfig().quickKey || '';
+  if (want === quickKey) return { ok: true };
+  if (quickKey) { try { globalShortcut.unregister(quickKey); } catch {} }
+  quickKey = null;
+  if (!want) return { ok: true };
+  let ok = false;
+  try { ok = globalShortcut.register(want, () => { showWindow(); send('menu', 'quick-task'); }); } catch {}
+  if (ok) quickKey = want;
+  return ok ? { ok: true } : { ok: false, error: `No pude registrar ${want} (¿lo usa otra app?).` };
+}
+ipcMain.handle('app:quickKey', () => registerQuickKey());
 
 // ---------- Puente entre agentes (MCP) ----------
 let bridge = null;
@@ -538,6 +641,7 @@ function buildMenu() {
         { type: 'separator' },
         { label: 'Tareas', accelerator: 'CmdOrCtrl+Shift+T', click: cmd('tasks') },
         { label: 'Diagrama', accelerator: 'CmdOrCtrl+Shift+D', click: cmd('diagram') },
+        { label: 'Buscar o ejecutar…', accelerator: 'CmdOrCtrl+Shift+P', click: cmd('palette') },
         { type: 'separator' },
         { label: 'Panel de agentes', accelerator: 'CmdOrCtrl+Shift+A', click: cmd('sidebar') },
         { label: 'Skills y agentes…', click: cmd('skills') },
@@ -634,7 +738,7 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false, // el preload usa el clipboard de Electron
+      sandbox: false,
       backgroundThrottling: false, // con la ventana oculta, los estados y la cola de tareas siguen al día
     },
   });
@@ -672,6 +776,7 @@ if (!app.requestSingleInstanceLock()) {
     startBridge();
     createWindow();
     createTray();
+    registerQuickKey();
     app.on('activate', showWindow);
   });
 }
@@ -682,3 +787,4 @@ app.on('before-quit', (e) => {
   killAll(); bridge?.stop();
 });
 app.on('window-all-closed', () => { killAll(); bridge?.stop(); app.quit(); });
+app.on('will-quit', () => globalShortcut.unregisterAll());

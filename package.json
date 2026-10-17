@@ -1,7 +1,7 @@
 {
   "name": "agentboard",
   "productName": "AgentBoard",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Tablero infinito con terminales reales para Claude Code, Codex y Gemini CLI. Mac y Windows.",
   "author": "Sergio Cortés",
   "license": "MIT",
@@ -11,7 +11,7 @@
     "start": "electron .",
     "check": "node scripts/check-agents.js",
     "app": "node scripts/install-app.js",
-    "icon": "node scripts/build-icons.js",
+    "icon": "python3 scripts/make-icon.py",
     "dist": "electron-builder",
     "dist:mac": "electron-builder --mac",
     "dist:win": "electron-builder --win",
