@@ -179,7 +179,7 @@ npm run app        # Mac: construye AgentBoard.app con su ícono, la copia a /Ap
                    # Windows: genera el instalador y lo abre (acceso directo en escritorio y menú inicio)
 ```
 
-Para regenerar el ícono: `npm run icon` (requiere Python con Pillow).
+Para regenerar el ícono desde `src/assets/logo.svg`: `npm run icon`.
 
 ## Instaladores (.dmg / .exe)
 
@@ -210,7 +210,7 @@ src/
     diagram.js      vista de diagrama por proyecto → grupo → agente
     palette.js      paleta de comandos (⇧⌘P)
 skills-pack/        skills de ahorro de tokens que se instalan en cada CLI
-build/              íconos (icon.png / .icns / .ico), generados por scripts/make-icon.py
+build/              íconos (icon.png / .icns / .ico), generados por scripts/build-icons.js (`npm run icon`)
 scripts/check-agents.js     scripts/install-app.js (npm run app)     scripts/fix-pty.js (postinstall)
 scripts/agentboard-mcp.js   servidor MCP que registran los CLIs para hablar entre ellos
 .github/workflows/build.yml

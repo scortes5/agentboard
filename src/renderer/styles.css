@@ -79,9 +79,8 @@ body.mac #topbar { padding-left: 80px; } /* semáforos de macOS */
 #topbar .brand button { -webkit-app-region: no-drag; }
 .brand-name { font-weight: 600; font-size: 14px; letter-spacing: -0.02em; }
 .logo {
-  width: 18px; height: 18px; border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #ffd2a8 0, #ff8a4c 30%, #e2481c 65%, #6e1d08 100%);
-  box-shadow: 0 0 14px rgba(255, 107, 61, .55);
+  display: block; width: 28px; height: 28px; flex: 0 0 28px;
+  object-fit: contain;
 }
 .machine { color: var(--muted); font: 11px var(--font-mono); padding: 2px 9px; border-radius: 20px; box-shadow: inset 0 0 0 1px var(--line); }
 .group { display: flex; align-items: center; gap: 6px; }
