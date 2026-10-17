@@ -9,45 +9,65 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <header id="topbar">
+  <main id="board">
+    <div id="world"></div>
+    <div id="empty" class="empty hidden">
+      <span class="eyebrow">Tablero vacío</span>
+      <h2>Pon a tus agentes en el tablero.</h2>
+      <p>Elige un proyecto arriba y abre un agente desde la barra de abajo.<br/>
+        <kbd>⇧⌘1</kbd> Claude · <kbd>⇧⌘2</kbd> Codex · <kbd>⇧⌘3</kbd> Gemini · <kbd>⇧⌘4</kbd> Terminal</p>
+      <p class="muted">Arrastra el fondo para moverte · ⌘/Ctrl + rueda para zoom</p>
+    </div>
+  </main>
+
+  <header id="topbar" class="glass">
     <div class="brand">
-      <span class="logo">◆</span>
-      <span>AgentBoard</span>
+      <button id="sidebarBtn" class="icon" title="Panel de agentes (⇧⌘A / Ctrl+Shift+A)">☰</button>
+      <span class="logo"></span>
+      <span class="brand-name">AgentBoard</span>
       <span id="machine" class="machine" title="Este tablero es solo de este computador"></span>
     </div>
 
     <div class="group">
       <label class="lbl" for="project">Proyecto</label>
       <select id="project"></select>
-      <button id="addProject" class="ghost" title="Agregar carpeta de proyecto">＋</button>
+      <button id="addProject" class="icon" title="Agregar carpeta de proyecto">＋</button>
     </div>
 
-    <div class="group" id="agentButtons"><!-- botones generados --></div>
-
     <div class="group right">
-      <button id="addNote" class="ghost" title="Nueva nota (⇧⌘N / Ctrl+Shift+N)">✎ Nota</button>
-      <button id="arrange" class="ghost" title="Ordenar tarjetas">▦</button>
-      <button id="fit" class="ghost" title="Ver todo">⤢</button>
-      <span id="zoomLabel" class="zoom">100%</span>
-      <button id="settingsBtn" class="ghost" title="Ajustes">⚙</button>
+      <button id="skillsBtn" title="Skills, tus agentes y la conexión entre agentes">Skills y agentes</button>
+      <button id="accountsBtn" title="Suscripciones, CLIs y modelos locales">Suscripciones</button>
+      <button id="settingsBtn" class="icon" title="Ajustes">⚙</button>
     </div>
   </header>
 
-  <main id="board">
-    <div id="world"></div>
-    <div id="empty" class="empty hidden">
-      <h2>Tablero vacío</h2>
-      <p>Elige un proyecto arriba y abre un agente.<br/>
-        <kbd>⇧⌘1</kbd> Claude · <kbd>⇧⌘2</kbd> Codex · <kbd>⇧⌘3</kbd> Gemini · <kbd>⇧⌘4</kbd> Terminal
-        <span class="muted">(Ctrl+Shift en Windows)</span></p>
-      <p class="muted">Arrastra el fondo para moverte · ⌘/Ctrl + rueda para zoom</p>
+  <aside id="sidebar" class="glass">
+    <div class="side-head">
+      <span class="eyebrow">Agentes</span>
+      <span id="sideCounts" class="muted small"></span>
     </div>
-  </main>
+    <input id="sideFilter" placeholder="Buscar…" />
+    <div id="sideList"></div>
+  </aside>
+
+  <nav id="dock" class="glass">
+    <div id="agentButtons" class="dock-group"><!-- botones generados --></div>
+    <button id="moreAgents" class="chip ghost" title="Agregar agentes o modelos locales">＋</button>
+    <span class="dock-sep"></span>
+    <button id="addNote" class="chip ghost" title="Nueva nota (⇧⌘N / Ctrl+Shift+N)">✎ Nota</button>
+    <button id="arrange" class="chip ghost icon" title="Ordenar tarjetas (⇧⌘O)">▦</button>
+    <button id="fit" class="chip ghost icon" title="Ver todo (⌘0)">⤢</button>
+    <span id="zoomLabel" class="zoom">100%</span>
+  </nav>
+
+  <canvas id="minimap" class="glass" width="200" height="130" title="Clic o arrastra para moverte"></canvas>
+  <div id="toasts"></div>
 
   <!-- Ajustes -->
   <dialog id="settings">
     <form method="dialog" id="settingsForm">
-      <h2>Ajustes de este computador</h2>
+      <span class="eyebrow">Este computador</span>
+      <h2>Ajustes</h2>
       <label>Nombre de la máquina <input name="machineName" /></label>
       <label>Shell <input name="shell" placeholder="Automático (zsh / PowerShell)" />
         <small>Ej: <code>pwsh</code>, <code>/bin/bash -l</code>, <code>cmd.exe</code></small></label>
@@ -67,6 +87,90 @@
       <div class="actions">
         <button value="cancel" class="ghost">Cancelar</button>
         <button value="ok" id="saveSettings" class="primary">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Agentes y modelos -->
+  <dialog id="accounts" class="wide">
+    <form method="dialog">
+      <span class="eyebrow">Tus cuentas, en tu computador</span>
+      <h2>Suscripciones y modelos</h2>
+      <p class="muted small">Cada CLI inicia sesión con tu suscripción y guarda la sesión en este computador.
+        AgentBoard solo revisa si existe: no lee, copia ni envía tus tokens. Los modelos locales corren en tu máquina, sin cuenta.</p>
+
+      <h3>Suscripciones y CLIs</h3>
+      <div id="catalogRows" class="rows"></div>
+
+      <h3>Modelos locales</h3>
+      <div id="localRows" class="rows"></div>
+
+      <div class="actions">
+        <button type="button" id="accountsRefresh" class="ghost">↻ Revisar</button>
+        <button value="ok" class="primary">Listo</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Skills y agentes -->
+  <dialog id="skills" class="wide">
+    <form method="dialog" id="skillsForm">
+      <span class="eyebrow">Todo lo que saben tus agentes</span>
+      <h2>Skills y agentes</h2>
+      <div class="tabs" role="tablist">
+        <button type="button" data-tab="skills" class="active">Skills</button>
+        <button type="button" data-tab="agents">Mis agentes</button>
+        <button type="button" data-tab="connect">Conexión entre agentes</button>
+      </div>
+
+      <section data-pane="skills">
+        <div class="toolbar">
+          <input id="skillFilter" placeholder="Buscar skill…" />
+          <div id="skillProviders" class="seg"></div>
+        </div>
+        <div id="skillRows" class="rows"></div>
+      </section>
+
+      <section data-pane="agents" class="hidden">
+        <p class="muted small">Subagentes de Claude Code: asistentes especializados con sus propias instrucciones y herramientas.
+          Claude los usa cuando la descripción encaja con la tarea, o cuando se lo pides ("usa el agente revisor").</p>
+        <div id="agentDefRows" class="rows"></div>
+        <div id="agentForm" class="agent-form hidden">
+          <div class="grid2">
+            <label>Nombre <input name="adName" placeholder="revisor-codigo" /></label>
+            <label>Dónde <select name="adProject"></select></label>
+          </div>
+          <label>Cuándo usarlo <input name="adDescription" placeholder="Revisa cambios de código buscando bugs antes de hacer commit" /></label>
+          <div class="grid2">
+            <label>Modelo <select name="adModel">
+              <option value="">Por defecto</option><option value="inherit">El mismo de la sesión</option>
+              <option value="sonnet">Sonnet</option><option value="opus">Opus</option><option value="haiku">Haiku</option>
+            </select></label>
+            <label>Herramientas <input name="adTools" placeholder="Vacío = todas. Ej: Read, Grep, Glob" /></label>
+          </div>
+          <label>Instrucciones <textarea name="adPrompt" rows="7" placeholder="Eres un revisor de código. Busca errores de lógica, casos borde…"></textarea></label>
+          <div class="row-end">
+            <span id="agentFormError" class="form-error"></span>
+            <button type="button" id="agentFormCancel" class="ghost">Cancelar</button>
+            <button type="button" id="agentFormSave" class="primary">Guardar agente</button>
+          </div>
+        </div>
+        <button type="button" id="newAgentDef" class="ghost">＋ Nuevo agente</button>
+      </section>
+
+      <section data-pane="connect" class="hidden">
+        <p class="muted small">Conecta tus suscripciones con AgentBoard y podrán hablar entre ellas: un agente puede ver a los demás,
+          pasarles una tarea, leer su respuesta o abrir uno nuevo. Ejemplo: pídele a Claude <em>"pregúntale a Codex qué opina de este cambio"</em>.
+          Todo pasa por un canal local de este computador; nunca se escribe en terminales normales, solo en agentes.</p>
+        <h3>Conectar cada suscripción</h3>
+        <div id="mcpRows" class="rows"></div>
+        <h3>Agentes en el tablero</h3>
+        <div id="boardAgentRows" class="rows"></div>
+      </section>
+
+      <div class="actions">
+        <button type="button" id="skillsRefresh" class="ghost">↻ Revisar</button>
+        <button value="ok" class="primary">Listo</button>
       </div>
     </form>
   </dialog>
