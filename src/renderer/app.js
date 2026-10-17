@@ -55,7 +55,7 @@ function paintBackground() {
 // Zona del tablero que no tapan la barra, el dock ni el panel (los paneles flotan encima).
 function visibleRect() {
   const r = board.getBoundingClientRect();
-  const left = cfg.sidebarOpen ? 276 : 0, top = 68, bottom = 72, right = cfg.tasksOpen ? 372 : 0;
+  const left = cfg.sidebarOpen ? 248 : 0, top = 52, bottom = 66, right = cfg.tasksOpen ? 352 : 0;
   return { left, top, width: r.width - left - right, height: r.height - top - bottom };
 }
 
@@ -79,7 +79,7 @@ function layoutCard(c) {
     height: `${c.h * zoom + HEAD_H * (1 - zoom)}px`,
   });
   if (rt.term) {
-    const fs = Math.max(4, Math.round(cfg.fontSize * zoom * 10) / 10);
+    const fs = Math.max(4, Math.round((cfg.fontSizePreview || cfg.fontSize) * zoom * 10) / 10);
     if (rt.term.options.fontSize !== fs) rt.term.options.fontSize = fs;
   }
   if (rt.noteEl) rt.noteEl.style.fontSize = `${Math.max(6, 13 * zoom)}px`;
@@ -103,9 +103,10 @@ function zoomCenter(factor) {
 
 function fitAll() {
   const v = visibleRect();
-  if (!cfg.cards.length) { cfg.viewport = { x: v.left + 40, y: v.top + 20, zoom: 1 }; applyViewport(); save(); return; }
-  const minX = Math.min(...cfg.cards.map((c) => c.x)), minY = Math.min(...cfg.cards.map((c) => c.y));
-  const maxX = Math.max(...cfg.cards.map((c) => c.x + c.w)), maxY = Math.max(...cfg.cards.map((c) => c.y + c.h));
+  const cards = shownCards();
+  if (!cards.length) { cfg.viewport = { x: v.left + 40, y: v.top + 20, zoom: 1 }; applyViewport(); save(); return; }
+  const minX = Math.min(...cards.map((c) => c.x)), minY = Math.min(...cards.map((c) => c.y));
+  const maxX = Math.max(...cards.map((c) => c.x + c.w)), maxY = Math.max(...cards.map((c) => c.y + c.h));
   const pad = 30;
   const zoom = clamp(Math.min((v.width - pad * 2) / (maxX - minX), (v.height - pad * 2) / (maxY - minY)), MIN_ZOOM, 1);
   cfg.viewport = {
@@ -117,6 +118,7 @@ function fitAll() {
 }
 
 function focusCardView(c) {
+  if (!inSpace(c)) switchSpace(spaceOf(c), { keepView: true });
   const v = visibleRect();
   const zoom = clamp(Math.min((v.width - 40) / c.w, (v.height - 30) / c.h), MIN_ZOOM, 1.4);
   cfg.viewport = { zoom, x: v.left + (v.width - c.w * zoom) / 2 - c.x * zoom, y: v.top + (v.height - c.h * zoom) / 2 - c.y * zoom };
@@ -133,8 +135,8 @@ function gridLayout(cards, x0, y0, cols) {
 }
 
 function arrange() {
-  const groups = cfg.cards.filter((c) => c.type === 'group');
-  const items = cfg.cards.filter((c) => c.type !== 'group');
+  const groups = shownCards().filter((c) => c.type === 'group');
+  const items = shownCards().filter((c) => c.type !== 'group');
   if (!items.length && !groups.length) return;
   syncGroups();
   let x = 0, maxH = 0;
@@ -161,7 +163,7 @@ function scheduleFitAll() { for (const c of cfg.cards) fitQueue.add(c.id); clear
 function flushFits() {
   for (const id of fitQueue) {
     const rt = runtime.get(id);
-    if (!rt || !rt.term || !rt.fit) continue;
+    if (!rt || !rt.term || !rt.fit || rt.el.style.display === 'none') continue;
     try {
       rt.fit.fit();
       if (rt.alive) ab.ptyResize(id, rt.term.cols, rt.term.rows);
@@ -195,12 +197,14 @@ function newCard(type, agentKey, opts = {}) {
     y: opts.y ?? (r.height / 2 - vp.y) / vp.zoom - h / 2 + offset,
     w, h, text: opts.text || '',
   };
+  if (type !== 'term') c.space = opts.space ?? currentSpace();
   if (type === 'group') c.color = opts.color || GROUP_COLORS[cfg.cards.filter((x) => x.type === 'group').length % GROUP_COLORS.length];
   if (type === 'term' && isClaude(cfg.agents[c.agent])) c.sessionId = newSessionId();
   if (opts.prompt) c.prompt = opts.prompt;
   if (opts.taskId) c.taskId = opts.taskId;
   cfg.cards.push(c);
   mountCard(c, { resume: false });
+  if (!inSpace(c)) runtime.get(c.id).el.style.display = 'none';
   if (!opts.noFocus) focusCard(c.id);
   save();
   updateEmpty();
@@ -262,12 +266,8 @@ function mountCard(c, { resume }) {
       allowProposedApi: true,
       scrollback: 10000,
       macOptionIsMeta: true,
-      theme: {
-        background: '#15120e', foreground: '#f1e9dd', cursor: agent.color, cursorAccent: '#15120e',
-        selectionBackground: 'rgba(255,107,61,.28)',
-        black: '#2a241e', red: '#f0715a', green: '#7cc68a', yellow: '#e7b05a', blue: '#7aa2f7', magenta: '#c49cf0', cyan: '#5fd0c8', white: '#d8cfc2',
-        brightBlack: '#6b6156', brightRed: '#ff8f78', brightGreen: '#9bd9a7', brightYellow: '#f4c77d', brightBlue: '#9bbcff', brightMagenta: '#d8b8ff', brightCyan: '#86e3dc', brightWhite: '#f1e9dd',
-      },
+      theme: termTheme(c),
+      lineHeight: ui().lineHeight,
     });
     const fit = new FitAddon.FitAddon();
     term.loadAddon(fit);
@@ -510,7 +510,11 @@ const groupsList = () => cfg.cards.filter((c) => c.type === 'group');
 const centerIn = (c, g) => { const x = c.x + c.w / 2, y = c.y + c.h / 2; return x >= g.x && x <= g.x + g.w && y >= g.y && y <= g.y + g.h; };
 function groupAt(c) {
   let best = null;
-  for (const g of groupsList()) if (centerIn(c, g) && (!best || g.w * g.h < best.w * best.h)) best = g;
+  const sp = spaceOf(c);
+  for (const g of groupsList()) {
+    if (spaceOf(g) && sp && spaceOf(g) !== sp) continue; // cada proyecto tiene sus grupos
+    if (centerIn(c, g) && (!best || g.w * g.h < best.w * best.h)) best = g;
+  }
   return best;
 }
 const membersOf = (g) => cfg.cards.filter((c) => c.type !== 'group' && c.groupId === g.id);
@@ -538,12 +542,13 @@ function newGroup(opts = {}) {
 }
 
 // Busca un grupo por nombre o lo crea a la derecha de todo lo que hay.
-function ensureGroup(name) {
-  const g = groupsList().find((x) => x.title.toLowerCase() === name.toLowerCase());
+function ensureGroup(name, space = currentSpace()) {
+  const g = groupsList().find((x) => x.title.toLowerCase() === name.toLowerCase() && (!spaceOf(x) || !space || spaceOf(x) === space));
   if (g) return g;
-  const right = cfg.cards.length ? Math.max(...cfg.cards.map((c) => c.x + c.w)) + 80 : 0;
-  const top = cfg.cards.length ? Math.min(...cfg.cards.map((c) => c.y)) : 0;
-  return newGroup({ title: name, x: right, y: top });
+  const same = cfg.cards.filter((c) => spaceOf(c) === space);
+  const right = same.length ? Math.max(...same.map((c) => c.x + c.w)) + 80 : 0;
+  const top = same.length ? Math.min(...same.map((c) => c.y)) : 0;
+  return newGroup({ title: name, x: right, y: top, space });
 }
 
 // Lugar para una tarjeta suelta que no caiga dentro de un grupo.
@@ -733,6 +738,7 @@ setInterval(() => {
     }
   }
   updateGroupMeta();
+  updateSpaceBadges();
   updateSideCounts();
   drawMinimap();
 }, 500);
@@ -945,7 +951,7 @@ function refreshCardHead(c) {
   const proj = $('.proj', rt.el);
   proj.textContent = basename(c.cwd) || '~';
   proj.title = c.cwd || 'Carpeta personal';
-  if (rt.term) rt.term.options.theme = { ...rt.term.options.theme, cursor: a.color };
+  if (rt.term) rt.term.options.theme = termTheme(c);
 }
 
 // ---------- Panel de agentes ----------
@@ -1039,7 +1045,7 @@ function miniTransform() {
   const vp = cfg.viewport;
   const view = { x: -vp.x / vp.zoom, y: -vp.y / vp.zoom, w: r.width / vp.zoom, h: r.height / vp.zoom };
   let x0 = view.x, y0 = view.y, x1 = view.x + view.w, y1 = view.y + view.h;
-  for (const c of cfg.cards) {
+  for (const c of shownCards()) {
     x0 = Math.min(x0, c.x); y0 = Math.min(y0, c.y);
     x1 = Math.max(x1, c.x + c.w); y1 = Math.max(y1, c.y + c.h);
   }
@@ -1052,7 +1058,7 @@ function miniTransform() {
 
 function drawMinimap() {
   if (!cfg) return;
-  const show = cfg.cards.length > 0;
+  const show = shownCards().length > 0;
   mini.classList.toggle('hidden', !show);
   if (!show) return;
   const dpr = window.devicePixelRatio || 1;
@@ -1062,7 +1068,7 @@ function drawMinimap() {
   const t = miniDrag || cur;
   mctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   mctx.clearRect(0, 0, W, H);
-  for (const c of cfg.cards) {
+  for (const c of shownCards()) {
     if (c.type === 'group') {
       mctx.globalAlpha = 0.7; mctx.strokeStyle = c.color || '#ff6b3d'; mctx.lineWidth = 1;
       mctx.strokeRect(t.ox + c.x * t.s + 0.5, t.oy + c.y * t.s + 0.5, c.w * t.s, c.h * t.s);
@@ -1646,20 +1652,73 @@ $('#skills .tabs').addEventListener('click', (e) => { const t = e.target.closest
 $('#skillsForm').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.tagName === 'INPUT') e.preventDefault(); });
 
 // ---------- Barra superior ----------
-function renderProjects() {
-  const sel = $('#project');
-  sel.innerHTML = cfg.projects.length
-    ? cfg.projects.map((p) => `<option value="${esc(p.path)}" title="${esc(p.path)}">${esc(p.name)}</option>`).join('')
-    : '<option value="">— agrega una carpeta —</option>';
-  if (cfg.selectedProject) sel.value = cfg.selectedProject;
+// ---------- Espacios: una pestaña por proyecto (como un IDE) ----------
+// Todas las pestañas siguen corriendo; la pestaña solo decide qué tarjetas ves y
+// dónde se abre el próximo agente. "Todos" muestra el tablero completo.
+const spaceOf = (c) => (c.type === 'term' ? projectOfPath(c.cwd) : (c.space ?? ''));
+const currentSpace = () => (cfg.activeSpace && cfg.activeSpace !== '*' ? cfg.activeSpace : (cfg.selectedProject || ''));
+function inSpace(c) {
+  const a = cfg.activeSpace || '*';
+  if (a === '*') return true;
+  const sp = spaceOf(c);
+  return sp === a || (c.type !== 'term' && !sp);
 }
+const shownCards = () => cfg.cards.filter(inSpace);
+
+function switchSpace(key, { keepView = false } = {}) {
+  const prev = cfg.activeSpace || '*';
+  if (prev === key) return;
+  cfg.viewports = cfg.viewports || {};
+  cfg.viewports[prev] = { ...cfg.viewport };
+  cfg.activeSpace = key;
+  if (key !== '*') cfg.selectedProject = key;
+  for (const c of cfg.cards) { const rt = runtime.get(c.id); if (rt) rt.el.style.display = inSpace(c) ? '' : 'none'; }
+  const saved = cfg.viewports[key];
+  if (saved && !keepView) { cfg.viewport = { ...saved }; applyViewport(); } else if (!keepView) fitAll(); else applyViewport();
+  renderSpaces(); updateEmpty(); renderSidebar(); drawMinimap();
+  document.title = key === '*' ? 'AgentBoard' : `${spaceName(key)} — AgentBoard`;
+  if (typeof renderTaskOptions === 'function') renderTaskOptions();
+  save();
+}
+const spaceName = (p) => cfg.projects.find((x) => x.path === p)?.name || basename(p) || 'Carpeta personal';
+
+function renderSpaces() {
+  const box = $('#spaceTabs');
+  const active = cfg.activeSpace || '*';
+  const tabs = [['*', 'Todos'], ...cfg.projects.map((p) => [p.path, p.name])];
+  box.innerHTML = tabs.map(([k, name]) => `<button type="button" data-space="${esc(k)}" class="${k === active ? 'active' : ''}" title="${esc(k === '*' ? 'Todos los proyectos' : k)}">
+    <span class="sp-name">${esc(name)}</span><span class="sp-badge" data-badge="${esc(k)}"></span></button>`).join('')
+    || '<span class="muted small">Agrega un proyecto →</span>';
+  updateSpaceBadges();
+}
+
+function updateSpaceBadges() {
+  const counts = {};
+  for (const c of cfg.cards) {
+    if (c.type !== 'term') continue;
+    const sp = spaceOf(c);
+    counts[sp] = counts[sp] || { n: 0, busy: 0 };
+    counts[sp].n++;
+    if (runtime.get(c.id)?.status === 'busy') counts[sp].busy++;
+  }
+  const all = Object.values(counts).reduce((a, x) => ({ n: a.n + x.n, busy: a.busy + x.busy }), { n: 0, busy: 0 });
+  for (const el of document.querySelectorAll('#spaceTabs [data-badge]')) {
+    const k = el.dataset.badge;
+    const x = k === '*' ? all : counts[k] || { n: 0, busy: 0 };
+    const txt = x.n ? String(x.n) : '';
+    if (el.textContent !== txt) el.textContent = txt;
+    el.classList.toggle('busy', x.busy > 0);
+    el.title = x.n ? `${x.n} agente${x.n === 1 ? '' : 's'} · ${x.busy} trabajando` : '';
+  }
+}
+const renderProjects = renderSpaces;
 
 async function addProject() {
   const dir = await ab.pickFolder();
   if (!dir) return false;
   if (!cfg.projects.some((p) => p.path === dir)) cfg.projects.push({ path: dir, name: basename(dir) });
   cfg.selectedProject = dir;
-  renderProjects(); save();
+  renderSpaces(); switchSpace(dir); save();
   return true;
 }
 
@@ -1682,9 +1741,9 @@ function renderAgentButtons() {
   }
 }
 
-function updateEmpty() { $('#empty').classList.toggle('hidden', cfg.cards.length > 0); }
+function updateEmpty() { $('#empty').classList.toggle('hidden', shownCards().length > 0); }
 
-$('#project').addEventListener('change', (e) => { cfg.selectedProject = e.target.value || null; save(); });
+$('#spaceTabs').addEventListener('click', (e) => { const k = e.target.closest('[data-space]')?.dataset.space; if (k) switchSpace(k); });
 $('#addProject').onclick = addProject;
 $('#addNote').onclick = () => newCard('note');
 $('#addGroup').onclick = () => newGroup();
@@ -1712,6 +1771,16 @@ ab.onMenu((action) => {
   else if (action === 'tasks') toggleTasks();
   else if (action === 'diagram') toggleDiagram();
   else if (action === 'palette') openPalette();
+  else if (action === 'shortcuts') openSettings('keys');
+  else if (action === 'flows') toggleFlows();
+  else if (action === 'space:next' || action === 'space:prev' || action === 'space:all') {
+    const keys = ['*', ...cfg.projects.map((p) => p.path)];
+    if (action === 'space:all') switchSpace('*');
+    else {
+      const i = keys.indexOf(cfg.activeSpace || '*');
+      switchSpace(keys[(i + (action === 'space:next' ? 1 : -1) + keys.length) % keys.length]);
+    }
+  }
   else if (action === 'quick-task') { if (diagramOpen()) toggleDiagram(false); openTasks(); }
 });
 
@@ -1743,7 +1812,166 @@ function projectRow(p) {
   return row;
 }
 
-async function openSettings() {
+// ---------- Apariencia ----------
+// cfg.ui = { theme: auto|light|dark, accent, uiSize, font: system|geist, termTheme: auto|light|dark, lineHeight }
+const ACCENTS = ['#0a84ff', '#bf5af2', '#ff375f', '#ff453a', '#ff9f0a', '#ffd60a', '#30d158', '#64d2ff', '#8e8e93'];
+const TERM_THEMES = {
+  dark: {
+    background: '#1c1c1e', foreground: '#f2f2f7', cursorAccent: '#1c1c1e', selectionBackground: 'rgba(10,132,255,.35)',
+    black: '#3a3a3c', red: '#ff6961', green: '#4ade80', yellow: '#ffd60a', blue: '#64a8ff', magenta: '#d18cff', cyan: '#64d2ff', white: '#e5e5ea',
+    brightBlack: '#8e8e93', brightRed: '#ff8a80', brightGreen: '#86efac', brightYellow: '#ffe066', brightBlue: '#8cc2ff', brightMagenta: '#e0b0ff', brightCyan: '#9ae6ff', brightWhite: '#ffffff',
+  },
+  light: {
+    background: '#ffffff', foreground: '#1d1d1f', cursorAccent: '#ffffff', selectionBackground: 'rgba(0,122,255,.22)',
+    black: '#1d1d1f', red: '#d70015', green: '#248a3d', yellow: '#a05a00', blue: '#0040dd', magenta: '#8944ab', cyan: '#0071a4', white: '#6e6e73',
+    brightBlack: '#8e8e93', brightRed: '#ff3b30', brightGreen: '#34c759', brightYellow: '#c27c0e', brightBlue: '#007aff', brightMagenta: '#af52de', brightCyan: '#0a95c4', brightWhite: '#3a3a3c',
+  },
+};
+const ui = () => ({ theme: 'auto', accent: ACCENTS[0], uiSize: 13, font: 'system', termTheme: 'auto', lineHeight: 1.15, ...(cfg.ui || {}) });
+const darkMQ = matchMedia('(prefers-color-scheme: dark)');
+const resolvedTheme = (mode) => (mode === 'auto' ? (darkMQ.matches ? 'dark' : 'light') : mode);
+function termTheme(c) {
+  const t = TERM_THEMES[resolvedTheme(ui().termTheme === 'auto' ? ui().theme : ui().termTheme)];
+  return { ...t, cursor: agentOf(c).color };
+}
+function hexRgb(h) { const m = /^#?([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(h || ''); return m ? m.slice(1).map((x) => parseInt(x, 16)).join(', ') : '10, 132, 255'; }
+
+let lastUi = null; // lo último aplicado (incluye la vista previa de Configuración)
+function applyAppearance(u = ui()) {
+  lastUi = u;
+  const root = document.documentElement;
+  root.dataset.theme = resolvedTheme(u.theme);
+  root.dataset.font = u.font;
+  root.style.setProperty('--accent', u.accent);
+  root.style.setProperty('--accent-rgb', hexRgb(u.accent));
+  root.style.setProperty('--ui-scale', `${u.uiSize}px`);
+  ab.setTheme(u.theme);
+  for (const c of cfg.cards) {
+    const rt = runtime.get(c.id);
+    if (!rt?.term) continue;
+    rt.term.options.theme = termTheme(c);
+    rt.term.options.lineHeight = u.lineHeight;
+    rt.term.options.fontFamily = getComputedStyle(root).getPropertyValue('--font-mono');
+  }
+  applyViewport();
+}
+// el sistema cambió claro/oscuro (o lo cambiamos nosotros con nativeTheme): reaplica lo que se está mostrando
+darkMQ.addEventListener('change', () => applyAppearance(lastUi || ui()));
+
+// ---------- Configuración ----------
+let shortcutDefs = [];
+let draftKeys = {};
+let draftUi = null;
+
+function showSettingsSection(sec) {
+  for (const b of document.querySelectorAll('.set-nav [data-sec]')) b.classList.toggle('active', b.dataset.sec === sec);
+  for (const x of document.querySelectorAll('.set-body > section')) x.classList.toggle('hidden', x.dataset.sec !== sec);
+}
+$('.set-nav').addEventListener('click', (e) => { const s = e.target.closest('[data-sec]')?.dataset.sec; if (s) showSettingsSection(s); });
+
+// "CmdOrCtrl+Shift+T" → "⇧⌘T" (Mac) / "Ctrl+Shift+T"
+function prettyKey(acc) {
+  if (!acc) return '—';
+  if (!isMac()) return acc.replace(/CmdOrCtrl|CommandOrControl/g, 'Ctrl').replace(/\+/g, ' + ');
+  const sym = { CmdOrCtrl: '⌘', CommandOrControl: '⌘', Cmd: '⌘', Command: '⌘', Ctrl: '⌃', Control: '⌃', Alt: '⌥', Option: '⌥', Shift: '⇧', Right: '→', Left: '←', Up: '↑', Down: '↓', Space: 'Espacio', Plus: '+' };
+  const parts = acc.split('+').map((p) => sym[p] || p);
+  const order = ['⌃', '⌥', '⇧', '⌘'];
+  const mods = parts.filter((p) => order.includes(p)).sort((a, b) => order.indexOf(a) - order.indexOf(b));
+  return mods.join('') + parts.filter((p) => !order.includes(p)).join('');
+}
+// Tecla presionada → acelerador de Electron
+function accelFromEvent(e) {
+  const k = e.key;
+  if (['Meta', 'Control', 'Alt', 'Shift'].includes(k)) return null;
+  const map = { ' ': 'Space', ArrowRight: 'Right', ArrowLeft: 'Left', ArrowUp: 'Up', ArrowDown: 'Down', '+': 'Plus' };
+  let key = map[k] || (e.code.startsWith('Key') ? e.code.slice(3) : e.code.startsWith('Digit') ? e.code.slice(5) : k.length === 1 ? k.toUpperCase() : k);
+  const mods = [];
+  if (isMac() ? e.metaKey : e.ctrlKey) mods.push('CmdOrCtrl');
+  if (isMac() && e.ctrlKey) mods.push('Control');
+  if (e.altKey) mods.push('Alt');
+  if (e.shiftKey) mods.push('Shift');
+  if (!mods.length && !/^F\d+$/.test(key)) return null; // sin modificador no es atajo
+  return [...mods, key].join('+');
+}
+
+function renderKeyRows() {
+  const box = $('#keyRows');
+  const sections = [...new Set(shortcutDefs.map((x) => x.section))];
+  const used = {};
+  for (const d of shortcutDefs) { const k = d.id in draftKeys ? draftKeys[d.id] : d.key; if (k) (used[k] = used[k] || []).push(d.label); }
+  box.innerHTML = sections.map((sec) => `<h3>${esc(sec)}</h3><div class="set-group">${shortcutDefs.filter((d) => d.section === sec).map((d) => {
+    const key = d.id in draftKeys ? draftKeys[d.id] : d.key;
+    const clash = key && used[key].length > 1;
+    return `<div class="set-row">${esc(d.label)}<span class="key-cell">${key !== d.key ? `<button type="button" class="card-btn" data-reset="${esc(d.id)}" title="Restaurar ${esc(prettyKey(d.key))}">↺</button>` : ''}
+      <button type="button" class="keycap ${clash ? 'clash' : ''}" data-key="${esc(d.id)}" title="${clash ? 'También lo usa: ' + esc(used[key].filter((l) => l !== d.label).join(', ')) : 'Clic para cambiar'}">${esc(prettyKey(key))}</button></span></div>`;
+  }).join('')}</div>`).join('');
+}
+$('#keyRows').addEventListener('click', (e) => {
+  const r = e.target.closest('[data-reset]');
+  if (r) { delete draftKeys[r.dataset.reset]; renderKeyRows(); return; }
+  const b = e.target.closest('[data-key]');
+  if (!b) return;
+  b.classList.add('recording'); b.textContent = 'Presiona…';
+  const onKey = (ev) => {
+    ev.preventDefault(); ev.stopPropagation();
+    if (ev.key === 'Escape') return done();
+    if (ev.key === 'Backspace' || ev.key === 'Delete') { draftKeys[b.dataset.key] = ''; return done(); }
+    const acc = accelFromEvent(ev);
+    if (!acc) return;
+    draftKeys[b.dataset.key] = acc; done();
+  };
+  const done = () => { window.removeEventListener('keydown', onKey, true); renderKeyRows(); };
+  window.addEventListener('keydown', onKey, true);
+});
+$('#keysReset').onclick = () => { draftKeys = {}; renderKeyRows(); };
+
+// Apariencia: vista previa en vivo
+function renderAppearanceForm() {
+  const f = $('#settingsForm');
+  const u = draftUi;
+  for (const [id, key] of [['themeSeg', 'theme'], ['fontSeg', 'font'], ['termSeg', 'termTheme']]) {
+    for (const b of $('#' + id).querySelectorAll('[data-v]')) b.classList.toggle('active', b.dataset.v === u[key]);
+  }
+  $('#accentSwatches').innerHTML = ACCENTS.map((c) => `<button type="button" data-accent="${c}" class="${c === u.accent ? 'on' : ''}" style="background:${c}"></button>`).join('')
+    + `<input type="color" id="accentCustom" value="${esc(u.accent)}" title="Otro color" />`;
+  f.uiSize.value = u.uiSize; $('#uiSizeOut').textContent = `${u.uiSize}px`;
+  f.lineHeight.value = u.lineHeight; $('#lineHeightOut').textContent = (+u.lineHeight).toFixed(2);
+  $('#fontSizeOut').textContent = `${f.fontSize.value}px`;
+}
+function previewUi(patch) { Object.assign(draftUi, patch); applyAppearance(draftUi); renderAppearanceForm(); }
+for (const [id, key] of [['themeSeg', 'theme'], ['fontSeg', 'font'], ['termSeg', 'termTheme']]) {
+  $('#' + id).addEventListener('click', (e) => { const v = e.target.closest('[data-v]')?.dataset.v; if (v) previewUi({ [key]: v }); });
+}
+$('#accentSwatches').addEventListener('click', (e) => { const c = e.target.closest('[data-accent]')?.dataset.accent; if (c) previewUi({ accent: c }); });
+$('#accentSwatches').addEventListener('input', (e) => { if (e.target.id === 'accentCustom') { Object.assign(draftUi, { accent: e.target.value }); applyAppearance(draftUi); } });
+$('#settingsForm').uiSize.addEventListener('input', (e) => previewUi({ uiSize: +e.target.value }));
+$('#settingsForm').lineHeight.addEventListener('input', (e) => previewUi({ lineHeight: +e.target.value }));
+$('#settingsForm').fontSize.addEventListener('input', (e) => {
+  $('#fontSizeOut').textContent = `${e.target.value}px`;
+  cfg.fontSizePreview = +e.target.value; for (const c of cfg.cards) layoutCard(c);
+});
+
+// Avanzado: JSON de los ajustes (sin tarjetas, tareas ni flujos)
+const BULKY = ['cards', 'tasks', 'flows', 'viewport', 'viewports', 'version'];
+function settingsJson() {
+  const o = {};
+  for (const [k, v] of Object.entries(cfg)) if (!BULKY.includes(k) && k !== 'fontSizePreview') o[k] = v;
+  return JSON.stringify(o, null, 2);
+}
+$('#cfgJsonApply').onclick = async () => {
+  let obj;
+  try { obj = JSON.parse($('#cfgJson').value); } catch (err) { $('#cfgJsonError').textContent = 'JSON inválido: ' + err.message; return; }
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) { $('#cfgJsonError').textContent = 'Debe ser un objeto { … }.'; return; }
+  if (obj.agents && typeof obj.agents !== 'object') { $('#cfgJsonError').textContent = '"agents" debe ser un objeto.'; return; }
+  for (const k of Object.keys(cfg)) if (!BULKY.includes(k) && !(k in obj)) delete cfg[k]; // claves quitadas
+  for (const [k, v] of Object.entries(obj)) if (!BULKY.includes(k)) cfg[k] = v;
+  if (!cfg.agents?.shell) cfg.agents = { ...(cfg.agents || {}), shell: { label: 'Terminal', command: '', resumeArgs: '', color: '#8e8e93' } };
+  await ab.saveConfig(cfg);
+  $('#settings').close('cancel');
+  location.reload(); // vuelve a leer todo; las terminales se reanudan
+};
+
+async function openSettings(section = 'general') {
   const dlg = $('#settings');
   const f = $('#settingsForm');
   f.machineName.value = cfg.machineName;
@@ -1752,21 +1980,34 @@ async function openSettings() {
   f.resumeOnOpen.checked = cfg.resumeOnOpen;
   f.keepRunning.checked = cfg.keepRunning !== false;
   f.quickKey.value = cfg.quickKey ?? 'Control+Alt+Space';
+  f.taskAuto.checked = !!cfg.taskAuto;
+  f.maxParallel.value = cfg.maxParallel || 3;
+  f.perAgentParallel.value = cfg.perAgentParallel || 2;
+  f.taskWorktrees.checked = !!cfg.taskWorktrees;
   const rows = $('#agentRows'); rows.innerHTML = '';
   for (const [k, a] of Object.entries(cfg.agents)) rows.appendChild(agentRow(k, a));
   const prow = $('#projectRows'); prow.innerHTML = '';
   cfg.projects.forEach((p) => prow.appendChild(projectRow(p)));
   if (!cfg.projects.length) prow.innerHTML = '<span class="muted small">Sin proyectos todavía.</span>';
+  shortcutDefs = await ab.shortcutsList();
+  draftKeys = { ...(cfg.shortcuts || {}) };
+  renderKeyRows();
+  draftUi = ui();
+  renderAppearanceForm();
+  $('#cfgJson').value = settingsJson();
+  $('#cfgJsonError').textContent = '';
+  showSettingsSection(section);
   dlg.showModal();
 }
 
 $('#addAgent').onclick = () => {
-  $('#agentRows').appendChild(agentRow('custom-' + uid(), { label: '', command: '', resumeArgs: '', color: '#b07cf5' }));
+  $('#agentRows').appendChild(agentRow('custom-' + uid(), { label: '', command: '', resumeArgs: '', color: '#bf5af2' }));
 };
 $('#revealCfg').onclick = (e) => { e.preventDefault(); ab.revealConfig(); };
 
 $('#settings').addEventListener('close', async () => {
-  if ($('#settings').returnValue !== 'ok') return;
+  delete cfg.fontSizePreview;
+  if ($('#settings').returnValue !== 'ok') { applyAppearance(); for (const c of cfg.cards) layoutCard(c); return; }
   const f = $('#settingsForm');
   cfg.machineName = f.machineName.value.trim() || cfg.machineName;
   cfg.shell = f.shell.value.trim();
@@ -1774,6 +2015,12 @@ $('#settings').addEventListener('close', async () => {
   cfg.resumeOnOpen = f.resumeOnOpen.checked;
   cfg.keepRunning = f.keepRunning.checked;
   cfg.quickKey = f.quickKey.value.trim();
+  cfg.taskAuto = f.taskAuto.checked;
+  cfg.maxParallel = clamp(+f.maxParallel.value || 3, 1, 12);
+  cfg.perAgentParallel = clamp(+f.perAgentParallel.value || 2, 1, 6);
+  cfg.taskWorktrees = f.taskWorktrees.checked;
+  cfg.ui = { ...draftUi };
+  cfg.shortcuts = Object.fromEntries(Object.entries(draftKeys).filter(([id, k]) => shortcutDefs.find((d) => d.id === id)?.key !== k));
 
   const agents = {};
   for (const row of document.querySelectorAll('#agentRows .agent-row')) {
@@ -1782,19 +2029,23 @@ $('#settings').addEventListener('close', async () => {
     if (key !== 'shell' && !get('command')) continue;
     agents[key] = { ...(cfg.agents[key] || {}), label: get('label') || get('command') || key, command: key === 'shell' ? '' : get('command'), resumeArgs: key === 'shell' ? '' : get('resumeArgs'), lightArgs: key === 'shell' ? '' : get('lightArgs'), heavyArgs: key === 'shell' ? '' : get('heavyArgs'), color: get('color') };
   }
-  if (!agents.shell) agents.shell = { label: 'Terminal', command: '', resumeArgs: '', color: '#8a8f98' };
+  if (!agents.shell) agents.shell = { label: 'Terminal', command: '', resumeArgs: '', color: '#8e8e93' };
   cfg.agents = agents;
 
   const names = new Map([...document.querySelectorAll('#projectRows .project-row')].map((r) => [r.dataset.path, r.querySelector('[name=name]').value.trim()]));
   cfg.projects = cfg.projects.filter((p) => names.has(p.path)).map((p) => ({ ...p, name: names.get(p.path) || basename(p.path) }));
   if (!cfg.projects.some((p) => p.path === cfg.selectedProject)) cfg.selectedProject = cfg.projects[0]?.path || null;
+  if (cfg.activeSpace && cfg.activeSpace !== '*' && !cfg.projects.some((p) => p.path === cfg.activeSpace)) cfg.activeSpace = '*';
 
   await ab.saveConfig(cfg);
+  ab.rebuildMenu();
   ab.applyQuickKey().then((r) => { if (!r.ok) toast(esc(r.error), 5000); });
   $('#machine').textContent = cfg.machineName;
-  renderProjects();
-  for (const c of cfg.cards) refreshCardHead(c);
+  applyAppearance();
+  renderSpaces();
+  for (const c of cfg.cards) { refreshCardHead(c); const rt = runtime.get(c.id); if (rt) rt.el.style.display = inSpace(c) ? '' : 'none'; }
   renderSidebar();
+  if (typeof renderTaskOptions === 'function') renderTaskOptions();
   agentAvailable = await ab.checkAgents();
   renderAgentButtons();
   applyViewport();
@@ -1818,14 +2069,21 @@ $('#settings').addEventListener('close', async () => {
   // Sin texto en el placeholder vacío de Windows
   if (!isMac()) $('#empty').innerHTML = $('#empty').innerHTML.replace(/⇧⌘/g, 'Ctrl+Shift+');
 
+  applyAppearance();
+  renderSpaces();
+  document.title = cfg.activeSpace && cfg.activeSpace !== '*' ? `${spaceName(cfg.activeSpace)} — AgentBoard` : 'AgentBoard';
   document.body.classList.toggle('sidebar-open', !!cfg.sidebarOpen);
   // los grupos primero: quedan detrás de las tarjetas
-  for (const c of [...cfg.cards].sort((a, b) => (b.type === 'group') - (a.type === 'group'))) mountCard(c, { resume: true });
+  for (const c of [...cfg.cards].sort((a, b) => (b.type === 'group') - (a.type === 'group'))) {
+    mountCard(c, { resume: true });
+    if (!inSpace(c)) runtime.get(c.id).el.style.display = 'none';
+  }
   applyViewport();
   updateEmpty();
   renderSidebar();
   initTasks();
   initDiagram();
+  initFlows();
   refreshGit();
   if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission();
 })();

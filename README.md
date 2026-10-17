@@ -13,6 +13,35 @@ Tablero infinito con **terminales reales** para correr Claude Code, Codex y Gemi
 - No usa API keys ni manda nada a ningún servidor: corre los binarios que ya tienes en el PATH.
 - **App de escritorio con ícono**: `npm run app` la instala en Aplicaciones (Mac) o genera el instalador (Windows). Se abre con un clic desde Launchpad, Spotlight, el Dock o el menú inicio.
 
+## Un IDE para agentes
+
+- **Estilo macOS**: barra de herramientas unificada, barra lateral e inspector a los bordes, tipografía del sistema (SF Pro), **modo claro, oscuro o automático** y color de acento a elección.
+- **Proyectos en paralelo**: cada proyecto es una **pestaña** arriba (más *Todos*). Cada una tiene su propia vista del tablero y sus grupos; los agentes de todas siguen trabajando a la vez, y la pestaña muestra cuántos hay y si alguno está trabajando. `⌘⌥→` / `⌘⌥←` cambia de proyecto, `⌘⌥0` muestra todos.
+- **Configuración** (`⌘,`), al estilo de Configuración del Sistema:
+  - *Apariencia*: tema, acento, tamaño del texto de la interfaz, tipografía (SF Pro o Geist), tamaño de letra, tema y alto de línea de las terminales, con vista previa en vivo.
+  - *Atajos*: cada acción con su atajo; haz clic y presiona la combinación nueva (avisa si choca con otra). `⌘/` abre esta sección.
+  - *Agentes*, *Proyectos*, *Tareas* y *General*.
+  - *Avanzado*: todos los ajustes como JSON para agregar, cambiar o quitar claves.
+
+## Automatizaciones (estilo n8n, ejecutadas por tus agentes)
+
+Botón **⟴ Automatizaciones** (`⇧⌘F`). Dibuja un flujo con nodos y conexiones:
+
+| Nodo | Qué hace |
+|---|---|
+| ⚡ Disparador | Cuándo empieza: a mano, cada N minutos o todos los días a una hora |
+| ◎ Agente | Un agente hace un trabajo: se vuelve una tarea de la cola (sesión nueva, suscripción auto o elegida, modo ligero/potente) |
+| ›_ Comando | Un comando de shell en el proyecto (tests, build, git); si falla, lo que sigue no corre |
+| ◇ Decisión | Claude (haiku) lee el resultado de lo anterior y responde SÍ o NO; el flujo sigue por esa rama |
+| ◉ Aviso | Notificación |
+| ✎ Concepto | Una idea en el diagrama; no se ejecuta |
+
+- Arrastra desde el punto derecho de un nodo hasta otro para conectarlos; `⌫` borra lo seleccionado; el inspector de la derecha edita cada nodo.
+- **✨ Diseñar con IA**: describe lo que quieres en tus palabras y Claude arma (o cambia) el diagrama.
+- **💬 Cómo ejecutarla**: la IA explica paso a paso qué va a pasar, qué falta o puede fallar, y cómo mejorarla o ahorrar tokens.
+- **▶ Ejecutar**: las ramas independientes corren en paralelo; cada agente recibe un resumen de una línea de los pasos anteriores, no todo su historial. Ves en vivo qué nodo está corriendo, cuál terminó y cuál se saltó.
+- Las programadas corren mientras AgentBoard esté abierto, también en segundo plano.
+
 ## Tareas: tus ToDo repartidos entre suscripciones
 
 Botón **☑ Tareas** (⇧⌘T / Ctrl+Shift+T). Escribe tus pendientes, uno por línea, y Enter:
@@ -27,7 +56,7 @@ nuevo botón de exportar
 
 - `@claude` `@codex` `@gemini` elige la suscripción; sin `@` es **auto**: va a la suscripción con menos tareas corriendo (eliges cuáles participan).
 - `#grupo` abre al agente dentro de ese grupo del tablero (lo crea si no existe). Una línea con solo `#grupo` o `@agente` aplica a las siguientes.
-- `+proyecto` elige el proyecto. `!` = **modo ligero** (modelo barato, ej. haiku) y `!!` = **modo potente** (ej. opus). Se editan en Ajustes → Agentes.
+- `+proyecto` elige el proyecto. `!` = **modo ligero** (modelo barato, ej. haiku) y `!!` = **modo potente** (ej. opus). Se editan en Configuración → Agentes.
 - **▲** sube una tarea al primer lugar de la cola. **⧉ Resumen** copia en Markdown lo hecho hoy y lo pendiente (para una daily, un correo o un commit).
 - **Límite de uso**: si una suscripción avisa que llegó a su límite ("usage limit reached… resets 5pm"), la tarea vuelve a la cola y la toma otra suscripción; la agotada no recibe tareas hasta la hora de renovación (se ve tachada en "auto reparte entre").
 - **Confiar y seguir**: si el CLI pregunta si confías en la carpeta, la tarea lo muestra con un botón que responde por ti.
@@ -44,7 +73,7 @@ nuevo botón de exportar
 
 ## Más rápido
 
-- **Atajo global** `Control+Alt+Space` (configurable en Ajustes): desde cualquier app abre AgentBoard con el panel de Tareas listo para escribir.
+- **Atajo global** `Control+Alt+Space` (configurable en Configuración → General): desde cualquier app abre AgentBoard con el panel de Tareas listo para escribir.
 - **Paleta** ⇧⌘P / Ctrl+Shift+P (o ⌕ arriba): busca un agente, grupo o tarea y salta a él, ejecuta acciones, o escribe algo nuevo y Enter lo agrega como tarea.
 - **Insignia en el Dock** con las tareas que esperan tu revisión.
 
@@ -58,7 +87,7 @@ nuevo botón de exportar
 Sí. Cada CLI guarda su login en este computador (Llavero de macOS, `~/.codex`, `~/.gemini`…): cerrar AgentBoard no cierra tu sesión de Claude, Codex ni Gemini.
 
 Además:
-- **Cerrar la ventana no detiene a los agentes**: AgentBoard sigue en segundo plano (ícono en la barra de menú / bandeja) y la cola de tareas sigue avanzando. Ábrela de nuevo desde el Dock o el ícono. Se desactiva en Ajustes.
+- **Cerrar la ventana no detiene a los agentes**: AgentBoard sigue en segundo plano (ícono en la barra de menú / bandeja) y la cola de tareas sigue avanzando. Ábrela de nuevo desde el Dock o el ícono. Se desactiva en Configuración → General.
 - **Salir** (⌘Q o la bandeja) sí detiene los procesos, con confirmación. Al volver a abrir, cada tarjeta retoma **su** conversación: las de Claude tienen su propio id de sesión (`--resume <id>`), aunque haya varios Claude en el mismo proyecto; Codex usa `resume --last`.
 - Si el login de una suscripción venció, ábrela en una tarjeta y vuelve a iniciar sesión (en Claude: `/login`).
 
@@ -81,7 +110,7 @@ Botón **Agentes y modelos** (o **＋** en la barra de abajo):
 
 **Tus credenciales no salen de tu computador.** Cada CLI inicia sesión con tu cuenta y guarda la sesión donde siempre (Llavero de macOS para Claude, `~/.codex`, `~/.gemini`…). AgentBoard solo comprueba que exista; nunca lee, copia ni envía tokens, y no los guarda en `board.json`. La detección de modelos locales solo consulta `127.0.0.1`. El `board.json` se guarda con permisos solo para tu usuario.
 
-Si un CLI cambia su comando, edítalo en **Ajustes → Agentes**.
+Si un CLI cambia su comando, edítalo en **Configuración → Agentes**.
 
 ## Skills y agentes
 
@@ -147,7 +176,7 @@ Si PowerShell bloquea los scripts de npm (`claude.ps1 cannot be loaded`):
 Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 ```
 
-o en **Ajustes → Shell** pon `cmd.exe`.
+o en **Configuración → General → Shell** pon `cmd.exe`.
 
 `node-pty` trae binarios precompilados para Mac (Intel y Apple Silicon) y Windows x64, así que no necesitas Visual Studio ni Xcode.
 
@@ -160,17 +189,20 @@ o en **Ajustes → Shell** pon `cmd.exe`.
 | Nuevo grupo | ⇧⌘G | Ctrl+Shift+G |
 | Tareas / Diagrama | ⇧⌘T / ⇧⌘D | Ctrl+Shift+T / Ctrl+Shift+D |
 | Paleta (buscar o ejecutar) | ⇧⌘P | Ctrl+Shift+P |
+| Automatizaciones | ⇧⌘F | Ctrl+Shift+F |
+| Proyecto siguiente / anterior / todos | ⌘⌥→ / ⌘⌥← / ⌘⌥0 | Ctrl+Alt+→ / ← / 0 |
+| Atajos de teclado | ⌘/ | Ctrl+/ |
 | Anotar tarea desde cualquier app | ⌃⌥Espacio | Ctrl+Alt+Espacio |
 | Panel de agentes | ⇧⌘A | Ctrl+Shift+A |
 | Ver todo / ordenar | ⌘0 / ⇧⌘O | Ctrl+0 / Ctrl+Shift+O |
 | Zoom | ⌘ + rueda, pinch | Ctrl + rueda |
 | Moverse | arrastrar el fondo, rueda, botón del medio | igual |
 | Copiar / pegar en terminal | ⌘C / ⌘V | Ctrl+C con selección / Ctrl+V (o Ctrl+Shift+C/V) |
-| Ajustes | ⌘, | Ctrl+, |
+| Configuración | ⌘, | Ctrl+, |
 
 - Doble clic en el título: renombrar. Doble clic en la cabecera: enfocar la tarjeta. **⋯** para editar o duplicar.
 - El proyecto seleccionado arriba es donde se abre el próximo agente.
-- **Ajustes** permite cambiar comandos y args (ej. `claude --model opus`), agregar agentes personalizados (cualquier CLI: `aider`, `opencode`, `ollama run qwen3`…), cambiar el shell y la fuente.
+- **Configuración** permite cambiar comandos y args (ej. `claude --model opus`), agregar agentes personalizados (cualquier CLI: `aider`, `opencode`, `ollama run qwen3`…), cambiar el shell y la fuente.
 
 ## Instalar como app de escritorio
 
@@ -209,6 +241,7 @@ src/
     tasks.js        lista de tareas: cola, reparto entre suscripciones, paralelo
     diagram.js      vista de diagrama por proyecto → grupo → agente
     palette.js      paleta de comandos (⇧⌘P)
+    flows.js        automatizaciones: editor de nodos, ejecución y diseño con IA
 skills-pack/        skills de ahorro de tokens que se instalan en cada CLI
 build/              íconos (icon.png / .icns / .ico), generados por scripts/build-icons.js (`npm run icon`)
 scripts/check-agents.js     scripts/install-app.js (npm run app)     scripts/fix-pty.js (postinstall)

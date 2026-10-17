@@ -106,7 +106,7 @@ async function startTask(t, key) {
     if (r.ok) { cwd = r.value.dir; t.branch = r.value.branch; t.workdir = r.value.dir; }
     else toast(`Sin worktree para esta tarea (${esc(r.error)}); uso la carpeta del proyecto.`, 5000);
   }
-  const g = t.group ? ensureGroup(t.group) : null;
+  const g = t.group ? ensureGroup(t.group, projectOfPath(t.cwd || cfg.selectedProject || '')) : null;
   const pos = g ? slotIn(g) : looseSpot();
   const title = t.text.length > 34 ? t.text.slice(0, 32).trim() + '…' : t.text;
   const card = newCard('term', key, {
@@ -119,11 +119,12 @@ async function startTask(t, key) {
   toast(`Tarea → <b>${esc(a.label)}</b>${g ? ` en ${esc(g.title)}` : ''}: ${esc(title)}`);
 }
 
-function dispatchQueued() {
+// onlyFlows: con "Ejecutar la cola" apagado igual corren los pasos de automatizaciones
+function dispatchQueued(onlyFlows = false) {
   let slots = (cfg.maxParallel || 3) - tasks().filter((t) => t.status === 'en_curso').length;
   for (const t of tasks()) {
     if (slots <= 0) break;
-    if (t.status !== 'pendiente') continue;
+    if (t.status !== 'pendiente' || (onlyFlows && !t.flowRun)) continue;
     const key = pickAgent(t);
     if (!key) continue;
     slots--;
@@ -225,7 +226,7 @@ function tickTasks() {
       t.status = 'revisar'; changed = true; // terminó o espera algo (permiso, pregunta)
     }
   }
-  if (cfg.taskAuto) dispatchQueued();
+  dispatchQueued(!cfg.taskAuto);
   if (changed) { save(); renderTasks(); }
   updateBadge();
 }
@@ -295,6 +296,7 @@ function renderTasks() {
       t.heavy ? chip('potente', 'heavy') : '',
       t.branch ? chip('⎇ ' + esc(t.branch.replace(/^agentboard\//, '')), '', '') : '',
       t.from ? chip('de ' + esc(cardData(t.from)?.title || 'un agente')) : '',
+      t.flowRun ? chip('⟴ automatización') : '',
     ].join('');
     const wt = t.workdir && t.branch ? '<button data-a="diff" title="Ver cambios de su worktree">±</button>' : '';
     const acts = {
@@ -545,5 +547,4 @@ function initTasks() {
   });
   $('#taskClear').onclick = () => { cfg.tasks = tasks().filter((t) => t.status !== 'hecho'); save(); renderTasks(); };
   $('#taskSummary').onclick = dailySummary;
-  $('#project').addEventListener('change', () => { $('#taskProject').value = cfg.selectedProject || ''; });
 }

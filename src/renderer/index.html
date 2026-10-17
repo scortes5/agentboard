@@ -29,15 +29,15 @@
       <span id="machine" class="machine" title="Este tablero es solo de este computador"></span>
     </div>
 
-    <div class="group">
-      <label class="lbl" for="project">Proyecto</label>
-      <select id="project"></select>
-      <button id="addProject" class="icon" title="Agregar carpeta de proyecto">＋</button>
+    <div class="group spaces-wrap">
+      <div id="spaceTabs" class="seg spaces" title="Proyectos abiertos: cada uno con sus agentes, trabajando a la vez"></div>
+      <button id="addProject" class="icon" title="Abrir otro proyecto (carpeta)">＋</button>
     </div>
 
     <div class="group">
       <button id="tasksBtn" title="Tus tareas: escríbelas y se reparten entre tus suscripciones (⇧⌘T / Ctrl+Shift+T)">☑ Tareas <span id="tasksBadge" class="badge-n hidden"></span></button>
       <button id="paletteBtn" class="icon" title="Buscar o ejecutar: agentes, tareas, acciones (⇧⌘P / Ctrl+Shift+P)">⌕</button>
+      <button id="flowsBtn" title="Automatizaciones: diagramas de pasos que ejecutan tus agentes (⇧⌘F / Ctrl+Shift+F)">⟴ Automatizaciones</button>
       <button id="diagramBtn" title="Diagrama: qué hace cada grupo de agentes, por proyecto (⇧⌘D / Ctrl+Shift+D)">◇ Diagrama</button>
     </div>
 
@@ -107,6 +107,34 @@
     </div>
   </div>
 
+  <section id="flows" class="hidden">
+    <aside class="fl-side">
+      <div class="side-head"><span class="eyebrow">Automatizaciones</span><button type="button" id="flNew" class="card-btn" title="Nueva automatización">＋</button></div>
+      <div id="flList"></div>
+      <button type="button" id="flClose" class="fl-back" title="Volver al tablero (Esc)">← Volver al tablero</button>
+    </aside>
+    <div class="fl-center">
+      <div id="flEmpty" class="dg-empty">
+        <h2>Automatiza con tus agentes.</h2>
+        <p>Dibuja un flujo como en n8n — disparador, agentes, comandos, decisiones — y AgentBoard lo ejecuta con tus suscripciones.
+          O descríbelo y la IA lo diseña por ti.</p>
+        <p><button type="button" id="flEmptyAI" class="primary">✨ Diseñar con IA</button> <button type="button" id="flEmptyNew">＋ Empezar en blanco</button></p>
+      </div>
+      <div id="flMain" class="hidden">
+        <div class="fl-bar">
+          <input id="flName" placeholder="Nombre" />
+          <div id="flAdd" class="seg fl-add"></div>
+          <span class="spacer"></span>
+          <button type="button" id="flDesign" title="Describe lo que quieres y la IA arma (o cambia) el diagrama">✨ Diseñar con IA</button>
+          <button type="button" id="flExplain" title="La IA explica cómo se ejecutará, qué falta y cómo mejorarla">💬 Cómo ejecutarla</button>
+          <button type="button" id="flRun" class="primary">▶ Ejecutar</button>
+        </div>
+        <div id="flCanvas"><svg id="flEdges"></svg><div id="flNodes"></div></div>
+      </div>
+    </div>
+    <aside id="flInspector" class="fl-inspector"></aside>
+  </section>
+
   <section id="diagram" class="hidden">
     <div class="dg-bar glass">
       <span class="eyebrow">Diagrama</span>
@@ -122,35 +150,112 @@
   <canvas id="minimap" class="glass" width="200" height="130" title="Clic o arrastra para moverte"></canvas>
   <div id="toasts"></div>
 
-  <!-- Ajustes -->
-  <dialog id="settings" class="wide">
+  <!-- Configuración (estilo Configuración del Sistema) -->
+  <dialog id="settings" class="settings-sheet">
     <form method="dialog" id="settingsForm">
-      <span class="eyebrow">Este computador</span>
-      <h2>Ajustes</h2>
-      <label>Nombre de la máquina <input name="machineName" /></label>
-      <label>Shell <input name="shell" placeholder="Automático (zsh / PowerShell)" />
-        <small>Ej: <code>pwsh</code>, <code>/bin/bash -l</code>, <code>cmd.exe</code></small></label>
-      <label>Tamaño de fuente <input name="fontSize" type="number" min="9" max="24" /></label>
-      <label class="check"><input name="resumeOnOpen" type="checkbox" /> Reanudar la sesión del agente al reabrir la app</label>
-      <label class="check"><input name="keepRunning" type="checkbox" /> Al cerrar la ventana, seguir en segundo plano (los agentes siguen trabajando)</label>
-      <label>Atajo global para anotar una tarea <input name="quickKey" placeholder="Control+Alt+Space (vacío = desactivado)" />
-        <small>Funciona desde cualquier app: abre AgentBoard con el panel de Tareas listo para escribir.</small></label>
-      <small>Tus suscripciones quedan con la sesión iniciada aunque cierres la app: cada CLI guarda su login en este computador. Lo que se detiene al salir son los procesos; al reabrir se reanudan.</small>
+      <nav class="set-nav">
+        <span class="set-title">Configuración</span>
+        <button type="button" data-sec="general" class="active">⚙︎ General</button>
+        <button type="button" data-sec="appearance">◐ Apariencia</button>
+        <button type="button" data-sec="agents">◎ Agentes</button>
+        <button type="button" data-sec="keys">⌘ Atajos</button>
+        <button type="button" data-sec="projects">▤ Proyectos</button>
+        <button type="button" data-sec="tasks">☑ Tareas</button>
+        <button type="button" data-sec="advanced">{ } Avanzado</button>
+      </nav>
+      <div class="set-body">
+        <section data-sec="general">
+          <h2>General</h2>
+          <div class="set-group">
+            <label class="set-row">Nombre de este computador <input name="machineName" /></label>
+            <label class="set-row">Shell <input name="shell" placeholder="Automático (zsh / PowerShell)" /></label>
+            <label class="set-row">Atajo global para anotar una tarea <input name="quickKey" placeholder="Vacío = desactivado" /></label>
+          </div>
+          <div class="set-group">
+            <label class="set-row check"><span>Reanudar la sesión de cada agente al abrir la app</span><input name="resumeOnOpen" type="checkbox" class="switch-input" /></label>
+            <label class="set-row check"><span>Al cerrar la ventana, seguir en segundo plano</span><input name="keepRunning" type="checkbox" class="switch-input" /></label>
+          </div>
+          <p class="set-note">Tus suscripciones quedan con la sesión iniciada aunque cierres la app: cada CLI guarda su login en este computador. Al salir se detienen los procesos; al volver a abrir se reanudan.</p>
+        </section>
 
-      <h3>Agentes</h3>
-      <div id="agentRows"></div>
-      <button type="button" id="addAgent" class="ghost">＋ Agente personalizado</button>
+        <section data-sec="appearance" class="hidden">
+          <h2>Apariencia</h2>
+          <div class="set-group">
+            <div class="set-row">Tema
+              <div class="seg" id="themeSeg"><button type="button" data-v="auto">Automático</button><button type="button" data-v="light">Claro</button><button type="button" data-v="dark">Oscuro</button></div></div>
+            <div class="set-row">Color de acento <div id="accentSwatches" class="swatches"></div></div>
+            <label class="set-row">Tamaño del texto de la interfaz <span class="range"><input name="uiSize" type="range" min="11" max="16" step="0.5" /><output id="uiSizeOut"></output></span></label>
+            <div class="set-row">Tipografía
+              <div class="seg" id="fontSeg"><button type="button" data-v="system">Sistema (SF Pro)</button><button type="button" data-v="geist">Geist</button></div></div>
+          </div>
+          <div class="set-group">
+            <label class="set-row">Tamaño de letra de las terminales <span class="range"><input name="fontSize" type="range" min="9" max="22" step="0.5" /><output id="fontSizeOut"></output></span></label>
+            <div class="set-row">Tema de las terminales
+              <div class="seg" id="termSeg"><button type="button" data-v="auto">Como la app</button><button type="button" data-v="light">Claro</button><button type="button" data-v="dark">Oscuro</button></div></div>
+            <label class="set-row">Alto de línea en terminales <span class="range"><input name="lineHeight" type="range" min="1" max="1.6" step="0.05" /><output id="lineHeightOut"></output></span></label>
+          </div>
+          <p class="set-note">Los cambios se ven al instante; se guardan con "Guardar".</p>
+        </section>
 
-      <h3>Proyectos guardados</h3>
-      <div id="projectRows"></div>
+        <section data-sec="agents" class="hidden">
+          <h2>Agentes</h2>
+          <p class="set-note">Color · nombre · comando · args al reanudar · args ligero (<code>!</code>) · args potente (<code>!!</code>)</p>
+          <div id="agentRows"></div>
+          <button type="button" id="addAgent" class="ghost">＋ Agente personalizado</button>
+        </section>
 
-      <p class="muted small">Config guardada en <code id="cfgPath"></code>
-        <a href="#" id="revealCfg">Mostrar</a></p>
+        <section data-sec="keys" class="hidden">
+          <h2>Atajos de teclado</h2>
+          <p class="set-note">Haz clic en un atajo y presiona la combinación nueva. <kbd>⌫</kbd> lo quita, <kbd>Esc</kbd> cancela.</p>
+          <div id="keyRows"></div>
+          <div class="row-end"><button type="button" id="keysReset" class="ghost">Restaurar todos</button></div>
+          <h3>Dentro del tablero</h3>
+          <div class="set-group static-keys">
+            <div class="set-row">Moverse por el tablero <span class="muted">arrastrar el fondo · rueda · botón del medio</span></div>
+            <div class="set-row">Zoom <span class="muted"><kbd>⌘</kbd> + rueda · pellizcar</span></div>
+            <div class="set-row">Renombrar tarjeta o grupo <span class="muted">doble clic en el título</span></div>
+            <div class="set-row">Agregar tarea <span class="muted"><kbd>Enter</kbd> · nueva línea <kbd>⇧ Enter</kbd></span></div>
+            <div class="set-row">En tareas <span class="muted"><code>@agente</code> <code>#grupo</code> <code>+proyecto</code> <code>!</code> ligero <code>!!</code> potente</span></div>
+          </div>
+        </section>
 
-      <div class="actions">
+        <section data-sec="projects" class="hidden">
+          <h2>Proyectos</h2>
+          <p class="set-note">Cada proyecto es una pestaña arriba: sus agentes trabajan a la vez que los de los demás.</p>
+          <div id="projectRows"></div>
+        </section>
+
+        <section data-sec="tasks" class="hidden">
+          <h2>Tareas</h2>
+          <div class="set-group">
+            <label class="set-row check"><span>Ejecutar la cola automáticamente</span><input name="taskAuto" type="checkbox" class="switch-input" /></label>
+            <label class="set-row">Tareas en paralelo (total) <input name="maxParallel" type="number" min="1" max="12" /></label>
+            <label class="set-row">Tareas en paralelo por suscripción <input name="perAgentParallel" type="number" min="1" max="6" /></label>
+            <label class="set-row check"><span>Cada tarea en su propio git worktree</span><input name="taskWorktrees" type="checkbox" class="switch-input" /></label>
+          </div>
+        </section>
+
+        <section data-sec="advanced" class="hidden">
+          <h2>Avanzado</h2>
+          <p class="set-note">Todos los ajustes como JSON: agrega, cambia o quita claves y aplica. Las tarjetas, tareas y automatizaciones no aparecen aquí (se editan desde la app).</p>
+          <textarea id="cfgJson" spellcheck="false"></textarea>
+          <div class="row-end"><span id="cfgJsonError" class="form-error"></span><button type="button" id="cfgJsonApply">Aplicar JSON</button></div>
+          <p class="set-note">Archivo: <code id="cfgPath"></code> <a href="#" id="revealCfg">Mostrar en el Finder</a></p>
+        </section>
+      </div>
+      <div class="actions set-actions">
         <button value="cancel" class="ghost">Cancelar</button>
         <button value="ok" id="saveSettings" class="primary">Guardar</button>
       </div>
+    </form>
+  </dialog>
+
+  <dialog id="askDialog" class="ask">
+    <form method="dialog">
+      <h2 id="askTitle"></h2>
+      <p id="askHint" class="set-note"></p>
+      <textarea id="askText" rows="5"></textarea>
+      <div class="actions"><button value="cancel" class="ghost">Cancelar</button><button value="ok" class="primary" id="askOk">Continuar</button></div>
     </form>
   </dialog>
 
@@ -267,5 +372,6 @@
   <script src="tasks.js"></script>
   <script src="diagram.js"></script>
   <script src="palette.js"></script>
+  <script src="flows.js"></script>
 </body>
 </html>

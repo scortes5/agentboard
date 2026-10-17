@@ -3,7 +3,7 @@
 'use strict';
 /* global cfg, $, esc, basename, agentOf, runtime, focusCardView, focusCard, newCard, newGroup, toggleTasks, openTasks,
    toggleDiagram, diagramOpen, arrange, fitAll, openSettings, openAccounts, openSkills, addTask, parseLine, tickTasks,
-   STATUS_LABEL, toast, composerDefaults */
+   STATUS_LABEL, toast, composerDefaults, toggleFlows, switchSpace, runFlow */
 
 let palItems = [];
 let palSel = 0;
@@ -12,6 +12,9 @@ function palCommands() {
   const cmds = [
     { icon: '☑', label: 'Tareas', hint: '⇧⌘T', run: () => openTasks() },
     { icon: '◇', label: 'Diagrama', hint: '⇧⌘D', run: () => toggleDiagram(true) },
+    { icon: '⟴', label: 'Automatizaciones', hint: '⇧⌘F', run: () => toggleFlows(true) },
+    { icon: '⌘', label: 'Atajos de teclado', hint: '⌘/', run: () => openSettings('keys') },
+    { icon: '◐', label: 'Apariencia', run: () => openSettings('appearance') },
     { icon: '▢', label: 'Nuevo grupo', hint: '⇧⌘G', run: () => newGroup() },
     { icon: '✎', label: 'Nueva nota', hint: '⇧⌘N', run: () => newCard('note') },
     { icon: '▦', label: 'Ordenar tarjetas', hint: '⇧⌘O', run: () => arrange() },
@@ -20,6 +23,8 @@ function palCommands() {
     { icon: '✦', label: 'Skills y ahorro de tokens', run: () => openSkills('saving') },
     { icon: '⚙', label: 'Ajustes', hint: '⌘,', run: () => openSettings() },
   ];
+  for (const p of cfg.projects) cmds.push({ icon: '▤', label: `Ir al proyecto ${p.name}`, sub: 'proyecto', run: () => switchSpace(p.path) });
+  for (const f of cfg.flows || []) cmds.push({ icon: '⟴', label: `Ejecutar "${f.name}"`, sub: 'automatización', run: () => runFlow(f) });
   for (const [k, a] of Object.entries(cfg.agents)) {
     if (a.hidden) continue;
     cmds.push({ icon: '＋', label: `Abrir ${a.label}`, sub: basename(cfg.selectedProject) || '', color: a.color, run: () => newCard('term', k) });
