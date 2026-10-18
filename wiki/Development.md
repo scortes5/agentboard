@@ -26,8 +26,9 @@ CodeQL code scanning (GitHub default setup) analyzes JavaScript and workflows on
 
 1. Bump `version` in `package.json` (and `VERSION` in `scripts/agentboard-mcp.js`).
 2. Move *Unreleased* entries in `CHANGELOG.md` under the new version.
-3. `git tag vX.Y.Z && git push --tags`.
-4. The `build` workflow builds macOS and Windows installers and attaches them to the Release with generated notes.
+3. Merge to `main`. The `build` workflow notices that `vX.Y.Z` has no tag yet, builds the macOS and Windows installers and publishes the Release (creating the tag) with generated notes.
+
+Pushes to `main` that keep the same version do not build anything. Pushing a `v*` tag by hand still works.
 
 ## Editing this wiki
 

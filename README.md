@@ -324,7 +324,7 @@ npm run dist:mac   # builds the .dmg files  ·  npm run dist:win  builds the .ex
 npm run icon       # regenerates the icons from src/assets/logo.svg
 ```
 
-Pushing a `v*` tag makes the `.github/workflows/build.yml` workflow build the Mac and Windows installers and attach them to the Release, together with `latest.yml` and the `.blockmap` that the Windows app uses to update itself. Every push and pull request runs the `ci` workflow and CodeQL code scanning; Dependabot keeps npm packages and GitHub Actions up to date.
+When a new `version` in `package.json` reaches `main`, the `.github/workflows/build.yml` workflow builds the Mac and Windows installers and publishes the Release with its `v<version>` tag, together with `latest.yml` and the `.blockmap` that the Windows app uses to update itself. Every push and pull request runs the `ci` workflow and CodeQL code scanning; Dependabot keeps npm packages and GitHub Actions up to date.
 
 To see the update notice from source, pretend to run an older version: `AGENTBOARD_FAKE_VERSION=0.1.0 npm start` (the check runs 10 seconds after opening).
 

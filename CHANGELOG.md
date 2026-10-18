@@ -6,7 +6,7 @@ All notable changes to AgentBoard. The format follows [Keep a Changelog](https:/
 
 ### Added
 - Repository setup: CI workflow, Dependabot for npm and GitHub Actions, issue and pull request templates, contributing guide, code of conduct, security policy and a [wiki](https://github.com/scortes5/agentboard/wiki) published from `wiki/`.
-- Release notes are generated automatically on tagged builds.
+- Releases are published automatically: when a new version in `package.json` reaches `main`, the installers are built and the release and its tag are created, with generated notes.
 
 ## [0.6.0] - 2026-10-17
 
