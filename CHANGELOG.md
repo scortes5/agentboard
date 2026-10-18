@@ -1,10 +1,10 @@
 # Changelog
 
-All notable changes to AgentBoard. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: a release with new features raises the first number (`2.0.0`); fixes and small changes raise the last one (`1.0.1`).
+All notable changes to AgentBoard. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: new features raise the middle number (`1.1.0`), fixes and small changes the last one (`1.0.1`), and a milestone with many features the first one (`2.0.0`).
 
 ## [Unreleased]
 
-## [2.0.0] - 2026-10-18
+## [1.1.0] - 2026-10-18
 
 ### Added
 - **Remote control from your phone**: turn it on in *Settings → Integrations* and open the link on your phone (same Wi-Fi). The page shows your tasks live (status, agent, time, tokens, last line), lets you **approve or reject** what agents ask, and **adds tasks**. Every request needs the random token in the link; **New Link** makes the old one stop working. Off by default.
