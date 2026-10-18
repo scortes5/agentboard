@@ -226,6 +226,30 @@ function mcpSession(dataDir, requests) {
     await win.evaluate(() => closePopover());
     step('daily summary schedule and the GitHub issues popover');
 
+    // Side bars like VS Code: views move between sides, collapse, hide, come back, and bars resize.
+    const layout = await win.evaluate(() => {
+      if ($('#limits').open) $('#limits').close();
+      toggleSidebar(true); toggleTasks(true);
+      const where = (id) => document.querySelector(`.view[data-view="${id}"]`).closest('aside, #viewStash').id;
+      viewLayout.moveTo('approvals', 'left', 'agents');
+      const moved = [where('approvals'), [...$('#sidebar .views').children].filter((e) => e.matches('.view')).map((e) => e.dataset.view).join()];
+      viewLayout.set('tasks', { collapsed: true });
+      const collapsed = $('.view[data-view="tasks"]').classList.contains('collapsed');
+      toggleTasks(true); // the Tasks button expands it again
+      const reopened = viewLayout.visible('tasks');
+      viewLayout.set('queue', { hidden: true });
+      const hidden = where('queue');
+      viewLayout.reset();
+      return { moved, collapsed, reopened, hidden, back: [where('approvals'), where('queue')]};
+    });
+    assert.deepEqual(layout, { moved: ['sidebar', 'approvals,agents'], collapsed: true, reopened: true, hidden: 'viewStash', back: ['tasks', 'tasks'] });
+    const handle = await win.$('#tasks .side-resizer');
+    const box = await handle.boundingBox();
+    await win.mouse.move(box.x + 3, box.y + 200); await win.mouse.down(); await win.mouse.move(box.x - 97, box.y + 200, { steps: 5 }); await win.mouse.up();
+    const width = await win.evaluate(() => [viewLayout.width('right'), Math.round($('#tasks').getBoundingClientRect().width)]);
+    assert.ok(width[0] >= 440 && width[0] <= 460 && Math.abs(width[1] - width[0]) <= 2, JSON.stringify(width));
+    step('side bars: views move, collapse, hide and reset; bars resize by dragging');
+
     // Every panel and dialog opens without errors (the interface is split across many files).
     await win.evaluate(async () => {
       await openAccounts(); $('#accounts').close();

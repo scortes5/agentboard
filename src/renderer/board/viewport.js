@@ -14,7 +14,7 @@ function paintBackground() {
 // Board area not covered by the toolbar, the dock or the side panels (they float on top).
 function visibleRect() {
   const r = board.getBoundingClientRect();
-  const left = cfg.sidebarOpen ? 248 : 0, top = 52, bottom = 66, right = cfg.tasksOpen ? 352 : 0;
+  const left = viewLayout.inset('left'), top = 52, bottom = 66, right = viewLayout.inset('right');
   return { left, top, width: r.width - left - right, height: r.height - top - bottom };
 }
 

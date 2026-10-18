@@ -17,7 +17,7 @@
 
 /* ---------- Agent list ---------- */
 #sidebar {
-  position: absolute; top: 68px; left: 10px; bottom: 10px; width: 256px; z-index: 15;
+  position: absolute; top: 68px; left: 10px; bottom: 10px; width: var(--left-w); z-index: 15;
   display: none; flex-direction: column; overflow: hidden;
 }
 body.sidebar-open #sidebar { display: flex; }

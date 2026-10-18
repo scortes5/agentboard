@@ -79,11 +79,14 @@ function updateSideCounts() {
   $('#sideCounts').textContent = terms.length ? `${terms.length} · ${busy} working` : '';
 }
 
+// The button and ⌘B show or hide the Agents view, on whichever side it is.
 function toggleSidebar(force) {
-  cfg.sidebarOpen = force ?? !cfg.sidebarOpen;
-  document.body.classList.toggle('sidebar-open', !!cfg.sidebarOpen);
-  drawMinimap(); save();
+  const open = force ?? !viewLayout.visible('agents');
+  if (open) viewLayout.reveal('agents');
+  else viewLayout.setOpen(viewLayout.sideOf('agents'), false);
 }
+
+viewLayout.register({ id: 'agents', title: 'Agents', side: 'left', badge: '#sideCounts', onShow: () => renderSidebar() });
 
 $('#sideFilter').addEventListener('input', renderSidebar);
 $('#sidebarBtn').onclick = () => toggleSidebar();

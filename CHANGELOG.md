@@ -4,6 +4,21 @@ All notable changes to AgentBoard. The format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-18
+
+### Added
+- **Side bars like VS Code**: the left and right bars are made of views (**Agents**, **Tasks**, **Approvals**, **Queue Options**).
+  - Click a title to collapse it.
+  - Drag a title to reorder a view or move it to the other side.
+  - Hide a view from its **⋯** menu; the bar's **⋯** shows it again or resets the layout.
+  - Drag a bar's inner edge to resize it, and the line between two views to share the height.
+  - The layout is saved with your board.
+- **Approvals view**: the permission requests now also have their own view in the side bar, besides the toolbar popover.
+- Palette: *Approvals View* and *Reset Side Bar Layout*.
+
+### Changed
+- The task queue options (Run queue, parallel limits, worktrees, which subscriptions "auto" uses) moved to the **Queue Options** view, collapsed by default, leaving more room for the task list.
+
 ## [1.2.0] - 2026-10-18
 
 ### Added

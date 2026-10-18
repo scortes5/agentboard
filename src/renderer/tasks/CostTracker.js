@@ -30,7 +30,7 @@ class CostTracker {
       if (this.taskBudget() && !t.budgetHit && t.tokens >= this.taskBudget()) this.budgetReached(t);
     }
     save();
-    if (cfg.tasksOpen) updateTaskLive();
+    if (viewLayout.visible('tasks')) updateTaskLive();
   }
 
   budgetReached(t) {

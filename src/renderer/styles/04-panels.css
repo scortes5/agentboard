@@ -30,12 +30,12 @@
 
 /* ---------- Tasks panel ---------- */
 #tasks {
-  position: absolute; top: 68px; right: 10px; bottom: 10px; width: 352px; z-index: 16;
+  position: absolute; top: 68px; right: 10px; bottom: 10px; width: var(--right-w); z-index: 16;
   display: none; flex-direction: column; overflow: hidden;
 }
 body.tasks-open #tasks { display: flex; }
-body.tasks-open #minimap { right: 374px; }
-body.tasks-open #dock { max-width: calc(100% - 700px); }
+body.tasks-open #minimap { right: calc(var(--right-w) + 22px); }
+body.tasks-open #dock { max-width: calc(100% - 2 * var(--right-w)); }
 #tasks .side-head { align-items: center; gap: 8px; }
 #tasks .spacer, .task-filter .spacer, .composer-row .spacer { flex: 1; }
 .task-opts { display: flex; flex-wrap: wrap; gap: 6px 12px; padding: 0 14px 8px; }
@@ -78,7 +78,7 @@ body.tasks-open #dock { max-width: calc(100% - 700px); }
 
 /* ---------- Diagram ---------- */
 #diagram { position: absolute; top: 68px; left: 10px; right: 10px; bottom: 10px; z-index: 19; display: flex; flex-direction: column; gap: 8px; }
-body.tasks-open #diagram { right: 372px; }
+body.tasks-open #diagram { right: calc(var(--right-w) + 20px); }
 body.diagram-open #dock, body.diagram-open #minimap, body.diagram-open #sidebar, body.diagram-open #empty { display: none !important; }
 .dg-bar { display: flex; align-items: center; gap: 12px; padding: 8px 12px; flex-wrap: wrap; }
 .dg-bar .spacer { flex: 1; }
