@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="styles/06-settings-automations.css" />
   <link rel="stylesheet" href="styles/07-task-control.css" />
   <link rel="stylesheet" href="styles/08-integrations.css" />
+  <link rel="stylesheet" href="styles/09-onboarding.css" />
 </head>
 <body>
   <main id="board">
@@ -330,6 +331,14 @@
     </form>
   </dialog>
 
+  <dialog id="onboarding" class="onboarding">
+    <div class="ob-head"><span class="eyebrow">Welcome to AgentBoard</span><span class="spacer"></span><span id="obDots" class="ob-dots"></span></div>
+    <h2 id="obTitle"></h2>
+    <div id="obBody"></div>
+    <div class="actions"><button type="button" id="obSkip" class="ghost" title="Close the guide; open it again from the palette (Welcome Guide)">Skip</button><span class="spacer"></span>
+      <button type="button" id="obBack" class="ghost">Back</button><button type="button" id="obNext" class="primary">Next</button></div>
+  </dialog>
+
   <dialog id="askDialog" class="ask">
     <form method="dialog">
       <h2 id="askTitle"></h2>
@@ -531,5 +540,6 @@
   <script src="integrations/IssueImporter.js"></script>
   <script src="integrations/IntegrationSettings.js"></script>
   <script src="agents/GroundRules.js"></script>
+  <script src="onboarding/Onboarding.js"></script>
 </body>
 </html>

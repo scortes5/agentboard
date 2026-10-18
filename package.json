@@ -32,6 +32,7 @@
   },
   "private": true,
   "main": "src/main/index.js",
+  "desktopName": "agentboard.desktop",
   "scripts": {
     "test": "node --test test/*.test.js",
     "start": "electron .",
@@ -110,6 +111,20 @@
         }
       ],
       "icon": "build/icon.ico"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "Development",
+      "icon": "build/icon.png",
+      "synopsis": "Run many coding agents side by side on one board",
+      "syncDesktopName": true
     },
     "nsis": {
       "artifactName": "${productName}-Setup-${version}.${ext}",

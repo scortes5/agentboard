@@ -16,6 +16,7 @@ function palCommands() {
     { icon: 'chart', label: 'Usage and Savings', hint: '⇧⌘U', run: () => openUsage() },
     { icon: 'keyboard', label: 'Keyboard Shortcuts', hint: '⌘/', run: () => openSettings('keys') },
     { icon: 'sun', label: 'Appearance', run: () => openSettings('appearance') },
+    { icon: 'idea', label: 'Welcome Guide', run: () => onboarding.open() },
     { icon: 'group', label: 'New Group', hint: '⇧⌘G', run: () => newGroup() },
     { icon: 'note', label: 'New Note', hint: '⇧⌘N', run: () => newCard('note') },
     { icon: 'grid', label: 'Arrange Cards', hint: '⇧⌘O', run: () => arrange() },

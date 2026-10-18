@@ -100,10 +100,12 @@ From [Releases](https://github.com/scortes5/agentboard/releases/latest):
 | Mac with Apple Silicon (M1, M2…) | `AgentBoard-x.y.z-arm64.dmg` |
 | Mac with Intel | `AgentBoard-x.y.z.dmg` |
 | Windows | `AgentBoard-Setup-x.y.z.exe` (`AgentBoard.Setup.x.y.z.exe` up to 0.5.0) |
+| Linux (x64) | `AgentBoard-x.y.z.AppImage` (from 3.0.0) |
 
 The app is not signed. The first time:
 - **Mac**: open AgentBoard once, press *Done* in the warning, then go to **System Settings → Privacy & Security**, scroll to *Security* and press **Open Anyway**. Or, in Terminal: `xattr -cr /Applications/AgentBoard.app`. (Right-click → *Open* no longer works on macOS 15 and later.)
 - **Windows**: in the SmartScreen warning, *More info* → *Run anyway*.
+- **Linux**: make it executable and open it: `chmod +x AgentBoard-*.AppImage && ./AgentBoard-*.AppImage`. On distributions without FUSE 2 (Ubuntu 22.04 and later), install `libfuse2` first.
 
 ### Updates
 
@@ -111,6 +113,7 @@ AgentBoard looks for a new release when it opens and every six hours (turn it of
 
 - **Windows**: the new version downloads in the background. When it is ready, a notice offers **Restart to Update**; if you choose **Later**, it installs the next time you quit.
 - **Mac**: a notice says which version is available. **Download** opens the `.dmg` for your Mac (Apple Silicon or Intel) in the browser; open it and drag AgentBoard to *Applications* to replace the old one. Your board and settings are kept.
+- **Linux**: the notice's **Download** gets the new `.AppImage`; make it executable and open it instead of the old one.
 
 Silent updates on Mac (download and install with no `.dmg`) need the app to be signed and notarized with an Apple Developer ID, which this project does not have yet. When you run AgentBoard from source, it only shows the notice; update with `git pull`.
 

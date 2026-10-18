@@ -68,6 +68,18 @@ function mcpSession(dataDir, requests) {
     assert.deepEqual(wanted.filter((c) => !handled.includes(c)), []);
     step('every IPC channel has a handler');
 
+    // A new board opens the welcome guide; every step renders and Finish closes it for good.
+    assert.equal(await win.evaluate(() => $('#onboarding').open), true, 'the guide opens on a new board');
+    const seen = [];
+    for (let i = 0; i < 5; i++) {
+      seen.push(await win.evaluate(() => $('#obBody').dataset.step));
+      if (seen.at(-1) === 'rules') assert.match(await win.evaluate(() => $('#obRules').value), /Co-Authored-By/);
+      await win.evaluate(() => $('#obNext').click());
+    }
+    assert.deepEqual(seen, ['agents', 'project', 'connect', 'rules', 'task']);
+    assert.deepEqual(await win.evaluate(() => [$('#onboarding').open, cfg.onboarded]), [false, true]);
+    step('the welcome guide walks through every step once');
+
     // The MCP server each CLI runs gets its tools from the app (one file per tool) and calls them.
     const mcp = await mcpSession(data, [
       { jsonrpc: '2.0', id: 1, method: 'initialize', params: {} },

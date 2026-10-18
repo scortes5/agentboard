@@ -6,3 +6,4 @@
 .is-item:hover { background: var(--fill); }
 .is-item input { margin-top: 2px; }
 #remoteLinks code.link { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; user-select: all; }
+
