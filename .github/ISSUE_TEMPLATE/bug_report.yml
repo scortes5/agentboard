@@ -1,0 +1,67 @@
+name: Bug report
+description: Something in AgentBoard does not work as expected.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this. Check the [troubleshooting table](https://github.com/scortes5/agentboard/blob/main/docs/GUIDE.md#15-if-something-does-not-work) first; many common problems are listed there.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you did, what you expected and what happened instead.
+      placeholder: I added a task with @codex and it stayed in Queued forever…
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open a project
+        2. Press Tasks and add "…"
+        3. …
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: AgentBoard version
+      description: AgentBoard menu → About, or `version` in package.json.
+      placeholder: 0.4.0
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS (Apple Silicon)
+        - macOS (Intel)
+        - Windows
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How did you install it?
+      options:
+        - Installer from Releases
+        - From source (npm run app / npm start)
+  - type: checkboxes
+    id: agents
+    attributes:
+      label: Agents involved
+      options:
+        - label: Claude Code
+        - label: Codex
+        - label: Gemini CLI
+        - label: Other CLI or local model
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or terminal output
+      description: Remove tokens, emails or anything private before pasting.
+      render: text

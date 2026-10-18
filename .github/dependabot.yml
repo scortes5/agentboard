@@ -1,0 +1,44 @@
+# Dependabot: weekly version updates for npm and GitHub Actions.
+# Security updates are opened as soon as an advisory is published
+# (enable "Dependabot alerts" and "Dependabot security updates" in Settings → Code security).
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "08:00"
+      timezone: America/Santiago
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(deps-dev)"
+    labels: [dependencies]
+    groups:
+      xterm:
+        patterns: ["@xterm/*"]
+      build-tooling:
+        dependency-type: development
+        patterns: ["electron-builder*"]
+      production-minor:
+        dependency-type: production
+        update-types: [minor, patch]
+    ignore:
+      # Electron majors change the runtime and native ABI (node-pty); review them by hand.
+      - dependency-name: electron
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "08:00"
+      timezone: America/Santiago
+    commit-message:
+      prefix: "ci"
+    labels: [dependencies, github-actions]
+    groups:
+      actions:
+        patterns: ["*"]
