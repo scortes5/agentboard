@@ -9,6 +9,7 @@ npm run check      # which agent CLIs are installed
 npm run app        # build and install the app
 npm run dist:mac   # .dmg files      ·  npm run dist:win  → .exe
 npm run icon       # regenerate icons from src/assets/logo.svg
+npm run test:e2e   # open the real app and drive a task with a fake agent
 ```
 
 ## Checks
@@ -19,6 +20,8 @@ CI (`.github/workflows/ci.yml`) runs on every push and pull request:
 npm ci --ignore-scripts
 git ls-files '*.js' | xargs -n1 node --check
 ```
+
+The `e2e` job opens the real app under `xvfb` and runs `test/e2e.js` (see [[Architecture]] → Tests).
 
 CodeQL code scanning (GitHub default setup) analyzes JavaScript and workflows on every push and pull request. Dependabot opens weekly update PRs for npm packages and GitHub Actions.
 

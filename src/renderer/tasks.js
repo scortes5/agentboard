@@ -4,11 +4,13 @@
 'use strict';
 /* global ab, cfg, $, esc, uid, basename, clamp, isMac, runtime, cardData, agentOf, newCard, focusCardView, focusCard, closeCard, closePopover, openPopover,
    ensureGroup, slotIn, looseSpot, terminalTail, toast, save, agentAvailable, visibleRect, applyViewport, drawMinimap, projectOfPath, icon,
-   diagramOpen, toggleDiagram, STATUS_LABEL, openSkills */
+   diagramOpen, toggleDiagram, STATUS_LABEL, openSkills, approvals, answerApproval, openReview, restoreCheckpoint, onTaskMarker,
+   afterTaskFinished, reviewPrompt */
 
 const STATUS = {
   pending: 'Queued',
   running: 'Working',
+  verifying: 'Checking',
   review: 'Needs your review',
   done: 'Done',
   blocked: 'Blocked',
@@ -60,6 +62,8 @@ function addTask(fields) {
     id: uid(), text: fields.text, status: 'pending', agent: fields.agent || 'auto',
     cwd: fields.cwd ?? cfg.selectedProject ?? null, group: fields.group || '', light: !!fields.light, heavy: !!fields.heavy && !fields.light,
     worktree: fields.worktree ?? null, from: fields.from || null, createdAt: Date.now(),
+    after: fields.after?.length ? fields.after : undefined,   // ids of tasks that must be done first
+    reviewOf: fields.reviewOf, issue: fields.issue,          // cross-review of another task; GitHub issue it comes from
   };
   tasks().push(t);
   save(); renderTasks();
@@ -102,8 +106,10 @@ function canOpenSubagents(key) {
 }
 
 function taskPrompt(t, subagents = false) {
+  if (t.reviewOf) return reviewPrompt(t);
   const max = cfg.maxSubagents || 4;
   return `[AgentBoard task ${t.id}] ${t.text}\n`
+    + (t.issue?.body ? `(GitHub issue #${t.issue.number}: ${t.issue.body.slice(0, 3000)})\n` : '')
     + '(Only this, keep it short; use the agentboard-task skill if you have it. When finished, call complete_task if available and end with the line «DONE: …» or «BLOCKED: …».)'
     + (subagents && !t.light
       ? `\n(If the task has parts that can be done at the same time, split it: open up to ${max} helpers with the AgentBoard tool start_agent — light=true for simple parts, each with a self-contained message — so they work in parallel on the user's board next to you. Follow them with read_agent_output, check and combine their work, then write your own DONE line. Do not split small tasks.)`
@@ -121,8 +127,13 @@ async function startTask(t, key) {
   const wantWorktree = t.worktree ?? cfg.taskWorktrees;
   if (wantWorktree && cwd) {
     const r = await ab.gitWorktree(cwd, t.text.split(/\s+/).slice(0, 5).join(' '));
-    if (r.ok) { cwd = r.value.dir; t.branch = r.value.branch; t.workdir = r.value.dir; }
+    if (r.ok) { cwd = r.value.dir; t.branch = r.value.branch; t.workdir = r.value.dir; t.base = r.value.base; }
     else toast(`No worktree for this task (${esc(r.error)}); using the project folder.`, 5000);
+  }
+  // Without a worktree, remember how the project looked so the task can be reviewed and undone.
+  if (!t.workdir && cwd && !t.reviewOf && cfg.taskCheckpoints !== false) {
+    const r = await ab.gitCheckpoint(cwd, t.text);
+    if (r.ok) t.checkpoint = r.value.sha;
   }
   const g = t.group ? ensureGroup(t.group, projectOfPath(t.cwd || cfg.selectedProject || '')) : null;
   const pos = g ? slotIn(g) : looseSpot();
@@ -133,17 +144,21 @@ async function startTask(t, key) {
   });
   if (!card) { t.status = 'pending'; taskRt.delete(t.id); save(); renderTasks(); return; }
   t.cardId = card.id;
+  t.sessionId = card.sessionId; // Claude's session: how its tokens are counted
   save(); renderTasks();
   setTimeout(() => { const rt = taskRt.get(t.id); if (rt) rt.dispatching = false; }, 4000);
   toast(`Task → <b>${esc(a.label)}</b>${g ? ` in ${esc(g.title)}` : ''}: ${esc(title)}`);
 }
+
+// A task with "after" waits until every task it depends on is done.
+const depsReady = (t) => !t.after?.some((id) => taskById(id) && taskById(id).status !== 'done');
 
 // onlyFlows: with "Run queue" off, automation steps still run
 function dispatchQueued(onlyFlows = false) {
   let slots = (cfg.maxParallel || 3) - tasks().filter((t) => t.status === 'running').length;
   for (const t of tasks()) {
     if (slots <= 0) break;
-    if (t.status !== 'pending' || (onlyFlows && !t.flowRun)) continue;
+    if (t.status !== 'pending' || (onlyFlows && !t.flowRun) || !depsReady(t)) continue;
     const key = pickAgent(t);
     if (!key) continue;
     slots--;
@@ -153,11 +168,12 @@ function dispatchQueued(onlyFlows = false) {
 
 // Look for «DONE: …» / «BLOCKED: …» at the end of the terminal (HECHO/BLOQUEADO from older
 // prompts still count). The echo of our own instruction says «DONE: …» and is skipped by the "…".
-function findMarker(c) {
+// ignore: markers already handled (e.g. a DONE whose checks failed and was sent back).
+function findMarker(c, ignore = []) {
   const lines = terminalTail(c, 30).split('\n').reverse();
   for (const line of lines) {
     const m = line.match(/(?:^|[\s●⏺•>*✦│])(DONE|BLOCKED|HECHO|BLOQUEADO):\s*(.+?)\s*$/);
-    if (!m || m[2].startsWith('…') || m[2].length < 3) continue;
+    if (!m || m[2].startsWith('…') || m[2].length < 3 || ignore.includes(m[2].slice(0, 300))) continue;
     return { status: /^(DONE|HECHO)$/.test(m[1]) ? 'done' : 'blocked', text: m[2].slice(0, 300) };
   }
   return null;
@@ -210,6 +226,19 @@ function finishTask(t, status, summary) {
   if (!document.hasFocus()) {
     try { new Notification(status === 'done' ? 'Task done' : 'Task blocked', { body: `${t.text.slice(0, 80)}\n${t.summary}` }); } catch {}
   }
+  afterTaskFinished(t);
+}
+
+// Back to work in the same card (review comments, failed checks): the DONE line on screen
+// is remembered so it does not finish the task again.
+function startTaskAgain(t) {
+  const c = t.cardId && cardData(t.cardId);
+  const m = c && findMarker(c, t.ignoreMarkers);
+  if (m) t.ignoreMarkers = [...(t.ignoreMarkers || []), m.text];
+  Object.assign(t, { status: 'running', finishedAt: null });
+  taskRt.set(t.id, { lastBusy: Date.now(), dispatching: true });
+  setTimeout(() => { const rt = taskRt.get(t.id); if (rt) rt.dispatching = false; }, 4000);
+  save(); renderTasks();
 }
 
 function tickTasks() {
@@ -225,8 +254,8 @@ function tickTasks() {
     const st = taskRt.get(t.id) || { lastBusy: t.startedAt || now };
     taskRt.set(t.id, st);
     if (st.dispatching) continue;
-    const m = findMarker(c);
-    if (m) { finishTask(t, m.status, m.text); changed = true; continue; }
+    const m = findMarker(c, t.ignoreMarkers);
+    if (m) { onTaskMarker(t, m); changed = true; continue; }
     const lim = findLimit(c);
     if (lim && t.assigned) {
       // the subscription ran out: back to the queue so another one picks it up
@@ -253,7 +282,7 @@ function tickTasks() {
 
 // ---------- Panel ----------
 function updateBadge() {
-  const n = tasks().filter((t) => t.status === 'pending' || t.status === 'running' || t.status === 'review').length;
+  const n = tasks().filter((t) => ['pending', 'running', 'verifying', 'review'].includes(t.status)).length;
   const review = tasks().filter((t) => t.status === 'review' || t.status === 'blocked').length;
   const b = $('#tasksBadge');
   b.textContent = review ? `${n} · ${review}!` : String(n);
@@ -290,7 +319,7 @@ function renderTasks() {
   if (!list) return;
   const active = (t) => t.status !== 'done';
   const shown = tasks().filter((t) => taskFilter === 'all' || (taskFilter === 'done' ? !active(t) : active(t)));
-  const order = { review: 0, blocked: 1, running: 2, pending: 3, done: 4 };
+  const order = { review: 0, blocked: 1, running: 2, verifying: 2, pending: 3, done: 4 };
   shown.sort((a, b) => (order[a.status] - order[b.status]) || (taskFilter === 'done' ? (b.finishedAt || 0) - (a.finishedAt || 0) : 0));
 
   const counts = {};
@@ -319,9 +348,17 @@ function renderTasks() {
       t.branch ? chip(icon('branch', 11) + ' ' + esc(t.branch.replace(/^agentboard\//, '')), 'branch') : '',
       t.from ? chip('from ' + esc(cardData(t.from)?.title || 'an agent')) : '',
       t.flowRun ? chip('automation') : '',
+      t.after?.length && !depsReady(t) ? chip('after: ' + esc((taskById(t.after[0])?.text || 'another task').slice(0, 30)), 'wait') : '',
+      t.issue ? chip(`#${t.issue.number}`, 'issue') : '',
+      t.reviewOf ? chip('reviewer', 'review') : '',
+      t.review ? chip(t.review.status === 'done' ? `approved by ${esc(t.review.by)}` : `changes asked by ${esc(t.review.by)}`, t.review.status === 'done' ? 'ok' : 'warn', '') : '',
+      t.checkFailures ? chip(`checks failed ×${t.checkFailures}`, 'warn') : '',
+      t.pr ? `<a class="tchip pr" href="${esc(t.pr)}" title="Open the pull request">PR</a>` : '',
     ].join('');
     const B = (a, ic, tip) => `<button data-a="${a}" title="${tip}">${icon(ic, 14)}</button>`;
-    const wt = t.workdir && t.branch ? B('diff', 'diff', 'See its worktree changes and merge or discard them') : '';
+    const canReview = (t.workdir && t.branch) || (t.checkpoint && !t.restored);
+    const wt = canReview ? B('diff', 'diff', 'Review its changes: full diff, comments for the agent, merge, pull request or undo') : '';
+    const undo = t.checkpoint && !t.workdir && !t.restored ? B('restore', 'back', 'Undo: put the project back as it was before this task') : '';
     const go = B('go', 'focus', 'Go to the agent card');
     const done = B('done', 'check', 'Mark as done');
     const retry = B('retry', 'refresh', 'Put it back in the queue');
@@ -329,9 +366,10 @@ function renderTasks() {
     const acts = {
       pending: B('top', 'up', 'Move to the top of the queue') + B('run', 'play', 'Run now, without waiting for the queue') + del,
       running: go + done,
+      verifying: go,
       review: wt + go + done,
-      blocked: go + retry + done,
-      done: wt + retry + del,
+      blocked: wt + undo + go + retry + done,
+      done: wt + undo + retry + del,
     }[t.status];
     return `<div class="task st-${t.status}" data-id="${esc(t.id)}">
       <span class="tdot" title="${STATUS[t.status]}"></span>
@@ -339,7 +377,7 @@ function renderTasks() {
         <div class="ttext" title="Double-click to edit">${esc(t.text)}</div>
         <div class="tmeta">${meta}</div>
         ${t.summary ? `<div class="tsum">${esc(t.summary)}</div>` : ''}
-        ${t.status === 'running' || t.status === 'review' ? `<div class="tlive" data-live="${esc(t.id)}"></div>` : ''}
+        ${['running', 'review', 'verifying'].includes(t.status) ? `<div class="tlive" data-live="${esc(t.id)}"></div>` : ''}
         ${t.needsTrust ? '<div class="tsum warn">It asks whether you trust the folder. <button class="inline" data-a="trust" title="Answer that you trust this folder so the task continues">Trust and Continue</button></div>'
           : t.status === 'review' ? '<div class="tsum warn">The agent is waiting: check whether it finished or asked you something.</div>' : ''}
       </div>
@@ -375,7 +413,10 @@ function updateTaskLive() {
     const me = liveOf(c);
     const kids = cfg.cards.filter((k) => k.parent === c.id);
     const sameLine = me.alert && me.alert === me.line;
-    el.innerHTML = `<div class="lrow${sameLine ? ' lalert' : ''}"${sameLine ? ` data-go="${esc(c.id)}"` : ''}><span class="status ${me.st}"></span><span class="ltime">${fmtElapsed(now - (t.startedAt || now))}</span><span class="lline">${esc(me.line || me.label)}</span>${sameLine ? icon('alert', 11) : ''}</div>`
+    const ask = approvals.get(c.id);
+    el.innerHTML = (ask ? `<div class="lrow lask"><span class="lline" title="${esc(ask.context)}">${esc(ask.question)}</span>
+        <button class="inline" data-approve="no" data-card="${esc(c.id)}" title="Reject (Esc)">Reject</button><button class="inline primary" data-approve="yes" data-card="${esc(c.id)}" title="Allow this once">Approve</button></div>` : '')
+      + `<div class="lrow${sameLine ? ' lalert' : ''}"${sameLine ? ` data-go="${esc(c.id)}"` : ''}><span class="status ${me.st}"></span><span class="ltime">${fmtElapsed(now - (t.startedAt || now))}</span><span class="lline">${esc(me.line || me.label)}</span>${sameLine ? icon('alert', 11) : ''}</div>`
       + (me.alert && !sameLine ? `<div class="lrow lalert" data-go="${esc(c.id)}">${icon('alert', 11)}<span class="lline">${esc(me.alert)}</span></div>` : '')
       + kids.map((k) => {
         const s = liveOf(k);
@@ -407,6 +448,8 @@ function updateProgress() {
 function taskById(id) { return tasks().find((t) => t.id === id); }
 
 $('#taskList').addEventListener('click', (e) => {
+  const ap = e.target.closest('[data-approve]');
+  if (ap) { answerApproval(ap.dataset.card, ap.dataset.approve === 'yes'); return; }
   const go = e.target.closest('[data-go]')?.dataset.go;
   const gc = go && cardData(go);
   if (gc) { if (diagramOpen()) toggleDiagram(false); focusCardView(gc); focusCard(gc.id); return; }
@@ -431,7 +474,9 @@ $('#taskList').addEventListener('click', (e) => {
   } else if (act === 'top') {
     cfg.tasks = [t, ...tasks().filter((x) => x !== t)]; save(); renderTasks();
   } else if (act === 'diff') {
-    worktreeMenu(t, e.target.closest('button'));
+    openReview(t);
+  } else if (act === 'restore') {
+    restoreCheckpoint(t);
   } else if (act === 'retry') {
     Object.assign(t, { status: 'pending', cardId: null, assigned: null, summary: '', finishedAt: null });
     save(); renderTasks();
@@ -448,54 +493,6 @@ $('#taskList').addEventListener('dblclick', (e) => {
   el.addEventListener('blur', done, { once: true });
   el.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === 'Escape') { ev.preventDefault(); el.blur(); } });
 });
-
-// Review what a task did in its worktree and merge it (or discard it).
-async function worktreeMenu(t, anchor) {
-  closePopover();
-  const r = await ab.worktreeInfo(t.workdir, t.branch);
-  const pop = document.createElement('div');
-  pop.className = 'popover edit wt';
-  if (!r.ok) {
-    pop.innerHTML = `<div class="hint">${esc(r.error)}</div>`;
-    openPopover(pop, anchor, 300);
-    return;
-  }
-  const v = r.value;
-  const nothing = !v.commits && !v.uncommitted;
-  pop.innerHTML = `
-    <label>Branch <code>${esc(v.branch)}</code> → <code>${esc(v.base)}</code></label>
-    <div class="hint">${v.commits} commit${v.commits === 1 ? '' : 's'}${v.uncommitted ? ` · ${v.uncommitted} uncommitted file${v.uncommitted === 1 ? '' : 's'} (committed when merging)` : ''}</div>
-    <pre class="stat">${esc(v.stat || 'No changes.')}</pre>
-    <div class="row">
-      <button data-x="open" title="Open the worktree folder">Open Folder</button>
-      <button data-x="discard" title="Delete the worktree and its branch">Discard</button>
-      <button data-x="merge" class="primary" ${nothing ? 'disabled' : ''} title="Commit pending changes, merge into ${esc(v.base)} and remove the worktree">Merge into ${esc(v.base)}</button>
-    </div>`;
-  openPopover(pop, anchor, 420);
-  pop.addEventListener('click', async (e) => {
-    const x = e.target.closest('[data-x]')?.dataset.x;
-    if (x === 'open') ab.openPath(t.workdir);
-    if (x === 'discard') {
-      if (!confirm(`Discard the work of "${t.text.slice(0, 60)}"? The worktree and the branch ${v.branch} are deleted.`)) return;
-      const d = await ab.worktreeDiscard(t.workdir, t.branch);
-      closePopover();
-      if (!d.ok) return toast(esc(d.error), 6000);
-      t.workdir = null; t.branch = null; save(); renderTasks();
-      toast('Worktree discarded.');
-    }
-    if (x === 'merge') {
-      const m = await ab.worktreeMerge(t.workdir, t.branch, `${t.text.slice(0, 120)}\n\nAgentBoard task`);
-      closePopover();
-      if (!m.ok) return toast(esc(m.error), 8000);
-      const c = t.cardId && cardData(t.cardId);
-      if (c) closeCard(c);
-      t.workdir = null; t.mergedInto = m.value.base;
-      if (t.status !== 'done') finishTask(t, 'done', t.summary || 'Merged.');
-      save(); renderTasks();
-      toast(`Merged into <b>${esc(m.value.base)}</b>`, 4000);
-    }
-  });
-}
 
 // Markdown summary of today's work, to paste into a standup, a commit or an email.
 function dailySummary() {
@@ -518,12 +515,18 @@ function composerDefaults() {
 // tasks and picks a subscription and model for each; the queue then runs them in parallel.
 const canRoute = () => cfg.taskRoute !== false && agentAvailable.claude !== false && !!cfg.agents.claude?.command;
 
+// x.after: index (in the same list) of the task this one must wait for.
 function addPlanned(list, d) {
+  const added = [];
   for (const x of list) {
     const proj = x.project && projectFrom(x.project);
     const light = !!x.light || d.light;
     const agent = agentKeyFrom(x.agent);
-    addTask({ text: x.text.trim(), agent: agent && agent !== 'auto' ? agent : d.agent, cwd: proj ? proj.path : d.cwd, light, heavy: !!x.heavy && !light, group: (x.group || '').trim() });
+    const dep = Number.isInteger(x.after) && added[x.after];
+    added.push(addTask({
+      text: x.text.trim(), agent: agent && agent !== 'auto' ? agent : d.agent, cwd: proj ? proj.path : d.cwd,
+      light, heavy: !!x.heavy && !light, group: (x.group || '').trim(), after: dep ? [dep.id] : undefined,
+    }));
   }
 }
 
@@ -552,13 +555,15 @@ function addLines(text) {
   const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
   if (!lines.length) return;
   const d = composerDefaults();
-  // a line with only #group / @agent and no text applies to the following lines
+  // a line with only #group / @agent and no text applies to the following lines;
+  // a line starting with ">" waits for the task on the line before it
   let carry = {};
-  let n = 0;
-  for (const line of lines) {
-    const t = parseLine(line, { ...d, ...carry });
+  let n = 0, prev = null;
+  for (const raw of lines) {
+    const then = /^>\s*/.test(raw);
+    const t = parseLine(raw.replace(/^>\s*/, ''), { ...d, ...carry });
     if (!t.text) { carry = { agent: t.agent, group: t.group, cwd: t.cwd, light: t.light }; continue; }
-    addTask(t); n++;
+    prev = addTask({ ...t, after: then && prev ? [prev.id] : undefined }); n++;
   }
   input.value = '';
   toast(`${n} task${n === 1 ? '' : 's'} queued${cfg.taskAuto ? '' : ' — turn on "Run queue" or run them one by one'}`);

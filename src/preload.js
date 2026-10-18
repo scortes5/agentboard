@@ -43,6 +43,11 @@ contextBridge.exposeInMainWorld('ab', {
   worktreeInfo: (dir, branch) => ipcRenderer.invoke('git:worktreeInfo', dir, branch),
   worktreeMerge: (dir, branch, msg) => ipcRenderer.invoke('git:worktreeMerge', dir, branch, msg),
   worktreeDiscard: (dir, branch) => ipcRenderer.invoke('git:worktreeDiscard', dir, branch),
+  // Review: checkpoints, the full diff of a task and pull requests
+  gitCheckpoint: (cwd, label) => ipcRenderer.invoke('git:checkpoint', cwd, label),
+  gitRestore: (cwd, sha) => ipcRenderer.invoke('git:restore', cwd, sha),
+  gitFullDiff: (opts) => ipcRenderer.invoke('git:fullDiff', opts),
+  gitPullRequest: (opts) => ipcRenderer.invoke('git:pullRequest', opts),
   claudeAccountDir: (name) => ipcRenderer.invoke('accounts:claudeDir', name),
   claudeAccountStatus: (dirs) => ipcRenderer.invoke('accounts:claudeStatus', dirs),
   setBadge: (n) => ipcRenderer.send('app:badge', n),

@@ -4,6 +4,22 @@ All notable changes to AgentBoard. The format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-18
+
+### Added
+- **Approvals inbox**: when Claude Code, Codex or Gemini asks for permission ("Do you want to proceed?", "Allow execution?"), the request appears under **Approvals** in the toolbar and under its task, with the command or file it is about. Approve or reject from there (or everything at once) without going to each card; you also get a notice and a notification.
+- **Review**: a task's full diff, file by file, with line numbers. Click a line to quote it, write what to change and **Send to Agent**: the same agent goes back to work. From the same window, **Merge**, **Create Pull Request** (pushes the branch; uses the GitHub CLI when installed, otherwise opens GitHub) or **Discard**.
+- **Checkpoints and undo**: before a task starts (without a worktree), AgentBoard snapshots the project. **Undo** puts it back exactly as it was: files the task created are removed and the ones it changed or deleted come back.
+- **Checks after each task**: a command per project (*Settings → Projects*) or a default one (*Settings → Tasks*), such as `npm test`. When the agent says DONE the command runs; if it fails, its output goes back to the same agent (twice by default) before the task is marked blocked.
+- **Cross-review** (off by default): another subscription reviews each finished task without editing anything, and approves it or sends the problems back to the first agent.
+- **Dependencies**: start a line with `>` to make it wait for the task above. Route also lets haiku mark a task that needs another one's result.
+- **Templates** for to-dos you write often, with `<placeholders>`; save your own from the composer.
+- An end-to-end test that opens the real app with a fake agent, run in CI on every pull request.
+
+### Changed
+- The main process is split into modules with one job each (`config`, `shell-env`, `pty-host`, `git`, `agents`, `library`, `ai`), and duplicated code was removed.
+- Tasks remember their Claude session, so the Usage panel counts tokens per task.
+
 ## [0.8.0] - 2026-10-18
 
 ### Added
@@ -132,7 +148,8 @@ Includes the 0.2.0 changes, which were not released separately.
 ### Added
 - First release: a board of terminals for CLI agents on Mac and Windows.
 
-[Unreleased]: https://github.com/scortes5/agentboard/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/scortes5/agentboard/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/scortes5/agentboard/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/scortes5/agentboard/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/scortes5/agentboard/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/scortes5/agentboard/compare/v0.5.0...v0.6.0

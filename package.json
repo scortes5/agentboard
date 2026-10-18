@@ -1,7 +1,7 @@
 {
   "name": "agentboard",
   "productName": "AgentBoard",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "A desktop board of real terminals to run Claude Code, Codex, Gemini CLI and other coding agents side by side, on your own subscriptions. macOS and Windows.",
   "keywords": [
     "claude-code",
@@ -40,7 +40,8 @@
     "dist": "electron-builder",
     "dist:mac": "electron-builder --mac",
     "dist:win": "electron-builder --win",
-    "postinstall": "node scripts/fix-pty.js"
+    "postinstall": "node scripts/fix-pty.js",
+    "test:e2e": "node test/e2e.js"
   },
   "dependencies": {
     "@xterm/addon-fit": "^0.11.0",
@@ -52,7 +53,8 @@
   },
   "devDependencies": {
     "electron": "^44.0.0",
-    "electron-builder": "^26.0.0"
+    "electron-builder": "^26.0.0",
+    "playwright-core": "^1.56.1"
   },
   "overrides": {
     "global-agent": "^4.1.3"

@@ -13,6 +13,7 @@ Open with the **Tasks** button (⇧⌘T). Write one to-do per line and press Ent
 | `+project` | Which project it runs in. |
 | `!` | **Light**: a cheaper model (e.g. haiku). |
 | `!!` | **Heavy**: a more capable model (e.g. opus). |
+| `>` at the start | Wait for the task on the line above. |
 
 Example:
 
@@ -47,6 +48,22 @@ refactor the payments module !!
 - Under each running task: time working, the last line its agent printed, and each **subagent** it opened with its status. Click any line to go to that card.
 - When a terminal prints an error (`npm ERR!`, `Error:`, `Traceback`, `FAIL`, an API or rate-limit error…), its card turns red, you get a notice (and a notification if you are in another app) and the task shows the line. Clicking the card clears the mark.
 - **Subagents**: with *Agent Connection* set up (*Skills and Agents*), a task agent may split its work with `start_agent`. Helpers open next to it as `↳ Agent` cards. *Settings → Tasks* sets whether they may and how many (4 by default).
+
+## Approvals
+
+When an agent asks for permission (run a command, edit a file), the request shows up under **Approvals** in the toolbar and under its task, with the command or file in question. **Approve** allows it once; **Reject** presses Esc so the agent asks what to do instead. **Approve All** answers every request at once.
+
+## Checks, review and undo
+
+- **Checks**: give a project a check command in *Settings → Projects* (for example `npm test`), or a default one in *Settings → Tasks*. When the agent says DONE the command runs; if it fails, the output goes back to the same agent (twice by default) and the task is marked blocked only if it keeps failing.
+- **Cross-review** (*Settings → Tasks*, off by default): another subscription reviews the finished task without editing it, and approves it or sends the problems back.
+- **Review**: the diff button opens the full diff file by file. Click a line to quote it, write what to change and **Send to Agent**. With a worktree you can also **Merge**, **Create Pull Request** or **Discard**.
+- **Undo**: without a worktree, each task starts from a checkpoint of the project. **Undo** puts the project back exactly as it was (new files removed, changed ones restored).
+
+## Dependencies and templates
+
+- Start a line with `>` to make it wait for the task on the line above (`write the API` / `> write tests for the API`). With **Route**, haiku may also mark a task that needs another one's result.
+- **Templates** (list button in the composer) insert to-dos you write often; `<placeholders>` are selected so you can type over them. Save your own with **Save Current Text**.
 
 ## Worktree per task
 

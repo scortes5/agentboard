@@ -172,6 +172,7 @@ refactor the payments module !!
 | `+project` | Which project it runs in. |
 | `!` | **Light**: a cheaper model (for example haiku). |
 | `!!` | **Heavy**: a more capable model (for example opus). |
+| `>` at the start | Wait for the task on the line above before starting. |
 
 - Each task runs in a **fresh session** and updates itself: *Done* when the agent writes `DONE: …`, *Needs your review* when it is waiting for an answer, *Blocked* with `BLOCKED: …`.
 - **Parallel** and **per subscription** limit how many run at once; with *Run queue* on, queued tasks start by themselves when there is room.
@@ -180,6 +181,11 @@ refactor the payments module !!
 - **Route** (on by default): when you add tasks, Claude's cheapest model (haiku, one short call with no terminal) splits what you wrote into independent tasks and picks the subscription and the model (light or heavy) for each one; the queue then runs them in parallel. Markers you write (`@agent`, `#group`, `+project`, `!`, `!!`) always win. Turn it off in the composer or in *Settings → Tasks*. Without Claude installed, lines are added as they are.
 - **Split**: paste free text and Claude breaks it into tasks, without starting them.
 - **Live progress**: a bar with done, working, blocked and errors; under each running task, its time, last output line and the subagents it opened. A card that prints an error turns red and notifies you.
+- **Approvals inbox**: every agent asking for permission, in one list under **Approvals**; approve or reject without visiting each card.
+- **Review and undo**: **Review** shows a task's full diff; click a line to quote it and send comments back to its agent, then **Merge**, **Create Pull Request** or **Discard**. Without a worktree, each task starts from a checkpoint and **Undo** puts the project back exactly as it was.
+- **Checks after each task**: set a command per project (for example `npm test`). If it fails, the output goes back to the same agent until it passes (or the task is marked blocked).
+- **Cross-review** (optional): another subscription reviews each finished task and approves it or sends the problems back.
+- **Dependencies and templates**: start a line with `>` to make it wait for the one above; insert frequent to-dos from **Templates**.
 - **Subagents you can see**: with *Agent Connection* on, a task agent may split its work with `start_agent`; each helper opens as a `↳` card next to it.
 - **Summary**: copies what was done today and what is pending, as Markdown.
 - **Global shortcut** (⌃⌥Space, configurable): add a task from any app.
@@ -326,6 +332,7 @@ npm start          # opens the app in development mode
 npm run app        # builds and installs the app
 npm run dist:mac   # builds the .dmg files  ·  npm run dist:win  builds the .exe
 npm run icon       # regenerates the icons from src/assets/logo.svg
+npm run test:e2e   # opens the real app and drives a task with a fake agent (Linux: xvfb-run -a npm run test:e2e)
 ```
 
 When a new `version` in `package.json` reaches `main`, the `.github/workflows/build.yml` workflow builds the Mac and Windows installers and publishes the Release with its `v<version>` tag, together with `latest.yml` and the `.blockmap` that the Windows app uses to update itself. Every push and pull request runs the `ci` workflow and CodeQL code scanning; Dependabot keeps npm packages and GitHub Actions up to date.
@@ -334,18 +341,32 @@ To see the update notice from source, pretend to run an older version: `AGENTBOA
 
 ```
 src/
-  main.js         main process: terminals, git, worktrees, menu, tray, settings
+  main.js         app lifecycle: window, menus, tray, shortcuts; wires the modules below
+  config.js       this machine's board and defaults
+  shell-env.js    the user's shell and PATH; headless and shell runs
+  pty-host.js     the cards' real terminals
+  git.js          status, branches, worktrees, checkpoints, diffs, merges, pull requests
+  agents.js       installed CLIs, sign-in, local models, Claude accounts, MCP status
+  library.js      skills, subagents, bundled skills and usage
+  ai.js           cheap model calls: routing tasks, automation design, shell steps
   bridge.js       local bridge between agents (socket + token)
   skills.js       reads and edits each CLI's skills, commands and subagents
+  usage.js        tokens and sessions from the CLIs' local logs
   updates.js      update checks: electron-updater on Windows, GitHub releases on Mac
-  preload.js      safe bridge between the interface and the main process
+  preload.js      the only bridge between the interface and the main process
   renderer/
     app.js        board, cards, groups, tabs, appearance and settings
-    tasks.js      task queue and spreading across subscriptions
+    tasks.js      task queue, spreading across subscriptions, live progress
+    task-checks.js  checks after each task and cross-review
+    approvals.js  inbox of agents asking for permission
+    review.js     diff review, comments, merge, pull request, undo
+    templates.js  task templates
     flows.js      automations: editor, runs and AI design
     diagram.js    diagram view
     palette.js    command palette
+    usage.js      usage and savings panel
     icons.js      icons and contextual help
+test/             end-to-end test with a fake agent
 skills-pack/      token-saving skills
 scripts/          MCP server, app install and icons
 docs/             guide and screenshots
