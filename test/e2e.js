@@ -34,6 +34,7 @@ const step = (name) => console.log(`✓ ${name}`);
   const win = await app.firstWindow();
   const errors = [];
   win.on('pageerror', (e) => errors.push(e.message));
+  win.on('console', (m) => { if (m.type() === 'error') errors.push(`console: ${m.text()}`); });
   win.on('dialog', (d) => d.accept());
   await win.waitForFunction(() => typeof cfg === 'object' && cfg && typeof addTask === 'function');
 
@@ -96,6 +97,33 @@ const step = (name) => console.log(`✓ ${name}`);
     await win.evaluate(() => { $('#taskInput').value = ''; insertTemplate(templates()[0].text); });
     assert.equal(await win.evaluate(() => { const i = $('#taskInput'); return i.value.slice(i.selectionStart, i.selectionEnd); }), '<METHOD>');
     step('templates select their first placeholder');
+
+    // Settings: opens, shows the new controls, and saves them.
+    await win.evaluate(() => openSettings('tasks'));
+    await win.evaluate(() => { const f = $('#settingsForm'); f.taskBudgetK.value = 250; f.termFont.value = 'Menlo'; f.termFont.dispatchEvent(new Event('change')); });
+    await win.evaluate(() => $('#saveSettings').click());
+    await until(() => win.evaluate(() => cfg.taskBudgetK === 250 && cfg.ui?.termFont === 'Menlo'), 5000);
+    assert.deepEqual(await win.evaluate(() => [cfg.taskBudgetK, cfg.ui?.termFont]), [250, 'Menlo']);
+    step('Settings opens and saves the new controls');
+
+    // A task pinned to a subscription that hits its limit moves to another one.
+    await win.evaluate((repo) => { cfg.taskAuto = true; cfg.tasks = []; addTask({ text: 'hit the limit please', agent: 'fake', cwd: repo }); tickTasks(); }, repo);
+    const moved = await until(() => win.evaluate(() => { const t = cfg.tasks[0]; return t.assigned === 'fake2' && cfg.exhausted?.fake && t; }), 30000);
+    assert.ok(moved, 'the pinned task is reassigned to the other subscription');
+    step('a subscription at its limit hands its task to another one');
+
+    // Every subscription out: the limits screen, with ideas that do not repeat.
+    await win.evaluate(() => {
+      cfg.taskAuto = false;
+      cfg.exhausted = { fake: Date.now() + 90 * 60000, fake2: Date.now() + 30 * 60000 };
+      addTask({ text: 'waiting for a subscription', agent: 'auto' });
+      checkAllLimited();
+    });
+    const limits = await win.evaluate(() => ({ open: $('#limits').open, when: $('#limitsWhen').textContent, idea: $('#limitsIdea').textContent }));
+    assert.ok(limits.open && /Come back in (29|30) min/.test(limits.when) && limits.idea, JSON.stringify(limits));
+    const ideas = await win.evaluate(() => { cfg.breakDeck = []; return Array.from({ length: 20 }, () => nextBreakIdea()); });
+    assert.equal(new Set(ideas).size, 20, 'twenty different ideas before any repeats');
+    step('all subscriptions out: "come back in" with the soonest reset and a fresh idea');
 
     assert.deepEqual(errors, [], 'no errors in the window');
     console.log('All end-to-end checks passed.');

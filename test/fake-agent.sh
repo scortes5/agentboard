@@ -3,6 +3,7 @@
 # its work when it receives feedback.
 echo "$1" | fold -w 120
 if [[ "$1" == *"Review, without editing"* ]]; then echo "$1" | fold -w 120; sleep 1; echo "DONE: approved — looks fine"; exec bash --norc; fi
+if [[ "$1" == *"hit the limit"* ]]; then echo "Claude usage limit reached. Your limit will reset in 2 hours."; exec bash --norc; fi
 echo " Bash command"
 echo "   touch out.txt"
 echo " Do you want to proceed?"

@@ -158,4 +158,25 @@ async function scanUsage({ tasks, historyFile, claudeDirs = [], codexDir }) {
   };
 }
 
-module.exports = { scanUsage };
+// Tokens used so far by specific Claude sessions (a running task's card), found by file name
+// (<claude dir>/projects/<project>/<session id>.jsonl), so a task's cost can be shown live.
+async function sessionTokens({ claudeDirs = [], ids = [] }) {
+  const want = new Set(ids.filter((id) => /^[0-9a-f-]{36}$/i.test(id)));
+  const out = {};
+  if (!want.size) return out;
+  for (const dir of new Set(claudeDirs)) {
+    let projects = [];
+    try { projects = fs.readdirSync(path.join(dir, 'projects'), { withFileTypes: true }).filter((e) => e.isDirectory()); } catch { continue; }
+    for (const p of projects) {
+      for (const id of want) {
+        const s = await cached(path.join(dir, 'projects', p.name, `${id}.jsonl`), parseClaude);
+        if (!s) continue;
+        const total = Object.values(s.days).reduce((n, r) => n + r.input + r.output + r.cacheRead + r.cacheWrite, 0);
+        out[id] = (out[id] || 0) + total;
+      }
+    }
+  }
+  return out;
+}
+
+module.exports = { scanUsage, sessionTokens };

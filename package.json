@@ -33,6 +33,7 @@
   "private": true,
   "main": "src/main.js",
   "scripts": {
+    "test": "node --test test/*.test.js",
     "start": "electron .",
     "check": "node scripts/check-agents.js",
     "app": "node scripts/install-app.js",

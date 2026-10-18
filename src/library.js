@@ -54,6 +54,10 @@ function register(ipcMain) {
     claudeDirs: [skills.claudeDir(), ...claudeAccountDirs()], codexDir: skills.codexDir(),
   })));
 
+  ipcMain.handle('usage:sessions', wrap((_e, ids) => usage.sessionTokens({
+    ids, claudeDirs: [skills.claudeDir(), ...claudeAccountDirs()],
+  })));
+
   ipcMain.handle('skills:scan', () => skills.scanSkills(projectsOf()));
 
   ipcMain.handle('skills:copy', wrap((_e, src, target) => skills.copySkill(src, target, projectsOf())));

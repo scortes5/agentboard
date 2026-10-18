@@ -5,7 +5,7 @@
 /* global ab, cfg, $, esc, uid, basename, clamp, isMac, runtime, cardData, agentOf, newCard, focusCardView, focusCard, closeCard, closePopover, openPopover,
    ensureGroup, slotIn, looseSpot, terminalTail, toast, save, agentAvailable, visibleRect, applyViewport, drawMinimap, projectOfPath, icon,
    diagramOpen, toggleDiagram, STATUS_LABEL, openSkills, approvals, answerApproval, openReview, restoreCheckpoint, onTaskMarker,
-   afterTaskFinished, reviewPrompt */
+   afterTaskFinished, reviewPrompt, fmtTokens, historyForRouting, overDailyBudget, checkAllLimited */
 
 const STATUS = {
   pending: 'Queued',
@@ -88,8 +88,11 @@ function pickAgent(t) {
   }
   const cands = autoAgents().filter((k) => runningOf(k) < per && !exhaustedUntil(k));
   if (!cands.length) return null;
-  cands.sort((a, b) => runningOf(a) - runningOf(b) || (lastAssigned[a] || 0) - (lastAssigned[b] || 0));
-  return cands[0];
+  // light work goes to a local model first when you asked for that (it costs nothing)
+  const local = t.light && cfg.preferLocalForLight ? cands.filter((k) => cfg.agents[k].local) : [];
+  const pool = local.length ? local : cands;
+  pool.sort((a, b) => runningOf(a) - runningOf(b) || (lastAssigned[a] || 0) - (lastAssigned[b] || 0));
+  return pool[0];
 }
 
 // Whether this subscription's CLI has the AgentBoard tools (MCP) registered, so it can open
@@ -159,6 +162,7 @@ function dispatchQueued(onlyFlows = false) {
   for (const t of tasks()) {
     if (slots <= 0) break;
     if (t.status !== 'pending' || (onlyFlows && !t.flowRun) || !depsReady(t)) continue;
+    if (overDailyBudget() && !t.light && !t.heavy) { t.light = true; t.budgetLight = true; }
     const key = pickAgent(t);
     if (!key) continue;
     slots--;
@@ -262,7 +266,9 @@ function tickTasks() {
       cfg.exhausted = { ...(cfg.exhausted || {}), [t.assigned]: lim.until };
       const label = cfg.agents[t.assigned]?.label || t.assigned;
       toast(`${esc(label)} hit its usage limit (until ${new Date(lim.until).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}). Reassigning the task.`, 6000);
-      Object.assign(t, { status: 'pending', cardId: null, assigned: t.agent === 'auto' ? null : t.assigned, summary: `${label}: ${lim.line}` });
+      // a task pinned to that subscription moves to another one too, unless you turned that off
+      const agent = cfg.limitFallback === false ? t.agent : 'auto';
+      Object.assign(t, { status: 'pending', cardId: null, agent, assigned: agent === 'auto' ? null : t.assigned, summary: `${label}: ${lim.line}` });
       taskRt.delete(t.id);
       changed = true; continue;
     }
@@ -276,6 +282,7 @@ function tickTasks() {
     }
   }
   dispatchQueued(!cfg.taskAuto);
+  checkAllLimited();
   if (changed) { save(); renderTasks(); }
   updateBadge();
 }
@@ -353,6 +360,8 @@ function renderTasks() {
       t.reviewOf ? chip('reviewer', 'review') : '',
       t.review ? chip(t.review.status === 'done' ? `approved by ${esc(t.review.by)}` : `changes asked by ${esc(t.review.by)}`, t.review.status === 'done' ? 'ok' : 'warn', '') : '',
       t.checkFailures ? chip(`checks failed ×${t.checkFailures}`, 'warn') : '',
+      t.budgetHit ? chip('over budget', 'warn') : t.budgetLight ? chip('light: daily budget', 'warn') : '',
+      t.status === 'done' && t.tokens ? chip(`${fmtTokens(t.tokens)} tok`) : '',
       t.pr ? `<a class="tchip pr" href="${esc(t.pr)}" title="Open the pull request">PR</a>` : '',
     ].join('');
     const B = (a, ic, tip) => `<button data-a="${a}" title="${tip}">${icon(ic, 14)}</button>`;
@@ -416,7 +425,7 @@ function updateTaskLive() {
     const ask = approvals.get(c.id);
     el.innerHTML = (ask ? `<div class="lrow lask"><span class="lline" title="${esc(ask.context)}">${esc(ask.question)}</span>
         <button class="inline" data-approve="no" data-card="${esc(c.id)}" title="Reject (Esc)">Reject</button><button class="inline primary" data-approve="yes" data-card="${esc(c.id)}" title="Allow this once">Approve</button></div>` : '')
-      + `<div class="lrow${sameLine ? ' lalert' : ''}"${sameLine ? ` data-go="${esc(c.id)}"` : ''}><span class="status ${me.st}"></span><span class="ltime">${fmtElapsed(now - (t.startedAt || now))}</span><span class="lline">${esc(me.line || me.label)}</span>${sameLine ? icon('alert', 11) : ''}</div>`
+      + `<div class="lrow${sameLine ? ' lalert' : ''}"${sameLine ? ` data-go="${esc(c.id)}"` : ''}><span class="status ${me.st}"></span><span class="ltime">${fmtElapsed(now - (t.startedAt || now))}${t.tokens ? ` · ${fmtTokens(t.tokens)} tok` : ''}</span><span class="lline">${esc(me.line || me.label)}</span>${sameLine ? icon('alert', 11) : ''}</div>`
       + (me.alert && !sameLine ? `<div class="lrow lalert" data-go="${esc(c.id)}">${icon('alert', 11)}<span class="lline">${esc(me.alert)}</span></div>` : '')
       + kids.map((k) => {
         const s = liveOf(k);
@@ -442,6 +451,8 @@ function updateProgress() {
   $('span', bar).innerHTML = [
     `${done}/${list.length} done`, running.length && `${running.length} working`, kids && `${kids} subagent${kids === 1 ? '' : 's'}`,
     errors && `<b class="bad">${errors} with errors</b>`, blocked && `<b class="bad">${blocked} blocked</b>`,
+    running.some((t) => t.tokens) && `${fmtTokens(running.reduce((n, t) => n + (t.tokens || 0), 0))} tokens`,
+    overDailyBudget() && '<b class="warn" title="New tasks use light models until tomorrow">daily budget reached</b>',
   ].filter(Boolean).join(' · ') + (noBridge ? ' · <button class="inline" data-x="connect" title="Register AgentBoard in your CLIs so task agents can open subagents you can see">Enable subagents</button>' : '');
 }
 
@@ -530,6 +541,15 @@ function addPlanned(list, d) {
   }
 }
 
+// What the router needs to know: subscriptions, projects, which agents are local (free)
+// and how each subscription did on past tasks.
+function planOptions() {
+  return {
+    agents: subscriptions().map(([k]) => k), projects: cfg.projects.map((p) => p.name),
+    local: subscriptions().filter(([, a]) => a.local).map(([k]) => k), history: historyForRouting(),
+  };
+}
+
 async function addFromComposer() {
   const input = $('#taskInput');
   const text = input.value.trim();
@@ -538,7 +558,7 @@ async function addFromComposer() {
   const btn = $('#taskAdd');
   if (btn.disabled) return;
   btn.disabled = true; btn.textContent = 'Routing…';
-  const r = await ab.planTasks(text, { agents: subscriptions().map(([k]) => k), projects: cfg.projects.map((p) => p.name) });
+  const r = await ab.planTasks(text, planOptions());
   btn.disabled = false; btn.textContent = 'Add';
   if (input.value.trim() === text) input.value = '';
   if (!r.ok || !r.value.length) {
@@ -576,7 +596,7 @@ async function planWithAI() {
   if (!text) return toast('Write your to-dos first; Claude (haiku) splits them into tasks.');
   const btn = $('#taskPlan');
   btn.disabled = true; btn.textContent = 'Splitting…';
-  const r = await ab.planTasks(text, { agents: subscriptions().map(([k]) => k), projects: cfg.projects.map((p) => p.name) });
+  const r = await ab.planTasks(text, planOptions());
   btn.disabled = false; btn.textContent = 'Split';
   if (!r.ok) return toast(`Could not split with Claude: ${esc(r.error)}`, 6000);
   addPlanned(r.value, composerDefaults());
