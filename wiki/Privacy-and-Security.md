@@ -21,7 +21,7 @@ Agents run with **your permissions**: anything you can do on this computer, they
 
 - **Settings → Security → Dangerous** (on by default: `rm -rf`, `git push --force`, `git reset --hard`, `sudo`, `curl … | sh`, `.env`, `.ssh/`, `DROP TABLE`, `npm publish`…): matching requests are flagged in red, left out of **Approve All**, ask once more before you approve them and can't be approved from the phone.
 - **Approve automatically**: empty by default. Add only commands that read or test (`npm test`, `git status`).
-- **Activity**: every answer (yours, the phone's or a rule's), remote devices, automation commands with the secrets they got, and secrets saved or removed, in `audit.log` (readable only by your user).
+- **Activity**: every answer (yours, the phone's or a rule's), remote devices, automation commands with the secrets they got, and secrets saved or removed, in `audit.log` (readable only by your user). Search it, or export it as CSV.
 
 ## Text from outside
 

@@ -12,6 +12,7 @@ npm run icon       # regenerate icons from src/assets/logo.svg
 npm run test:e2e   # open the real app and drive a task with a fake agent
 npm run test:smoke # open the app, run a command in a real terminal, open every panel (CI: macOS and Windows)
 xvfb-run -a node scripts/demo/record-demo.js   # re-record docs/images/demo.gif (Linux, needs Pillow)
+xvfb-run -a -s "-screen 0 1700x1200x24" node scripts/demo/screenshots.js   # retake docs/images/*.png
 ```
 
 ## Checks

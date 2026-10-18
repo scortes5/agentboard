@@ -83,6 +83,7 @@ contextBridge.exposeInMainWorld('ab', {
   // Security log: what was approved and by whom, remote devices, commands and secrets
   audit: (kind, detail) => ipcRenderer.send('audit:add', kind, detail),
   auditRecent: (n) => ipcRenderer.invoke('audit:recent', n),
+  auditExport: () => ipcRenderer.invoke('audit:export'),
   postWebhook: (url, text) => ipcRenderer.invoke('webhook:post', url, text),
   githubIssues: (cwd) => ipcRenderer.invoke('github:issues', cwd),
   onMenu: (cb) => ipcRenderer.on('menu', (_e, action) => cb(action)),

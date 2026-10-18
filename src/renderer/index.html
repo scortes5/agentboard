@@ -314,6 +314,8 @@
             <label class="set-row">Daily token budget, in thousands (0 = none; past it, new tasks use light models) <input name="dailyBudgetK" type="number" min="0" max="1000000" step="100" /></label>
             <label class="set-row">Weekly token budget, in thousands (0 = none; weeks start on Monday) <input name="weeklyBudgetK" type="number" min="0" max="10000000" step="1000" /></label>
             <label class="set-row">Monthly token budget, in thousands (0 = none) <input name="monthlyBudgetK" type="number" min="0" max="100000000" step="1000" /></label>
+            <div class="set-row" title="Used for the dollar estimates in Usage. With a subscription you don't pay per token; this shows what the same work would cost through the API.">API prices for estimates, $ per million tokens
+              <span class="prices"><label>input <input name="priceInput" type="number" min="0" step="0.01" /></label><label>output <input name="priceOutput" type="number" min="0" step="0.01" /></label><label>cache read <input name="priceCacheRead" type="number" min="0" step="0.01" /></label><label>cache write <input name="priceCacheWrite" type="number" min="0" step="0.01" /></label></span></div>
             <label class="set-row check" title="At 80% and 100% of a budget you get a notice; this also posts it to the channel of the daily summary (Settings → Integrations)"><span>Also send budget alerts to the daily summary's chat</span><input name="budgetAlertsToChat" type="checkbox" class="switch-input" /></label>
             <label class="set-row check"><span>Send light tasks to local models first (agents marked "local")</span><input name="preferLocalForLight" type="checkbox" class="switch-input" /></label>
             <label class="set-row check"><span>When a subscription hits its limit, move even tasks pinned to it (<code>@name</code>) to another one</span><input name="limitFallback" type="checkbox" class="switch-input" /></label>
@@ -332,8 +334,9 @@
           <p class="set-note">Leave it empty to answer every request yourself. Keep it to commands that only read or test.</p>
           <h3>Activity</h3>
           <p class="set-note">What was approved or rejected and by whom (you, your phone or a rule), devices that used the remote, automation commands and the secrets they got, and secrets saved or removed.</p>
+          <input id="auditSearch" class="audit-search" placeholder="Search the activity (a card, a command, a device…)" />
           <div id="auditList" class="audit"></div>
-          <div class="row-end"><button type="button" id="auditRefresh" class="ghost">Refresh</button></div>
+          <div class="row-end"><button type="button" id="auditExport" class="ghost" title="Save the whole log as a CSV file">Export CSV</button><button type="button" id="auditRefresh" class="ghost">Refresh</button></div>
         </section>
 
         <section data-sec="secrets" class="hidden">
@@ -590,6 +593,7 @@
   <script src="tasks/pipeline/ChecksStep.js"></script>
   <script src="tasks/pipeline/CrossReviewStep.js"></script>
   <script src="tasks/TemplateLibrary.js"></script>
+  <script src="usage/CostEstimate.js"></script>
   <script src="tasks/Budgets.js"></script>
   <script src="tasks/CostTracker.js"></script>
   <script src="tasks/LimitsNotice.js"></script>

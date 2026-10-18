@@ -1,7 +1,7 @@
 // AgentBoard — Settings → Security: the approval rules (ApprovalPolicy) and the security log
 // kept by the main process (AuditLog). Plugs into Settings through settingsSections.
 'use strict';
-/* global $, ab, cfg, esc, settingsSections, DEFAULT_DANGER */
+/* global $, ab, cfg, esc, toast, settingsSections, DEFAULT_DANGER */
 
 const AUDIT_TEXT = {
   approval: (e) => `${e.yes ? 'Approved' : 'Rejected'}${e.danger ? ' (dangerous)' : ''} by ${{ window: 'you', phone: 'your phone', rule: 'a rule' }[e.by] || e.by} · ${e.card}: ${[e.context, e.question].filter(Boolean).join(' · ')}`,
@@ -19,6 +19,12 @@ class SecuritySettings {
   constructor() {
     $('#dangerDefaults').onclick = () => { $('#settingsForm').approvalDanger.value = DEFAULT_DANGER.join('\n'); };
     $('#auditRefresh').onclick = () => this.renderLog();
+    $('#auditSearch').addEventListener('input', () => this.renderLog());
+    $('#auditExport').onclick = async () => {
+      const r = await ab.auditExport();
+      if (!r.ok) toast(`Could not export it: ${esc(r.error)}`, 6000);
+      else if (r.value) toast(`Activity saved to <b>${esc(r.value)}</b>`, 6000);
+    };
   }
 
   load(f) {
@@ -32,12 +38,15 @@ class SecuritySettings {
     cfg.approvalAuto = f.approvalAuto.value.trim();
   }
 
+  static text(e) { return (AUDIT_TEXT[e.kind] || ((x) => x.kind))(e); }
+
   async renderLog() {
-    const list = await ab.auditRecent(150);
+    const q = $('#auditSearch').value.trim().toLowerCase();
+    const list = (await ab.auditRecent(q ? 1000 : 150)).filter((e) => !q || SecuritySettings.text(e).toLowerCase().includes(q)).slice(0, 300);
     $('#auditList').innerHTML = list.length
       ? list.map((e) => `<div class="audit-row ${esc(e.kind)}"><time>${esc(new Date(e.at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }))}</time>
-          <span>${esc((AUDIT_TEXT[e.kind] || ((x) => x.kind))(e))}</span></div>`).join('')
-      : '<div class="muted small">Nothing yet.</div>';
+          <span>${esc(SecuritySettings.text(e))}</span></div>`).join('')
+      : `<div class="muted small">${q ? 'Nothing matches.' : 'Nothing yet.'}</div>`;
   }
 }
 

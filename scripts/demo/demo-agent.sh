@@ -4,9 +4,10 @@
 c() { printf '\e[%sm%s\e[0m\n' "$1" "$2"; }
 step() { sleep "$1"; c "$2" "$3"; }
 printf '\e[H\e[2J'
-task=${1#*] }; task=${task%%$'\n'*}; task=${task%% (Only*}
+prompt=${@: -1} # the task comes last; light/heavy model arguments may come before it
+task=${prompt#*] }; task=${task%%$'\n'*}; task=${task%% (Only*}
 c "1;35" "> $task"
-case "$1" in
+case "$prompt" in
   *coupon*)
     step 1.2 36 "● Reading src/routes/cart.js, src/models/coupon.js"
     step 1.4 36 "● Editing src/routes/cart.js  (+18 −2)"

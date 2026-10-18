@@ -44,11 +44,11 @@ function heatmap(days, metric) {
 }
 
 // Each project's tokens today, this week and this month, with its last 30 days as small bars.
-function costByProject(rows) {
+function costByProject(rows, perToken) {
   if (!rows.length) return '';
   const max = Math.max(1, ...rows.flatMap((r) => r.last30.map((d) => d.tokens)));
-  return `<table class="u-cost"><thead><tr><th>Project</th><th>Today</th><th>This week</th><th>This month</th><th>Last 30 days</th></tr></thead><tbody>
-    ${rows.map((r) => `<tr><td title="${esc(r.path)}">${esc(r.name)}</td><td>${fmt.count(r.today)}</td><td>${fmt.count(r.week)}</td><td>${fmt.count(r.month)}</td>
+  return `<table class="u-cost"><thead><tr><th>Project</th><th>Today</th><th>This week</th><th>This month</th><th title="At the API prices in Settings → Tasks; with a subscription you don't pay per token">≈ API price</th><th>Last 30 days</th></tr></thead><tbody>
+    ${rows.map((r) => `<tr><td title="${esc(r.path)}">${esc(r.name)}</td><td>${fmt.count(r.today)}</td><td>${fmt.count(r.week)}</td><td>${fmt.count(r.month)}</td><td>${CostEstimate.fmt(r.month * perToken)}</td>
       <td><span class="spark">${r.last30.map((d) => `<i style="height:${Math.max(d.tokens ? 8 : 0, Math.round((d.tokens / max) * 100))}%" title="${esc(d.day)}: ${fmt.count(d.tokens)}"></i>`).join('')}</span></td></tr>`).join('')}
   </tbody></table>`;
 }
@@ -81,7 +81,8 @@ function renderUsage() {
       <span class="u-val">${fmt.count(t)} · ${a.sessions} sessions${done ? ` · ${done.done} done, ${done.blocked} blocked` : ''}</span></div>`;
   }).join('') || '<p class="muted small">No Claude Code or Codex logs on this computer.</p>';
   budgets.update(usageData);
-  const projRows = costByProject(budgets.projectRows());
+  const perToken = CostEstimate.perToken(byAgent);
+  const projRows = costByProject(budgets.projectRows(), perToken);
   const budgetRows = budgetStatus(budgets.status());
 
   $('#usageBody').innerHTML = `
@@ -95,6 +96,7 @@ function renderUsage() {
       ${tile('Total tokens', fmt.count(total), `${fmt.count(output)} generated`)}
       ${tile('Sessions', sum('sessions'), `${sum('messages')} answers`)}
       ${tile('Tasks', ts.total, `${ts.light} in light mode`)}
+      ${tile('At API prices', '≈ ' + CostEstimate.fmt(Object.values(byAgent).reduce((s, a) => s + CostEstimate.of(a), 0)), 'what these tokens would cost without a subscription')}
     </div>
     <h3>Savings and Effectiveness</h3>
     <div class="u-tiles">
