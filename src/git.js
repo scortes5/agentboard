@@ -92,6 +92,7 @@ function register(ipcMain) {
     for (let i = 2; fs.existsSync(path.join(top, '.agentboard', 'worktrees', name)); i++) name = `${safe}-${i}`;
     const dir = path.join(top, '.agentboard', 'worktrees', name);
     const branch = `agentboard/${name}`;
+    const base = (await gitLong(top, ['rev-parse', 'HEAD'])).out.trim(); // where the task's work starts
     const r = await gitLong(top, ['worktree', 'add', '-b', branch, dir]);
     if (!r.ok) throw new Error(r.err.trim() || 'git worktree failed.');
     // keep worktrees from showing up as changes in the main repo
@@ -101,7 +102,7 @@ function register(ipcMain) {
       const cur = fs.existsSync(exclude) ? fs.readFileSync(exclude, 'utf8') : '';
       if (!/^\/?\.agentboard\/?$/m.test(cur)) { fs.mkdirSync(path.dirname(exclude), { recursive: true }); fs.appendFileSync(exclude, `${cur && !cur.endsWith('\n') ? '\n' : ''}.agentboard/\n`); }
     } catch {}
-    return { dir, branch };
+    return { dir, branch, base };
   }));
 
   // What a task's worktree holds compared with the base branch.

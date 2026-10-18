@@ -33,6 +33,7 @@ See the [Architecture](wiki/Architecture.md) wiki page for how the code is organ
 4. Run the same checks as CI:
    ```bash
    git ls-files '*.js' | xargs -n1 node --check
+   npm run test:e2e        # on Linux without a display: xvfb-run -a npm run test:e2e
    ```
 5. Try it with `npm start` on your system and say which one in the pull request.
 6. Add a line to `CHANGELOG.md` under **Unreleased** if users will notice the change.

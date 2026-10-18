@@ -42,6 +42,7 @@
     </div>
 
     <div class="group right">
+      <button id="approvalsBtn" data-icon="bell" title="Approvals: agents waiting for your permission, answered from one list">Approvals <span id="approvalsBadge" class="badge-n warn hidden"></span></button>
       <button id="usageBtn" title="Usage and savings: activity per day, tokens and effectiveness (⇧⌘U)">Usage</button>
       <button id="skillsBtn" title="Skills, your agents and the connection between agents">Skills and Agents</button>
       <button id="accountsBtn" title="Subscriptions, CLIs and local models">Subscriptions</button>
@@ -90,13 +91,14 @@
     </div>
     <div id="taskList"></div>
     <div class="composer">
-      <textarea id="taskInput" rows="3" placeholder="One to-do per line · Enter adds&#10;@claude  #group  +project  ! light  !! heavy"></textarea>
+      <textarea id="taskInput" rows="3" placeholder="One to-do per line · Enter adds&#10;@claude  #group  +project  ! light  !! heavy  > after the line above"></textarea>
       <div class="composer-row">
         <select id="taskAgent" title="Subscription that runs the tasks; Auto spreads them across the ones you have"></select>
         <select id="taskProject" title="Project the tasks run in"></select>
         <label class="switch" title="Light mode: use that subscription's cheapest model (same as ! in the text)"><input type="checkbox" id="taskLight" /> Light</label>
         <label class="switch" title="Route with AI: Claude's cheapest model (haiku, one short call) splits what you write into independent tasks and picks a subscription and model for each; they run in parallel"><input type="checkbox" id="taskRoute" /> Route</label>
         <span class="spacer"></span>
+        <button id="taskTemplates" class="ghost icon" data-icon="list" title="Templates: insert a to-do you write often, or save the current text as one"></button>
         <button id="taskPlan" class="ghost" title="Split: Claude (haiku, one short call) breaks your text into tasks and suggests who should do each one">Split</button>
         <button id="taskAdd" class="primary" title="Add every line of the text as a task (Enter)">Add</button>
       </div>
@@ -253,6 +255,10 @@
             <label class="set-row check"><span>Task agents may open subagents you can see on the board (needs Agent Connection)</span><input name="taskSubagents" type="checkbox" class="switch-input" /></label>
             <label class="set-row">Subagents per agent, at most <input name="maxSubagents" type="number" min="1" max="8" /></label>
             <label class="set-row check"><span>Flag cards that print an error (and notify me)</span><input name="watchErrors" type="checkbox" class="switch-input" /></label>
+            <label class="set-row check"><span>Take a checkpoint before each task, to review and undo it</span><input name="taskCheckpoints" type="checkbox" class="switch-input" /></label>
+            <label class="set-row">Check command after each task (empty = none; a project's own command wins) <input name="verifyCmd" placeholder="npm test" /></label>
+            <label class="set-row">Send failed checks back to the agent, at most <input name="verifyRetries" type="number" min="0" max="5" /></label>
+            <label class="set-row check"><span>Cross-review: another subscription reviews each finished task</span><input name="crossReview" type="checkbox" class="switch-input" /></label>
           </div>
         </section>
 
@@ -308,6 +314,24 @@
   </dialog>
 
   <!-- Skills and agents -->
+  <dialog id="review" class="wide review">
+    <form method="dialog">
+      <h2 id="reviewTitle">Review</h2>
+      <p id="reviewMeta" class="muted small"></p>
+      <div class="review-body"><nav id="reviewFiles"></nav><div id="reviewDiff" class="diff"></div></div>
+      <label>Comments for the agent <textarea id="reviewComment" rows="3" placeholder="Click a line of the diff to quote it, then write what to change"></textarea></label>
+      <div class="actions">
+        <button type="button" id="reviewSend" data-icon="send" title="Send the comments to the task's agent; it goes back to work">Send to Agent</button>
+        <button type="button" id="reviewRestore" class="ghost" data-icon="back" title="Put the project back as it was before this task">Undo Task</button>
+        <button type="button" id="reviewDiscard" class="ghost" data-icon="trash" title="Delete the worktree and its branch">Discard</button>
+        <span class="spacer"></span>
+        <button type="button" id="reviewPR" data-icon="branch" title="Push the branch and open a pull request on GitHub">Create Pull Request</button>
+        <button type="button" id="reviewMerge" class="primary" title="Commit pending changes, merge the branch and remove the worktree">Merge</button>
+        <button value="close" class="ghost">Close</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog id="usage" class="wide">
     <form method="dialog">
       <span class="eyebrow">Your activity with agents, on this computer</span>
@@ -408,5 +432,9 @@
   <script src="palette.js"></script>
   <script src="flows.js"></script>
   <script src="usage.js"></script>
+  <script src="approvals.js"></script>
+  <script src="review.js"></script>
+  <script src="task-checks.js"></script>
+  <script src="templates.js"></script>
 </body>
 </html>

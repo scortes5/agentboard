@@ -815,6 +815,7 @@ setInterval(() => {
     const sideDot = sideItems.get(c.id)?.querySelector('.status');
     if (sideDot) { sideDot.className = 'status ' + rt.status; sideDot.title = s.title; }
     if (cfg.watchErrors !== false && now - rt.scannedAt > 2000) scanForErrors(c, rt, now);
+    if (now - (rt.askedAt || 0) > 1000) { rt.askedAt = now; scanApprovals(c, rt); }
     // Notify if it worked for >8 s and you are not looking at it
     if (wasBusy && !busy && rt.lastData - rt.busySince > 8000 && (!document.hasFocus() || focusedId !== c.id)) {
       try { new Notification(`${c.title} finished`, { body: basename(c.cwd), silent: false }); } catch {}
@@ -1950,6 +1951,7 @@ function projectRow(p) {
   row.className = 'project-row';
   row.dataset.path = p.path;
   row.innerHTML = `<input name="name" value="${esc(p.name)}" /><span class="path" title="${esc(p.path)}">${esc(p.path)}</span>
+    <input name="verify" value="${esc(p.verify || '')}" placeholder="Check command (e.g. npm test)" title="Runs after each task in this project; if it fails, the agent gets the output and fixes it" />
     <button type="button" class="card-btn" title="Remove the project from the list (keeps the folder)">${icon('close', 13)}</button>`;
   row.querySelector('button').addEventListener('click', () => row.remove());
   return row;
@@ -2132,6 +2134,10 @@ async function openSettings(section = 'general') {
   f.taskSubagents.checked = cfg.taskSubagents !== false;
   f.maxSubagents.value = cfg.maxSubagents || 4;
   f.watchErrors.checked = cfg.watchErrors !== false;
+  f.taskCheckpoints.checked = cfg.taskCheckpoints !== false;
+  f.verifyCmd.value = cfg.verifyCmd || '';
+  f.verifyRetries.value = cfg.verifyRetries ?? 2;
+  f.crossReview.checked = !!cfg.crossReview;
   const rows = $('#agentRows'); rows.innerHTML = '';
   for (const [k, a] of Object.entries(cfg.agents)) rows.appendChild(agentRow(k, a));
   const prow = $('#projectRows'); prow.innerHTML = '';
@@ -2172,6 +2178,10 @@ $('#settings').addEventListener('close', async () => {
   cfg.taskSubagents = f.taskSubagents.checked;
   cfg.maxSubagents = clamp(+f.maxSubagents.value || 4, 1, 8);
   cfg.watchErrors = f.watchErrors.checked;
+  cfg.taskCheckpoints = f.taskCheckpoints.checked;
+  cfg.verifyCmd = f.verifyCmd.value.trim();
+  cfg.verifyRetries = clamp(+f.verifyRetries.value || 0, 0, 5);
+  cfg.crossReview = f.crossReview.checked;
   cfg.ui = { ...draftUi };
   cfg.shortcuts = Object.fromEntries(Object.entries(draftKeys).filter(([id, k]) => shortcutDefs.find((d) => d.id === id)?.key !== k));
 
@@ -2185,8 +2195,10 @@ $('#settings').addEventListener('close', async () => {
   if (!agents.shell) agents.shell = { label: 'Terminal', command: '', resumeArgs: '', color: '#8e8e93' };
   cfg.agents = agents;
 
-  const names = new Map([...document.querySelectorAll('#projectRows .project-row')].map((r) => [r.dataset.path, r.querySelector('[name=name]').value.trim()]));
-  cfg.projects = cfg.projects.filter((p) => names.has(p.path)).map((p) => ({ ...p, name: names.get(p.path) || basename(p.path) }));
+  const rows = new Map([...document.querySelectorAll('#projectRows .project-row')].map((r) => [r.dataset.path, {
+    name: r.querySelector('[name=name]').value.trim(), verify: r.querySelector('[name=verify]').value.trim(),
+  }]));
+  cfg.projects = cfg.projects.filter((p) => rows.has(p.path)).map((p) => ({ ...p, name: rows.get(p.path).name || basename(p.path), verify: rows.get(p.path).verify }));
   if (!cfg.projects.some((p) => p.path === cfg.selectedProject)) cfg.selectedProject = cfg.projects[0]?.path || null;
   if (cfg.activeSpace && cfg.activeSpace !== '*' && !cfg.projects.some((p) => p.path === cfg.activeSpace)) cfg.activeSpace = '*';
 

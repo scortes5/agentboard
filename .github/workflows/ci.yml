@@ -46,3 +46,16 @@ jobs:
           for f in skills-pack/*/SKILL.md; do
             head -1 "$f" | grep -qx -- '---' || { echo "::error file=$f::missing YAML front matter"; exit 1; }
           done
+
+  # Opens the real app on Linux (no display needed) and drives a task end to end with a fake agent.
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: End-to-end test
+        run: xvfb-run -a npm run test:e2e
