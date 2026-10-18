@@ -43,7 +43,8 @@
     "dist:mac": "electron-builder --mac",
     "dist:win": "electron-builder --win",
     "postinstall": "node scripts/fix-pty.js",
-    "test:e2e": "node test/e2e.js"
+    "test:e2e": "node test/e2e.js",
+    "test:smoke": "node test/smoke.js"
   },
   "dependencies": {
     "@xterm/addon-fit": "^0.11.0",
