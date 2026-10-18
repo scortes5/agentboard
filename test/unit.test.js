@@ -6,8 +6,8 @@ const assert = require('assert/strict');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { slugify, wrap } = require('../src/platform');
-const usage = require('../src/usage');
+const { slugify, wrap } = require('../src/main/core/platform');
+const usage = require('../src/main/library/usage');
 
 test('slugify makes names safe for branches, folders and accounts', () => {
   assert.equal(slugify('Fix the Login! Página'), 'fix-the-login-pagina');
@@ -29,4 +29,13 @@ test('sessionTokens adds up a Claude session once per message, by file name', as
   fs.writeFileSync(path.join(dir, 'projects', '-repo', `${id}.jsonl`), [line('m1'), line('m1'), line('m2')].join('\n'));
   const r = await usage.sessionTokens({ claudeDirs: [dir], ids: [id, 'not-a-session-id'] });
   assert.deepEqual(r, { [id]: 2300 });
+});
+
+test('the router prompt carries the user\'s subscriptions, local agents and history', () => {
+  const { TaskPlanner } = require('../src/main/ai/TaskPlanner');
+  const p = TaskPlanner.planPrompt('fix login', { agents: ['claude', 'codex'], projects: ['web'], local: ['ollama'], history: 'claude: 3 done, 0 blocked' });
+  assert.match(p, /"agent":"auto\|claude\|codex"/);
+  assert.match(p, /local models for free: ollama/);
+  assert.match(p, /claude: 3 done/);
+  assert.deepEqual(TaskPlanner.parsePlan('Sure:\n[{"text":"a"},{"text":" "},{"x":1}]'), [{ text: 'a' }]);
 });

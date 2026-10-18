@@ -21,6 +21,26 @@ async function until(fn, ms = 30000) {
 }
 const step = (name) => console.log(`✓ ${name}`);
 
+// Runs scripts/agentboard-mcp.js like a CLI would and returns its answers by request id.
+function mcpSession(dataDir, requests) {
+  return new Promise((resolve, reject) => {
+    const child = require('child_process').spawn(process.execPath, [path.join(ROOT, 'scripts', 'agentboard-mcp.js')], { env: { ...process.env, AGENTBOARD_DATA: dataDir } });
+    const answers = {};
+    let buf = '';
+    child.stdout.on('data', (d) => {
+      buf += d;
+      for (let i; (i = buf.indexOf('\n')) >= 0; buf = buf.slice(i + 1)) {
+        const msg = JSON.parse(buf.slice(0, i));
+        answers[msg.id] = msg;
+        if (Object.keys(answers).length === requests.length) { child.kill(); resolve(answers); }
+      }
+    });
+    child.on('error', reject);
+    setTimeout(() => { child.kill(); reject(new Error(`MCP server answered ${Object.keys(answers).length} of ${requests.length}`)); }, 15000);
+    for (const r of requests) child.stdin.write(JSON.stringify(r) + '\n');
+  });
+}
+
 (async () => {
   const data = fs.mkdtempSync(path.join(os.tmpdir(), 'agentboard-data-'));
   const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'agentboard-repo-'));
@@ -41,9 +61,19 @@ const step = (name) => console.log(`✓ ${name}`);
   try {
     // Every channel the interface calls has a handler in the main process.
     const handled = await app.evaluate(({ ipcMain }) => [...ipcMain._invokeHandlers.keys()]);
-    const wanted = [...fs.readFileSync(path.join(ROOT, 'src/preload.js'), 'utf8').matchAll(/invoke\('([^']+)'/g)].map((m) => m[1]);
+    const wanted = [...fs.readFileSync(path.join(ROOT, 'src/preload/index.js'), 'utf8').matchAll(/invoke\('([^']+)'/g)].map((m) => m[1]);
     assert.deepEqual(wanted.filter((c) => !handled.includes(c)), []);
     step('every IPC channel has a handler');
+
+    // The MCP server each CLI runs gets its tools from the app (one file per tool) and calls them.
+    const mcp = await mcpSession(data, [
+      { jsonrpc: '2.0', id: 1, method: 'initialize', params: {} },
+      { jsonrpc: '2.0', id: 2, method: 'tools/list' },
+      { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'list_agents', arguments: {} } },
+    ]);
+    assert.deepEqual(mcp[2].result.tools.map((t) => t.name).sort(), ['add_task', 'complete_task', 'list_agents', 'list_tasks', 'read_agent_output', 'send_to_agent', 'start_agent']);
+    assert.equal(mcp[3].result.isError, false);
+    step('the MCP server lists and calls the bridge tools');
 
     const script = path.join(__dirname, 'fake-agent.sh');
     await win.evaluate(({ repo, script }) => {
