@@ -42,6 +42,7 @@ input.switch-input:checked::after { transform: translateX(14px); }
 .keycap.recording { box-shadow: 0 0 0 2px var(--accent) !important; color: var(--accent); }
 .keycap.clash { color: var(--warn); box-shadow: inset 0 0 0 1px rgba(var(--warn-rgb), .6); }
 .static-keys .set-row span { font-size: 12px; }
+#groundRules { width: 100%; resize: vertical; background: var(--fill); border: none; box-shadow: inset 0 0 0 .5px var(--line-hi); padding: 10px 12px; color: var(--text); font: 12.5px/1.55 var(--font-mono); outline: none; border-radius: 8px; }
 #cfgJson { width: 100%; min-height: 340px; resize: vertical; background: var(--fill); border: none; box-shadow: inset 0 0 0 .5px var(--line-hi); padding: 12px; color: var(--text); font: 12px/1.55 var(--font-mono); outline: none; }
 #agentRows { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
 .project-row { padding: 4px 0; }

@@ -10,7 +10,8 @@ const PRELOAD = path.join(__dirname, '..', '..', 'preload', 'index.js');
 const PAGE = path.join(__dirname, '..', '..', 'renderer', 'index.html');
 
 class App {
-  // services: objects with register(ipcMain); see src/main/index.js for how they are made.
+  // services: objects with register(ipcMain) and, optionally, onReady() and onQuit();
+  // see src/main/index.js for how they are made.
   constructor({ config, ptyHost, bridge, menu, tray, quickKey, updater, services }) {
     Object.assign(this, { config, ptyHost, bridge, menu, tray, quickKey, updater, services });
     this.win = null;
@@ -85,12 +86,14 @@ class App {
       this.tray.create();
       this.quickKey.apply();
       this.updater.start();
+      for (const s of this.services) s.onReady?.();
       app.on('activate', () => this.showWindow());
     });
     app.on('before-quit', (e) => {
       if (!this.quitting && !this.confirmQuit()) { e.preventDefault(); return; }
       this.quitting = true;
       this.ptyHost.killAll(); this.bridge.stop();
+      for (const s of this.services) s.onQuit?.();
     });
     app.on('window-all-closed', () => { this.ptyHost.killAll(); this.bridge.stop(); app.quit(); });
     app.on('will-quit', () => globalShortcut.unregisterAll());

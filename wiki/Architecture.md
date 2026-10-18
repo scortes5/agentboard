@@ -48,7 +48,9 @@ New behavior is added with a new file; the code that uses it does not change.
 | A way to install updates | a class with `check()` (and `install()`) in `src/main/updates/` | `Updater` |
 | Something to detect in terminals | a watcher with `name`, `every`, `enabled()`, `scan()`, registered with `terminalWatchers.add()` | the status loop |
 | A step after a task says DONE | a step with `prompt()`, `onMarker()` or `afterFinish()`, registered with `taskPipeline.use()` | the task queue |
-| A main-process service | a class with `register(ipcMain)` | one line in `src/main/index.js` |
+| A main-process service | a class with `register(ipcMain)` (and, if it needs them, `onReady()` and `onQuit()`) | one line in `src/main/index.js` |
+| A CLI's global instructions file (for ground rules) | `instructions: (probe) => path` in its provider file | `GroundRules` |
+| A section in Settings | an object with `load(form)`, `save(form)` and `saved()`, pushed to `settingsSections` | the Settings dialog |
 
 `test/ocp.test.js` proves the first two by adding a provider and a tool as files in a temporary folder; the end-to-end test registers a pipeline step and a watcher from outside and checks they run.
 

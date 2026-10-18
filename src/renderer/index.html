@@ -14,6 +14,7 @@
   <link rel="stylesheet" href="styles/05-macos.css" />
   <link rel="stylesheet" href="styles/06-settings-automations.css" />
   <link rel="stylesheet" href="styles/07-task-control.css" />
+  <link rel="stylesheet" href="styles/08-integrations.css" />
 </head>
 <body>
   <main id="board">
@@ -93,7 +94,7 @@
     <div class="task-auto"><span class="muted small">"auto" spreads across:</span> <span id="taskAutoAgents" class="seg"></span></div>
     <div id="taskFilter" class="seg task-filter">
       <button data-f="active" class="active" title="Show queued, running and to-review tasks">Active</button><button data-f="all" title="Show every task, including finished ones">All</button><button data-f="done" title="Show finished tasks only, most recent first">Done</button>
-      <span class="spacer"></span><button id="taskSummary" class="ghost" data-icon="copy" title="Copy a Markdown summary of today's finished and pending tasks">Summary</button><button id="taskClear" class="ghost" title="Remove finished tasks from the list">Clear</button>
+      <span class="spacer"></span><button id="taskSummary" class="ghost" data-icon="copy" title="Copy a Markdown summary of today's finished and pending tasks">Summary</button><button id="taskIssues" class="ghost" title="Import open GitHub issues of the chosen project as tasks (needs the gh CLI)">Issues</button><button id="taskClear" class="ghost" title="Remove finished tasks from the list">Clear</button>
     </div>
     <div id="taskList"></div>
     <div class="composer">
@@ -182,9 +183,11 @@
         <button type="button" data-sec="general" class="active" data-icon="gear" title="Computer name, shell, global shortcut and background mode">General</button>
         <button type="button" data-sec="appearance" data-icon="sun" title="Theme, accent color, typography and terminals">Appearance</button>
         <button type="button" data-sec="agents" data-icon="agent" title="Commands and arguments for each agent">Agents</button>
+        <button type="button" data-sec="rules" data-icon="note" title="Rules every agent follows, like committing as you or explaining before deleting files">Ground Rules</button>
         <button type="button" data-sec="keys" data-icon="keyboard" title="View and change keyboard shortcuts">Shortcuts</button>
         <button type="button" data-sec="projects" data-icon="folder" title="Rename or remove projects">Projects</button>
         <button type="button" data-sec="tasks" data-icon="tasks" title="Queue, parallelism and worktrees for tasks">Tasks</button>
+        <button type="button" data-sec="integrations" data-icon="send" title="Control AgentBoard from your phone and send a daily summary to Slack or Discord">Integrations</button>
         <button type="button" data-sec="advanced" data-icon="code" title="Edit every setting as JSON">Advanced</button>
       </nav>
       <div class="set-body">
@@ -234,6 +237,14 @@
           <button type="button" id="addAgent" class="ghost" data-icon="plus" title="Add any CLI as an agent (aider, opencode, ollama…)">Custom Agent</button>
         </section>
 
+        <section data-sec="rules" class="hidden">
+          <h2>Ground Rules</h2>
+          <p class="set-note">Write once what every agent must follow, so you don't repeat it in each task. AgentBoard puts the rules in the instructions file each CLI reads when it starts (in a marked block; the rest of the file is left alone), so they apply to the agents you open by hand too.</p>
+          <textarea name="groundRules" id="groundRules" rows="9" spellcheck="false" placeholder="- Commit with my git author only; never add Co-Authored-By lines"></textarea>
+          <div class="row-end"><button type="button" id="rulesSuggest" class="ghost" title="Add a set of common rules you can edit">Add Suggested Rules</button></div>
+          <div id="rulesFiles" class="set-note"></div>
+        </section>
+
         <section data-sec="keys" class="hidden">
           <h2>Keyboard Shortcuts</h2>
           <p class="set-note">Click a shortcut and press the new combination. <kbd>⌫</kbd> removes it, <kbd>Esc</kbd> cancels.</p>
@@ -280,6 +291,27 @@
             <label class="set-row check"><span>Send light tasks to local models first (agents marked "local")</span><input name="preferLocalForLight" type="checkbox" class="switch-input" /></label>
             <label class="set-row check"><span>When a subscription hits its limit, move even tasks pinned to it (<code>@name</code>) to another one</span><input name="limitFallback" type="checkbox" class="switch-input" /></label>
             <div class="set-row">Subscriptions out of usage <span id="exhaustedList" class="muted">None</span></div>
+          </div>
+        </section>
+
+        <section data-sec="integrations" class="hidden">
+          <h2>Integrations</h2>
+          <h3>Remote control</h3>
+          <p class="set-note">See your tasks, approve what the agents ask and add tasks from your phone's browser, on the same Wi-Fi as this computer.</p>
+          <div class="set-group">
+            <label class="set-row check"><span>Let my phone control AgentBoard</span><input name="remoteEnabled" type="checkbox" class="switch-input" /></label>
+            <label class="set-row">Port <input name="remotePort" type="number" min="1024" max="65535" /></label>
+            <div id="remoteLinks"></div>
+            <div class="set-row">Anyone with the link can control your agents: share it with no one.
+              <button type="button" id="remoteNewLink" class="ghost" title="Create a new link; the old one stops working">New Link</button></div>
+          </div>
+          <p class="set-note">The page uses plain http on your local network, so turn it on only on networks you trust (home or office, not a café).</p>
+          <h3>Daily summary</h3>
+          <p class="set-note">Once a day, today's done and pending tasks are sent to a channel. Create an incoming webhook in Slack, Discord, Teams or Google Chat and paste its URL.</p>
+          <div class="set-group">
+            <label class="set-row">Webhook URL (empty = off) <input name="summaryWebhook" type="url" placeholder="https://hooks.slack.com/services/…" /></label>
+            <label class="set-row">Send it at <input name="summaryTime" type="time" /></label>
+            <div class="row-end"><button type="button" id="summaryTest" class="ghost" title="Send today's summary now to the URL above">Send Test</button></div>
           </div>
         </section>
 
@@ -494,5 +526,10 @@
   <script src="tasks/TemplateLibrary.js"></script>
   <script src="tasks/CostTracker.js"></script>
   <script src="tasks/LimitsNotice.js"></script>
+  <script src="integrations/RemoteBridge.js"></script>
+  <script src="integrations/DailySummary.js"></script>
+  <script src="integrations/IssueImporter.js"></script>
+  <script src="integrations/IntegrationSettings.js"></script>
+  <script src="agents/GroundRules.js"></script>
 </body>
 </html>

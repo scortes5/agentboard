@@ -1,0 +1,8 @@
+/* Integrations: GitHub issues popover and the remote-control links in Settings */
+.popover.issues { display: flex; flex-direction: column; gap: 8px; max-height: 70vh; }
+.popover.issues .row { display: flex; align-items: center; gap: 6px; }
+.is-list { display: flex; flex-direction: column; gap: 2px; overflow: auto; }
+.is-item { display: flex; align-items: flex-start; gap: 8px; padding: 6px 8px; border-radius: 8px; font-size: 12.5px; cursor: pointer; }
+.is-item:hover { background: var(--fill); }
+.is-item input { margin-top: 2px; }
+#remoteLinks code.link { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; user-select: all; }

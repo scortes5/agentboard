@@ -48,6 +48,7 @@ It uses no API keys and sends nothing to servers of its own: it runs the program
 - [Diagram](#diagram)
 - [Usage and savings](#usage-and-savings)
 - [Settings and shortcuts](#settings-and-shortcuts)
+- [Remote control and integrations](#remote-control-and-integrations)
 - [Subscriptions and accounts](#subscriptions-and-accounts)
 - [Token saving](#token-saving)
 - [Agent connection](#agent-connection)
@@ -67,6 +68,8 @@ It uses no API keys and sends nothing to servers of its own: it runs the program
 | **Tasks** | Write your to-dos and they are spread across your subscriptions, several at a time. |
 | **Automations** | n8n-style step diagrams run by your agents. The AI can design and explain them. |
 | **Diagram** | A per-project, per-group, per-agent view of what each one is doing. |
+| **From your phone** | See the tasks, approve what agents ask and add tasks from your phone's browser. |
+| **Ground rules** | Write once what every agent must follow (commit as you, ask before deleting…). |
 | **Background** | Closing the window does not stop the agents; your sessions are kept. |
 | **Token saving** | A fresh session per task, light mode, compact-context skills and load spreading across accounts. |
 
@@ -188,7 +191,8 @@ refactor the payments module !!
 - **Dependencies and templates**: start a line with `>` to make it wait for the one above; insert frequent to-dos from **Templates**.
 - **Limits and budgets**: if a subscription runs out, its tasks move to another; if all of them do, AgentBoard tells you when the first one comes back (with an idea for the break). Tokens per task are shown live, with optional budgets per task and per day.
 - **Subagents you can see**: with *Agent Connection* on, a task agent may split its work with `start_agent`; each helper opens as a `↳` card next to it.
-- **Summary**: copies what was done today and what is pending, as Markdown.
+- **GitHub issues**: **Issues** lists the project's open issues (needs the `gh` CLI signed in) and queues the ones you pick; the agent reads the issue and its pull request says `Closes #n`.
+- **Summary**: copies what was done today and what is pending, as Markdown (or sends it every day to a chat, see below).
 - **Global shortcut** (⌃⌥Space, configurable): add a task from any app.
 
 ---
@@ -245,8 +249,9 @@ It reads the Claude Code and Codex logs on this computer (every Claude account i
 - **General**: computer name, shell, global shortcut, resuming sessions and running in the background.
 - **Appearance**: light, dark or automatic theme; accent color; interface size; typeface (SF Pro or Geist); terminal font size, theme and line height. With a live preview.
 - **Agents**: each agent's command and arguments (for resuming, light mode and heavy mode), and custom agents for any CLI.
+- **Ground Rules**: rules every agent follows, written once. They go into each CLI's own instructions file (`~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, `~/.gemini/GEMINI.md`…) inside a marked block, so the rest of the file stays yours and agents you open by hand follow them too.
 - **Shortcuts**: all editable; click one and press the new combination.
-- **Projects**, **Tasks** and **Advanced** (every setting as JSON, to add or remove keys).
+- **Projects**, **Tasks**, **Integrations** and **Advanced** (every setting as JSON, to add or remove keys).
 
 ![Keyboard shortcuts](docs/images/shortcuts.png)
 
@@ -267,6 +272,15 @@ It reads the Claude Code and Codex logs on this computer (every Claude account i
 ![Command palette](docs/images/palette.png)
 
 The **palette** (⇧⌘P or the magnifier) finds agents, tasks, projects and actions; if you type something that does not exist, Enter adds it as a task.
+
+---
+
+## Remote control and integrations
+
+*Settings → Integrations*:
+
+- **Remote control**: turn on *Let my phone control AgentBoard*, save, and open the link on your phone, on the same Wi-Fi. You see the tasks live, approve or reject what the agents ask, and add tasks. Every request needs the random token in the link (it travels in the `#` part, which the browser never sends to servers); **New Link** makes the old one stop working. The page uses plain http on your local network, so turn it on only on networks you trust.
+- **Daily summary**: create an incoming webhook in Slack, Discord, Teams or Google Chat, paste its URL and pick a time. Once a day, today's done and pending tasks are sent to that channel. **Send Test** sends it now.
 
 ---
 
@@ -322,6 +336,7 @@ Example, in Claude: *"ask Codex what it thinks of this change and summarize its 
   | Windows | `%APPDATA%\AgentBoard\board.json` |
 
 - The agent bridge is a local socket with a random token. It only writes to cards running an agent (never to a plain terminal), each card can turn it off, and it has a messages-per-minute limit.
+- Optional, and off by default: the phone remote (a page on your local network that needs the random token in its link), the daily summary (sent only to the webhook you paste) and GitHub issues (read through your own `gh` CLI). Ground rules are written only to the CLIs' instructions files, inside a marked block.
 
 ---
 

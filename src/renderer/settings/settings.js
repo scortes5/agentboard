@@ -230,6 +230,11 @@ $('#cfgJsonApply').onclick = async () => {
   location.reload(); // re-read everything; terminals resume
 };
 
+// Sections other files add (Integrations, …): each one fills its fields when Settings opens,
+// reads them back on Save and may act once the settings are stored. Register with
+// settingsSections.push({ load(form), save(form), saved() }) without changing this file.
+const settingsSections = [];
+
 async function openSettings(section = 'general') {
   const dlg = $('#settings');
   const f = $('#settingsForm');
@@ -268,6 +273,7 @@ async function openSettings(section = 'general') {
   renderKeyRows();
   draftUi = ui();
   renderAppearanceForm();
+  for (const sec of settingsSections) sec.load(f);
   $('#cfgJson').value = settingsJson();
   $('#cfgJsonError').textContent = '';
   showSettingsSection(section);
@@ -333,7 +339,10 @@ $('#settings').addEventListener('close', async () => {
   if (!cfg.projects.some((p) => p.path === cfg.selectedProject)) cfg.selectedProject = cfg.projects[0]?.path || null;
   if (cfg.activeSpace && cfg.activeSpace !== '*' && !cfg.projects.some((p) => p.path === cfg.activeSpace)) cfg.activeSpace = '*';
 
+  for (const sec of settingsSections) sec.save(f);
+
   await ab.saveConfig(cfg);
+  for (const sec of settingsSections) sec.saved?.();
   ab.rebuildMenu();
   ab.applyQuickKey().then((r) => { if (!r.ok) toast(esc(r.error), 5000); });
   $('#machine').textContent = cfg.machineName;

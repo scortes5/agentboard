@@ -113,6 +113,7 @@ function taskPrompt(t, subagents = false) {
   const max = cfg.maxSubagents || 4;
   return `[AgentBoard task ${t.id}] ${t.text}\n`
     + (t.issue?.body ? `(GitHub issue #${t.issue.number}: ${t.issue.body.slice(0, 3000)})\n` : '')
+    + groundRules.forTask(t)
     + '(Only this, keep it short; use the agentboard-task skill if you have it. When finished, call complete_task if available and end with the line «DONE: …» or «BLOCKED: …».)'
     + (subagents && !t.light
       ? `\n(If the task has parts that can be done at the same time, split it: open up to ${max} helpers with the AgentBoard tool start_agent — light=true for simple parts, each with a self-contained message — so they work in parallel on the user's board next to you. Follow them with read_agent_output, check and combine their work, then write your own DONE line. Do not split small tasks.)`
@@ -504,8 +505,9 @@ $('#taskList').addEventListener('dblclick', (e) => {
   el.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === 'Escape') { ev.preventDefault(); el.blur(); } });
 });
 
-// Markdown summary of today's work, to paste into a standup, a commit or an email.
-function dailySummary() {
+// Markdown summary of today's work, to paste into a standup, a commit or an email (and the
+// one the daily summary sends to a chat webhook).
+function summaryMarkdown() {
   const start = new Date(); start.setHours(0, 0, 0, 0);
   const done = tasks().filter((t) => t.status === 'done' && (t.finishedAt || 0) >= start.getTime());
   const open = tasks().filter((t) => t.status !== 'done');
@@ -513,8 +515,13 @@ function dailySummary() {
   const line = (t) => `- ${t.status === 'done' ? '[x]' : '[ ]'} ${t.text}${t.summary ? ` — ${t.summary}` : ''} _(${[cfg.agents[t.assigned]?.label, projName(t.cwd), t.mergedInto ? `merged into ${t.mergedInto}` : t.branch].filter(Boolean).join(' · ')})_`;
   const md = [`## ${start.toLocaleDateString()} — AgentBoard`, '', `### Done (${done.length})`, ...done.map(line),
     '', `### Pending (${open.length})`, ...open.map(line)].join('\n');
+  return { md, done: done.length, open: open.length };
+}
+
+function dailySummary() {
+  const { md, done, open } = summaryMarkdown();
   ab.copy(md);
-  toast(`Summary copied: ${done.length} done, ${open.length} pending.`);
+  toast(`Summary copied: ${done} done, ${open} pending.`);
 }
 
 function composerDefaults() {
@@ -584,7 +591,7 @@ function addLines(text) {
     if (!t.text) { carry = { agent: t.agent, group: t.group, cwd: t.cwd, light: t.light }; continue; }
     prev = addTask({ ...t, after: then && prev ? [prev.id] : undefined }); n++;
   }
-  input.value = '';
+  if (input.value.trim() === text.trim()) input.value = ''; // it may come from elsewhere (the phone)
   toast(`${n} task${n === 1 ? '' : 's'} queued${cfg.taskAuto ? '' : ' — turn on "Run queue" or run them one by one'}`);
   tickTasks();
 }

@@ -39,3 +39,56 @@ test('the router prompt carries the user\'s subscriptions, local agents and hist
   assert.match(p, /claude: 3 done/);
   assert.deepEqual(TaskPlanner.parsePlan('Sure:\n[{"text":"a"},{"text":" "},{"x":1}]'), [{ text: 'a' }]);
 });
+
+test('the webhook payload carries the text for Slack/Teams (text) and Discord (content)', () => {
+  const { WebhookNotifier } = require('../src/main/integrations/WebhookNotifier');
+  const p = WebhookNotifier.payload('x'.repeat(5000));
+  assert.equal(p.text.length, 3800);
+  assert.equal(p.content.length, 1990);
+  assert.equal(WebhookNotifier.payload('hi').content, 'hi');
+});
+
+test('the remote server needs the token, shows the snapshot and forwards actions', async () => {
+  const { RemoteServer } = require('../src/main/remote/RemoteServer');
+  const token = 'a'.repeat(48);
+  const sent = [];
+  const config = { load: () => ({ remote: { enabled: true, port: 0, token } }) };
+  const remote = new RemoteServer({ config, send: (...a) => sent.push(a) });
+  await remote.apply();
+  try {
+    const base = `http://127.0.0.1:${remote.server.address().port}`;
+    const call = (p, { auth = token, body } = {}) => fetch(base + p, {
+      method: body ? 'POST' : 'GET', headers: { Authorization: `Bearer ${auth}` }, body: body && JSON.stringify(body),
+    });
+    assert.equal((await fetch(base + '/')).status, 200);
+    assert.equal((await call('/api/state', { auth: 'b'.repeat(48) })).status, 401);
+    assert.equal((await call('/api/state', { auth: '' })).status, 401);
+    remote.snapshot = { tasks: [{ id: 't1', text: 'Fix it' }], approvals: [{ card: 'c1', question: 'Run?' }], counts: {} };
+    assert.deepEqual((await (await call('/api/state')).json()).tasks, [{ id: 't1', text: 'Fix it' }]);
+    assert.equal((await call('/api/task', { body: { text: 'From the phone' } })).status, 202);
+    assert.equal((await call('/api/task', { body: { text: '  ' } })).status, 400);
+    assert.equal((await call('/api/approve', { body: { card: 'gone', yes: true } })).status, 404);
+    assert.equal((await call('/api/approve', { body: { card: 'c1', yes: true } })).status, 202);
+    assert.deepEqual(sent, [['remote:action', { kind: 'task', text: 'From the phone' }], ['remote:action', { kind: 'approve', card: 'c1', yes: true }]]);
+  } finally {
+    await remote.stop();
+  }
+});
+
+test('the remote server stays off without a strong token', async () => {
+  const { RemoteServer } = require('../src/main/remote/RemoteServer');
+  const remote = new RemoteServer({ config: { load: () => ({ remote: { enabled: true, port: 0, token: 'short' } }) }, send() {} });
+  await assert.rejects(remote.apply(), /Create a link first/);
+  assert.equal(remote.status().running, false);
+});
+
+test('ground rules live in one marked block that can be replaced and removed', () => {
+  const { GroundRules } = require('../src/main/agents/GroundRules');
+  const once = GroundRules.merge('# Mine\n', '- Commit as me.');
+  assert.match(once, /^# Mine\n\n<!-- agentboard:ground-rules:start[^\n]*-->\n## Ground rules\n\n- Commit as me\.\n<!-- agentboard:ground-rules:end -->\n$/);
+  const twice = GroundRules.merge(once, '- Ask before deleting.');
+  assert.equal((twice.match(/ground-rules:start/g) || []).length, 1);
+  assert.doesNotMatch(twice, /Commit as me/);
+  assert.equal(GroundRules.merge(twice, ''), '# Mine\n');
+  assert.equal(GroundRules.merge('', ''), '');
+});

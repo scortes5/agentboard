@@ -48,6 +48,8 @@ contextBridge.exposeInMainWorld('ab', {
   gitRestore: (cwd, sha) => ipcRenderer.invoke('git:restore', cwd, sha),
   gitFullDiff: (opts) => ipcRenderer.invoke('git:fullDiff', opts),
   gitPullRequest: (opts) => ipcRenderer.invoke('git:pullRequest', opts),
+  rulesApply: (rules) => ipcRenderer.invoke('rules:apply', rules),
+  rulesStatus: () => ipcRenderer.invoke('rules:status'),
   claudeAccountDir: (name) => ipcRenderer.invoke('accounts:claudeDir', name),
   claudeAccountStatus: (dirs) => ipcRenderer.invoke('accounts:claudeStatus', dirs),
   setBadge: (n) => ipcRenderer.send('app:badge', n),
@@ -67,6 +69,13 @@ contextBridge.exposeInMainWorld('ab', {
   onUpdate: (cb) => ipcRenderer.on('update:available', (_e, u) => cb(u)),
   updateDownload: (url) => ipcRenderer.send('update:download', url),
   updateInstall: () => ipcRenderer.send('update:install'),
+  // Integrations: remote control from a phone, chat webhooks and GitHub issues
+  remoteApply: () => ipcRenderer.invoke('remote:apply'),
+  remoteStatus: () => ipcRenderer.invoke('remote:status'),
+  remoteSnapshot: (snap) => ipcRenderer.send('remote:snapshot', snap),
+  onRemoteAction: (cb) => ipcRenderer.on('remote:action', (_e, a) => cb(a)),
+  postWebhook: (url, text) => ipcRenderer.invoke('webhook:post', url, text),
+  githubIssues: (cwd) => ipcRenderer.invoke('github:issues', cwd),
   onMenu: (cb) => ipcRenderer.on('menu', (_e, action) => cb(action)),
 
   // Clipboard
