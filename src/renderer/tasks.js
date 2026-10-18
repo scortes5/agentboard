@@ -248,6 +248,7 @@ function renderTaskOptions() {
   $('#taskParallel').value = cfg.maxParallel || 3;
   $('#taskPerAgent').value = cfg.perAgentParallel || 2;
   $('#taskWorktree').checked = !!cfg.taskWorktrees;
+  $('#taskRoute').checked = cfg.taskRoute !== false;
   const auto = new Set(autoAgents());
   const time = (ms) => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   $('#taskAutoAgents').innerHTML = subscriptions().map(([k, a]) =>
@@ -435,9 +436,42 @@ function composerDefaults() {
   return { agent: $('#taskAgent').value || 'auto', cwd: $('#taskProject').value || null, light: $('#taskLight').checked };
 }
 
-function addFromComposer() {
+// Routing: haiku (one short call, no terminal) splits what you wrote into independent
+// tasks and picks a subscription and model for each; the queue then runs them in parallel.
+const canRoute = () => cfg.taskRoute !== false && agentAvailable.claude !== false && !!cfg.agents.claude?.command;
+
+function addPlanned(list, d) {
+  for (const x of list) {
+    const proj = x.project && projectFrom(x.project);
+    const light = !!x.light || d.light;
+    const agent = agentKeyFrom(x.agent);
+    addTask({ text: x.text.trim(), agent: agent && agent !== 'auto' ? agent : d.agent, cwd: proj ? proj.path : d.cwd, light, heavy: !!x.heavy && !light, group: (x.group || '').trim() });
+  }
+}
+
+async function addFromComposer() {
   const input = $('#taskInput');
-  const lines = input.value.split('\n').map((l) => l.trim()).filter(Boolean);
+  const text = input.value.trim();
+  if (!text) return;
+  if (!canRoute()) return addLines(text);
+  const btn = $('#taskAdd');
+  if (btn.disabled) return;
+  btn.disabled = true; btn.textContent = 'Routing…';
+  const r = await ab.planTasks(text, { agents: subscriptions().map(([k]) => k), projects: cfg.projects.map((p) => p.name) });
+  btn.disabled = false; btn.textContent = 'Add';
+  if (input.value.trim() === text) input.value = '';
+  if (!r.ok || !r.value.length) {
+    toast(`Could not route with haiku (${esc(r.error || 'empty answer')}); added the lines as they are.`, 6000);
+    return addLines(text);
+  }
+  addPlanned(r.value, composerDefaults());
+  toast(`haiku routed it into ${r.value.length} task${r.value.length === 1 ? '' : 's'}${cfg.taskAuto ? ' running in parallel' : ' — turn on "Run queue" to start them'}`);
+  tickTasks();
+}
+
+function addLines(text) {
+  const input = $('#taskInput');
+  const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
   if (!lines.length) return;
   const d = composerDefaults();
   // a line with only #group / @agent and no text applies to the following lines
@@ -462,11 +496,7 @@ async function planWithAI() {
   const r = await ab.planTasks(text, { agents: subscriptions().map(([k]) => k), projects: cfg.projects.map((p) => p.name) });
   btn.disabled = false; btn.textContent = 'Split';
   if (!r.ok) return toast(`Could not split with Claude: ${esc(r.error)}`, 6000);
-  const d = composerDefaults();
-  for (const x of r.value) {
-    const proj = x.project && projectFrom(x.project);
-    addTask({ text: x.text.trim(), agent: agentKeyFrom(x.agent) || d.agent, cwd: proj ? proj.path : d.cwd, light: !!x.light || d.light, group: (x.group || '').trim() });
-  }
+  addPlanned(r.value, composerDefaults());
   input.value = '';
   toast(`${r.value.length} tasks created with haiku`);
 }
@@ -535,6 +565,7 @@ function initTasks() {
   });
   $('#taskAuto').onchange = (e) => { cfg.taskAuto = e.target.checked; save(); tickTasks(); };
   $('#taskWorktree').onchange = (e) => { cfg.taskWorktrees = e.target.checked; save(); };
+  $('#taskRoute').onchange = (e) => { cfg.taskRoute = e.target.checked; save(); };
   $('#taskParallel').onchange = (e) => { cfg.maxParallel = clamp(+e.target.value || 3, 1, 12); e.target.value = cfg.maxParallel; save(); tickTasks(); };
   $('#taskPerAgent').onchange = (e) => { cfg.perAgentParallel = clamp(+e.target.value || 2, 1, 6); e.target.value = cfg.perAgentParallel; save(); tickTasks(); };
   $('#taskAutoAgents').addEventListener('click', (e) => {

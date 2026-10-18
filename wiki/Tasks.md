@@ -47,7 +47,8 @@ Each task works on its own branch `agentboard/<task>` in a separate git worktree
 
 ## Helpers
 
-- **Split**: paste free text and Claude breaks it into tasks.
+- **Route** (on by default): when you add tasks, Claude's cheapest model (haiku, one short call with no terminal) splits what you wrote into independent tasks and picks the subscription and the model (light or heavy) for each one; the queue then runs them in parallel. Markers you write (`@agent`, `#group`, `+project`, `!`, `!!`) always win. Turn it off in the composer or in *Settings → Tasks*. Without Claude installed, lines are added as they are.
+- **Split**: paste free text and Claude breaks it into tasks, without starting them.
 - **Summary**: copies what was done today and what is pending, as Markdown.
 - **Global shortcut** (⌃⌥Space, configurable): add a task from any app.
 - **Command palette** (⇧⌘P): typing something that does not exist and pressing Enter adds it as a task.

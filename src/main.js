@@ -232,16 +232,43 @@ ipcMain.handle('git:checkout', async (_e, cwd, branch, create) => {
 });
 
 // ---------- Detect installed agents ----------
-function which(cmd, cfg) {
+// An app opened from Finder starts with a minimal PATH, and a non-interactive login shell
+// (-lc) skips ~/.zshrc, where nvm, fnm or volta add the folder with npm's global CLIs
+// (codex, gemini…). Ask an interactive login shell for its PATH once and add it to ours,
+// so detection, headless runs and automation commands find the same CLIs as the cards.
+let shellPathReady = null;
+function loadShellPath() {
+  if (IS_WIN) return Promise.resolve();
+  if (!shellPathReady) shellPathReady = new Promise((resolve) => {
+    const { file } = resolveShell(loadConfig());
+    // markers skip whatever the shell's startup files print; "$PATH" is colon-joined in fish too
+    const child = execFile(file, ['-ilc', 'printf "\\n__AB_PATH__%s__AB_PATH__\\n" "$PATH"'], { timeout: 10000 }, (_err, stdout) => {
+      const fromShell = [...String(stdout || '').matchAll(/__AB_PATH__(.*?)__AB_PATH__/g)].flatMap((m) => m[1].split(':'));
+      const common = [path.join(os.homedir(), '.local', 'bin'), path.join(os.homedir(), '.npm-global', 'bin'), '/opt/homebrew/bin', '/usr/local/bin'];
+      const dirs = [...(process.env.PATH || '').split(':'), ...fromShell, ...common].filter(Boolean);
+      process.env.PATH = [...new Set(dirs)].join(':');
+      resolve();
+    });
+    child.stdin?.end(); // a startup file that asks something gets EOF instead of waiting
+  });
+  return shellPathReady;
+}
+
+const isExecutable = (f) => { try { fs.accessSync(f, fs.constants.X_OK); return fs.statSync(f).isFile(); } catch { return false; } };
+
+async function which(cmd, cfg) {
+  if (!cmd) return true;
+  const bin = cmd.trim().split(/\s+/)[0];
+  if (IS_WIN) {
+    return new Promise((resolve) => execFile('where.exe', [bin], { windowsHide: true, timeout: 5000 }, (err) => resolve(!err)));
+  }
+  await loadShellPath();
+  if (bin.includes('/')) return isExecutable(bin.replace(/^~(?=\/)/, os.homedir()));
+  if ((process.env.PATH || '').split(':').some((dir) => dir && isExecutable(path.join(dir, bin)))) return true;
+  // last resort: whatever the login shell resolves (aliases and functions are not CLIs we can run)
   return new Promise((resolve) => {
-    if (!cmd) return resolve(true);
-    const bin = cmd.trim().split(/\s+/)[0];
-    if (IS_WIN) {
-      execFile('where.exe', [bin], { windowsHide: true, timeout: 5000 }, (err) => resolve(!err));
-    } else {
-      const { file } = resolveShell(cfg);
-      execFile(file, ['-lc', `command -v ${bin}`], { timeout: 8000 }, (err) => resolve(!err));
-    }
+    const { file } = resolveShell(cfg);
+    execFile(file, ['-lc', 'command -v "$1"', 'sh', bin], { timeout: 8000 }, (err) => resolve(!err));
   });
 }
 
@@ -448,10 +475,13 @@ ipcMain.handle('tasks:plan', wrap(async (_e, text, opts = {}) => {
   const agents = (opts.agents || []).join(', ') || 'claude, codex, gemini';
   const projects = (opts.projects || []).join(', ') || '(none)';
   const prompt = [
-    'Turn this to-do list into concrete, independent tasks for coding agents.',
+    'Turn this to-do list into concrete, independent tasks for coding agents that will run in parallel.',
     'Reply ONLY with a JSON array, no extra text:',
-    '[{"text":"clear, self-contained instruction","agent":"auto|' + agents.replace(/, /g, '|') + '","light":true|false,"project":"name or empty","group":"short label or empty"}]',
-    'light=true for simple work (docs, renames, a small test, a question). Use "auto" unless the text asks for a specific agent.',
+    '[{"text":"clear, self-contained instruction","agent":"auto|' + agents.replace(/, /g, '|') + '","light":true|false,"heavy":true|false,"project":"name or empty","group":"short label or empty"}]',
+    'Split a large request into tasks that touch different files or areas, so agents do not step on each other; keep small requests as one task.',
+    'light=true for simple work (docs, renames, a small test, a question); heavy=true only for hard work (architecture, tricky bugs, large refactors); never both.',
+    'Use "auto" unless the text asks for a specific agent.',
+    'Markers in a line are the user\'s choice and win: @name = agent, #name = group, +name = project, ! = light, !! = heavy. Do not copy markers into "text".',
     'Write each task in the same language as the to-do list.',
     'Available projects: ' + projects + '. Do not invent projects.',
     'To-do list:',
@@ -842,6 +872,7 @@ if (!app.requestSingleInstanceLock()) {
 } else {
   app.on('second-instance', showWindow);
   app.whenReady().then(() => {
+    loadShellPath();
     if (IS_MAC && !app.isPackaged) app.dock?.setIcon(ICON);
     buildMenu();
     startBridge();
