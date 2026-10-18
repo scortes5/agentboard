@@ -34,6 +34,7 @@ It uses no API keys and sends nothing to servers of its own: it runs the program
 - [Tasks](#tasks)
 - [Automations](#automations)
 - [Diagram](#diagram)
+- [Usage and savings](#usage-and-savings)
 - [Settings and shortcuts](#settings-and-shortcuts)
 - [Subscriptions and accounts](#subscriptions-and-accounts)
 - [Token saving](#token-saving)
@@ -178,6 +179,18 @@ refactor the payments module !!
 
 ---
 
+## Usage and savings
+
+**Usage** button (⇧⌘U). A heatmap of your daily activity over the last year (by tokens, sessions or tasks done), plus:
+
+- **Usage**: total tokens, sessions and tasks.
+- **Savings and effectiveness**: tokens saved by the prompt cache and its hit rate, share of tasks solved, and median time and tokens per task.
+- **By subscription** and **by project**: where your tokens go.
+
+It reads the Claude Code and Codex logs on this computer (every Claude account included) and only adds up token counters; nothing leaves your machine.
+
+---
+
 ## Settings and shortcuts
 
 ![Settings](docs/images/settings.png)
@@ -197,6 +210,7 @@ refactor the payments module !!
 | New Claude / Codex / Gemini / Terminal | ⇧⌘1 / 2 / 3 / 4 | Ctrl+Shift+1 / 2 / 3 / 4 |
 | New note / new group | ⇧⌘N / ⇧⌘G | Ctrl+Shift+N / G |
 | Tasks / Diagram / Automations | ⇧⌘T / ⇧⌘D / ⇧⌘F | Ctrl+Shift+T / D / F |
+| Usage and savings | ⇧⌘U | Ctrl+Shift+U |
 | Search or run (palette) | ⇧⌘P | Ctrl+Shift+P |
 | Next / previous / all projects | ⌘⌥→ / ⌘⌥← / ⌘⌥0 | Ctrl+Alt+→ / ← / 0 |
 | Agent list | ⇧⌘A | Ctrl+Shift+A |
@@ -244,7 +258,7 @@ In *Skills and Agents → Agent Connection*, one click registers AgentBoard as a
 |---|---|
 | `list_agents` | See the agents on the board and their status. |
 | `send_to_agent` / `read_agent_output` | Ask another agent for something and read its answer. |
-| `start_agent` | Open a new agent with a task. |
+| `start_agent` | Open a new agent with a task; `light: true` uses its cheap model. |
 | `list_tasks` / `add_task` / `complete_task` | Use the task list: hand out work and mark it done. |
 
 Example, in Claude: *"ask Codex what it thinks of this change and summarize its comments"*.
