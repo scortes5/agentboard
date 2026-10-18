@@ -82,16 +82,20 @@ function mcpSession(dataDir, requests) {
       for (const k of ['fake', 'fake2']) cfg.agents[k] = { label: k, command: `bash ${script}`, taskPrompt: 'arg', color: '#888888' };
       Object.assign(cfg, { autoAgents: ['fake', 'fake2'], taskAuto: true, tasksOpen: true, crossReview: true, taskSubagents: false });
       Object.assign(agentAvailable, { fake: true, fake2: true });
+      // Open/closed: a new pipeline step and a new terminal watcher, registered from outside,
+      // are used by the queue and the status loop without changing them.
+      taskPipeline.use({ afterFinish: (t) => { (window.__stepSaw ||= []).push(t.status); } });
+      terminalWatchers.add({ name: 'probe', every: 0, enabled: () => true, scan: (c) => { window.__watched = c.id; } });
       addTask({ text: 'make out.txt', agent: 'fake', cwd: repo });
       tickTasks();
     }, { repo, script });
 
-    const ask = await until(() => win.evaluate(() => [...approvals.entries()].map(([id, a]) => ({ id, ...a }))[0]));
+    const ask = await until(() => win.evaluate(() => [...approvalsInbox.waiting.entries()].map(([id, a]) => ({ id, ...a }))[0]));
     assert.ok(ask, 'the permission prompt reaches the approvals inbox');
     assert.match(ask.question, /Do you want to proceed/);
     assert.match(ask.context, /touch out\.txt/);
     step('permission prompt in the approvals inbox');
-    await win.evaluate((id) => answerApproval(id, true), ask.id);
+    await win.evaluate((id) => approvalsInbox.answer(id, true), ask.id);
 
     const main = () => win.evaluate(() => cfg.tasks.find((x) => !x.reviewOf));
     const done = await until(async () => { const t = await main(); return t.status === 'done' && t; }, 40000);
@@ -100,17 +104,20 @@ function mcpSession(dataDir, requests) {
     assert.match(done.summary, /fixed the check · checks passed/);
     assert.ok(done.checkpoint, 'a checkpoint was taken');
     step('failed checks go back to the agent, then pass');
+    const ext = await win.evaluate(() => ({ step: window.__stepSaw, watched: window.__watched }));
+    assert.ok(ext.step?.includes('done') && ext.watched, `extensions not called: ${JSON.stringify(ext)}`);
+    step('a new pipeline step and a new watcher plug in without changing the queue or the status loop');
 
     const review = await until(async () => (await main()).review, 30000);
     assert.equal(review?.status, 'done', 'the other subscription approves');
     step('cross-review by another subscription');
 
-    await win.evaluate(() => openReview(cfg.tasks.find((x) => !x.reviewOf)));
+    await win.evaluate(() => reviewDialog.open(cfg.tasks.find((x) => !x.reviewOf)));
     const files = await until(() => win.evaluate(() => [...document.querySelectorAll('#reviewFiles .rf-name')].map((e) => e.textContent).join()), 10000);
     assert.equal(files, 'out.txt');
     step('review dialog shows the diff');
 
-    await win.evaluate(() => { $('#review').close(); return restoreCheckpoint(cfg.tasks.find((x) => !x.reviewOf)); });
+    await win.evaluate(() => { $('#review').close(); return reviewDialog.restore(cfg.tasks.find((x) => !x.reviewOf)); });
     await until(() => !fs.existsSync(path.join(repo, 'out.txt')), 5000);
     assert.equal(fs.existsSync(path.join(repo, 'out.txt')), false, 'undo removes the file the task created');
     step('undo back to the checkpoint');
@@ -124,7 +131,7 @@ function mcpSession(dataDir, requests) {
     assert.deepEqual(dep, { linked: true, ready: false });
     step('"> " makes a task wait for the one above');
 
-    await win.evaluate(() => { $('#taskInput').value = ''; insertTemplate(templates()[0].text); });
+    await win.evaluate(() => { $('#taskInput').value = ''; templateLibrary.insert(templateLibrary.all()[0].text); });
     assert.equal(await win.evaluate(() => { const i = $('#taskInput'); return i.value.slice(i.selectionStart, i.selectionEnd); }), '<METHOD>');
     step('templates select their first placeholder');
 
@@ -147,13 +154,27 @@ function mcpSession(dataDir, requests) {
       cfg.taskAuto = false;
       cfg.exhausted = { fake: Date.now() + 90 * 60000, fake2: Date.now() + 30 * 60000 };
       addTask({ text: 'waiting for a subscription', agent: 'auto' });
-      checkAllLimited();
+      limitsNotice.check();
     });
     const limits = await win.evaluate(() => ({ open: $('#limits').open, when: $('#limitsWhen').textContent, idea: $('#limitsIdea').textContent }));
     assert.ok(limits.open && /Come back in (29|30) min/.test(limits.when) && limits.idea, JSON.stringify(limits));
-    const ideas = await win.evaluate(() => { cfg.breakDeck = []; return Array.from({ length: 20 }, () => nextBreakIdea()); });
+    const ideas = await win.evaluate(() => { cfg.breakDeck = []; return Array.from({ length: 20 }, () => limitsNotice.nextIdea()); });
     assert.equal(new Set(ideas).size, 20, 'twenty different ideas before any repeats');
     step('all subscriptions out: "come back in" with the soonest reset and a fresh idea');
+
+    // Every panel and dialog opens without errors (the interface is split across many files).
+    await win.evaluate(async () => {
+      await openAccounts(); $('#accounts').close();
+      await openSkills(); $('#skills').close();
+      toggleFlows(true); toggleFlows(false);
+      toggleDiagram(true); toggleDiagram(false);
+      openPalette(); document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+      await openUsage(); $('#usage').close();
+      toggleSidebar(); toggleSidebar();
+      newCard('note'); arrange(); fitAll();
+    });
+    await wait(1500);
+    step('every panel and dialog opens');
 
     assert.deepEqual(errors, [], 'no errors in the window');
     console.log('All end-to-end checks passed.');

@@ -2,8 +2,6 @@
 let usageMetric = 'tokens';
 let usageData = null;
 
-const fmtN = (n) => n >= 1e9 ? (n / 1e9).toFixed(1) + 'B' : n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 1e3 ? (n / 1e3).toFixed(1) + 'k' : String(Math.round(n));
-const fmtDur = (ms) => ms >= 3600e3 ? (ms / 3600e3).toFixed(1) + ' h' : ms >= 60e3 ? Math.round(ms / 60e3) + ' min' : Math.round(ms / 1e3) + ' s';
 const median = (xs) => { if (!xs.length) return 0; const s = [...xs].sort((a, b) => a - b); return s[Math.floor(s.length / 2)]; };
 const dayKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
@@ -35,7 +33,7 @@ function heatmap(days, metric) {
     const week = vals.slice(w * 7, w * 7 + 7);
     const first = week.find((x) => x.date === 1);
     labels += `<span>${first ? months[first.month] : ''}</span>`;
-    cols += `<div class="hm-col">${week.map((x) => `<i class="l${level(x.v)}" title="${x.key}: ${fmtN(x.v)} ${unit}"></i>`).join('')}</div>`;
+    cols += `<div class="hm-col">${week.map((x) => `<i class="l${level(x.v)}" title="${x.key}: ${fmt.count(x.v)} ${unit}"></i>`).join('')}</div>`;
   }
   const active = vals.filter((x) => x.v > 0).length;
   let streak = 0; for (let i = vals.length - 1; i >= 0 && vals[i].v > 0; i--) streak++;
@@ -63,11 +61,11 @@ function renderUsage() {
     const done = ts.byAgent[k];
     return `<div class="u-bar"><span class="u-name"><i style="background:${esc(color)}"></i>${esc(cfg.agents[k]?.label || k)}</span>
       <span class="u-track"><span style="width:${total ? (t / total) * 100 : 0}%;background:${esc(color)}"></span></span>
-      <span class="u-val">${fmtN(t)} · ${a.sessions} sessions${done ? ` · ${done.done} done, ${done.blocked} blocked` : ''}</span></div>`;
+      <span class="u-val">${fmt.count(t)} · ${a.sessions} sessions${done ? ` · ${done.done} done, ${done.blocked} blocked` : ''}</span></div>`;
   }).join('') || '<p class="muted small">No Claude Code or Codex logs on this computer.</p>';
   const maxP = byProject[0]?.tokens || 1;
   const projRows = byProject.map((p) => `<div class="u-bar"><span class="u-name" title="${esc(p.cwd)}">${esc(basename(p.cwd))}</span>
-    <span class="u-track"><span style="width:${(p.tokens / maxP) * 100}%"></span></span><span class="u-val">${fmtN(p.tokens)}</span></div>`).join('');
+    <span class="u-track"><span style="width:${(p.tokens / maxP) * 100}%"></span></span><span class="u-val">${fmt.count(p.tokens)}</span></div>`).join('');
 
   $('#usageBody').innerHTML = `
     <div class="u-head"><div id="usageMetric" class="seg">
@@ -77,17 +75,17 @@ function renderUsage() {
     ${heatmap(days, usageMetric)}
     <h3>Usage</h3>
     <div class="u-tiles">
-      ${tile('Total tokens', fmtN(total), `${fmtN(output)} generated`)}
+      ${tile('Total tokens', fmt.count(total), `${fmt.count(output)} generated`)}
       ${tile('Sessions', sum('sessions'), `${sum('messages')} answers`)}
       ${tile('Tasks', ts.total, `${ts.light} in light mode`)}
     </div>
     <h3>Savings and Effectiveness</h3>
     <div class="u-tiles">
-      ${tile('Cache savings', '≈ ' + fmtN(saved), 'input tokens you did not pay in full')}
+      ${tile('Cache savings', '≈ ' + fmt.count(saved), 'input tokens you did not pay in full')}
       ${tile('Cache hit rate', Math.round(hitRate * 100) + '%', 'of the input came from cache')}
       ${tile('Tasks solved', finished ? Math.round((ts.done / finished) * 100) + '%' : '—', `${ts.done} done · ${ts.blocked} blocked`)}
-      ${tile('Time per task', ts.durations.length ? fmtDur(median(ts.durations)) : '—', 'median')}
-      ${tile('Tokens per task', ts.tokensPerTask.length ? fmtN(median(ts.tokensPerTask)) : '—', 'median (Claude tasks)')}
+      ${tile('Time per task', ts.durations.length ? fmt.duration(median(ts.durations)) : '—', 'median')}
+      ${tile('Tokens per task', ts.tokensPerTask.length ? fmt.count(median(ts.tokensPerTask)) : '—', 'median (Claude tasks)')}
     </div>
     <h3>By Subscription</h3><div class="rows">${agentRows}</div>
     ${projRows ? `<h3>By Project</h3><div class="rows">${projRows}</div>` : ''}

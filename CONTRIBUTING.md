@@ -23,16 +23,17 @@ npm start       # runs the app in development mode
 
 Install at least one agent CLI (`claude`, `codex` or `gemini`) to try real cards; `npm run check` lists which ones are found.
 
-See the [Architecture](wiki/Architecture.md) wiki page for how the code is organized.
+See the [Architecture](wiki/Architecture.md) wiki page for how the code is organized and how to extend it by adding files (a new CLI, bridge tool, watcher or task step).
 
 ## Pull requests
 
 1. Create a branch from `main` (`feat/…`, `fix/…`, `docs/…`).
 2. Keep the change focused: one pull request, one topic.
-3. Follow the style of the surrounding code: plain JavaScript, no build step, `'use strict'` in Node files, short comments explaining *why*.
+3. Follow the style of the surrounding code: plain JavaScript, no build step, one folder per area, a class for each process with its dependencies passed in, `'use strict'`, short comments explaining *why*. Extend through the extension points instead of editing the code that uses them.
 4. Run the same checks as CI:
    ```bash
    git ls-files '*.js' | xargs -n1 node --check
+   npm test
    npm run test:e2e        # on Linux without a display: xvfb-run -a npm run test:e2e
    ```
 5. Try it with `npm start` on your system and say which one in the pull request.

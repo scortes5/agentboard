@@ -1,0 +1,69 @@
+/* AgentBoard — Selection, error flags, live progress, approvals, review, templates and limits. */
+/* ---------- Selection, error flags and live task progress ---------- */
+.card.selected { outline: 2px solid var(--accent); outline-offset: 3px; }
+.side-item.selected { box-shadow: inset 0 0 0 1.5px var(--accent); }
+.selbar { position: absolute; top: 62px; left: 50%; transform: translateX(-50%); z-index: 41; display: flex; align-items: center; gap: 8px; padding: 6px 8px 6px 14px; border-radius: 12px; font-size: 12.5px; }
+.selbar .danger { color: var(--bad); }
+.alertpill { display: inline-flex; align-items: center; color: var(--bad); flex: none; animation: pulse 1.4s ease-in-out infinite; }
+.card.alerted:not(.focused) { box-shadow: inset 0 0 0 1px rgba(var(--bad-rgb), .7), 0 0 40px -14px rgba(var(--bad-rgb), .8), 0 24px 60px -24px rgba(0, 0, 0, .9); }
+.side-item.alerted .name { color: var(--bad); }
+.tprogress { display: flex; flex-direction: column; gap: 4px; padding: 0 14px 10px; font-size: 11.5px; color: var(--text-2); }
+.tprogress .bar { height: 4px; border-radius: 4px; background: var(--fill-hi); overflow: hidden; }
+.tprogress .bar i { display: block; height: 100%; width: 0; background: var(--ok); transition: width .4s; }
+.tprogress.bad .bar { box-shadow: 0 0 0 1px rgba(var(--bad-rgb), .5); }
+.tprogress b.bad, .lalert { color: var(--bad); font-weight: 600; }
+.tlive { margin-top: 6px; display: flex; flex-direction: column; gap: 3px; font: 11px var(--font-mono); color: var(--text-2); }
+.tlive .lrow { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.tlive .lrow .status { width: 6px; height: 6px; }
+.tlive .ltime { color: var(--muted); flex: none; }
+.tlive .lname { flex: none; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--agent, var(--text)); }
+.tlive .lline { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tlive .lkid, .tlive .lalert { cursor: pointer; padding-left: 10px; border-left: 1px solid var(--line-hi); }
+.tlive .lkid:hover .lline { color: var(--text); }
+
+/* ---------- Approvals, review, templates ---------- */
+#approvalsBtn.attn { color: var(--warn); }
+.popover.approvals { display: flex; flex-direction: column; gap: 8px; max-height: 70vh; overflow: auto; }
+.ap-head { display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
+.ap-item { display: flex; flex-direction: column; gap: 6px; padding: 9px; border-radius: 10px; background: var(--fill); box-shadow: inset 0 0 0 1px var(--line); }
+.ap-title { font-weight: 600; }
+.ap-ctx { margin: 0; font: 11px var(--font-mono); color: var(--text-2); white-space: pre-wrap; max-height: 90px; overflow: auto; }
+.ap-q { color: var(--warn); font-size: 12.5px; }
+.ap-item .row, .popover.templates .row { display: flex; align-items: center; gap: 6px; }
+.tlive .lask { color: var(--warn); }
+.tlive .lask .lline { font-weight: 600; }
+.tchip.wait, .tchip.warn { color: var(--warn); }
+.tchip.ok { color: var(--ok); }
+.tchip.review, .tchip.issue { color: var(--accent); }
+a.tchip.pr { color: var(--accent); text-decoration: none; }
+.st-verifying .tdot { background: var(--warn); box-shadow: 0 0 10px var(--warn); animation: pulse 1s ease-in-out infinite; }
+dialog.review { width: min(1100px, 94vw); }
+.review-body { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 10px; height: min(58vh, 640px); }
+#reviewFiles { overflow: auto; display: flex; flex-direction: column; gap: 2px; }
+#reviewFiles .rf { display: flex; gap: 6px; justify-content: space-between; text-align: left; font: 11.5px var(--font-mono); padding: 5px 7px; border-radius: 7px; background: transparent; box-shadow: none; }
+#reviewFiles .rf:hover { background: var(--fill); }
+#reviewFiles .rf-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
+#reviewFiles .rf.added .rf-name { color: var(--ok); } #reviewFiles .rf.deleted .rf-name { color: var(--bad); }
+.rf-n .add, .df .dl.add .no { color: var(--ok); font-style: normal; } .rf-n .del { color: var(--bad); font-style: normal; }
+.diff { overflow: auto; border-radius: 10px; box-shadow: inset 0 0 0 1px var(--line); font: 11.5px/1.5 var(--font-mono); }
+.df header { position: sticky; top: 0; padding: 6px 10px; background: var(--fill-hi); font-weight: 600; z-index: 1; }
+.dl { display: grid; grid-template-columns: 42px 42px minmax(0, 1fr); white-space: pre; }
+.dl .no { color: var(--muted); text-align: right; padding-right: 8px; user-select: none; }
+.dl code { font: inherit; overflow: hidden; text-overflow: ellipsis; }
+.dl.add { background: rgba(var(--ok-rgb), .12); } .dl.del { background: rgba(var(--bad-rgb), .12); }
+.dl.hunk { color: var(--accent); background: rgba(var(--accent-rgb), .06); }
+.dl[data-line] { cursor: pointer; } .dl[data-line]:hover { outline: 1px solid var(--line-hi); }
+.popover.templates { display: flex; flex-direction: column; gap: 4px; }
+.tpl { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 8px; cursor: pointer; }
+.tpl:hover { background: var(--fill); }
+.tpl-name { flex: 1; }
+.project-row [name=verify] { font: 11.5px var(--font-mono); }
+
+/* ---------- Limits ---------- */
+dialog.limits { width: 440px; text-align: center; }
+dialog.limits form { align-items: center; }
+.limits-emoji { font-size: 44px; line-height: 1; }
+.limits-when { font-size: 15px; font-weight: 600; margin: 0; }
+.limits-idea { font-size: 17px; margin: 6px 0 4px; color: var(--accent); }
+dialog.limits .actions { width: 100%; }
+.tprogress b.warn { color: var(--warn); font-weight: 600; }

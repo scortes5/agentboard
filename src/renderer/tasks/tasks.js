@@ -4,8 +4,7 @@
 'use strict';
 /* global ab, cfg, $, esc, uid, basename, clamp, isMac, runtime, cardData, agentOf, newCard, focusCardView, focusCard, closeCard, closePopover, openPopover,
    ensureGroup, slotIn, looseSpot, terminalTail, toast, save, agentAvailable, visibleRect, applyViewport, drawMinimap, projectOfPath, icon,
-   diagramOpen, toggleDiagram, STATUS_LABEL, openSkills, approvals, answerApproval, openReview, restoreCheckpoint, onTaskMarker,
-   afterTaskFinished, reviewPrompt, fmtTokens, historyForRouting, overDailyBudget, checkAllLimited */
+   diagramOpen, toggleDiagram, STATUS_LABEL, openSkills, approvalsInbox, reviewDialog, taskPipeline, fmt, costTracker, limitsNotice */
 
 const STATUS = {
   pending: 'Queued',
@@ -109,7 +108,8 @@ function canOpenSubagents(key) {
 }
 
 function taskPrompt(t, subagents = false) {
-  if (t.reviewOf) return reviewPrompt(t);
+  const custom = taskPipeline.prompt(t);
+  if (custom) return custom;
   const max = cfg.maxSubagents || 4;
   return `[AgentBoard task ${t.id}] ${t.text}\n`
     + (t.issue?.body ? `(GitHub issue #${t.issue.number}: ${t.issue.body.slice(0, 3000)})\n` : '')
@@ -162,7 +162,7 @@ function dispatchQueued(onlyFlows = false) {
   for (const t of tasks()) {
     if (slots <= 0) break;
     if (t.status !== 'pending' || (onlyFlows && !t.flowRun) || !depsReady(t)) continue;
-    if (overDailyBudget() && !t.light && !t.heavy) { t.light = true; t.budgetLight = true; }
+    if (costTracker.overDailyBudget() && !t.light && !t.heavy) { t.light = true; t.budgetLight = true; }
     const key = pickAgent(t);
     if (!key) continue;
     slots--;
@@ -230,7 +230,7 @@ function finishTask(t, status, summary) {
   if (!document.hasFocus()) {
     try { new Notification(status === 'done' ? 'Task done' : 'Task blocked', { body: `${t.text.slice(0, 80)}\n${t.summary}` }); } catch {}
   }
-  afterTaskFinished(t);
+  taskPipeline.afterFinish(t);
 }
 
 // Back to work in the same card (review comments, failed checks): the DONE line on screen
@@ -259,7 +259,7 @@ function tickTasks() {
     taskRt.set(t.id, st);
     if (st.dispatching) continue;
     const m = findMarker(c, t.ignoreMarkers);
-    if (m) { onTaskMarker(t, m); changed = true; continue; }
+    if (m) { taskPipeline.onMarker(t, m); changed = true; continue; }
     const lim = findLimit(c);
     if (lim && t.assigned) {
       // the subscription ran out: back to the queue so another one picks it up
@@ -282,7 +282,7 @@ function tickTasks() {
     }
   }
   dispatchQueued(!cfg.taskAuto);
-  checkAllLimited();
+  limitsNotice.check();
   if (changed) { save(); renderTasks(); }
   updateBadge();
 }
@@ -361,7 +361,7 @@ function renderTasks() {
       t.review ? chip(t.review.status === 'done' ? `approved by ${esc(t.review.by)}` : `changes asked by ${esc(t.review.by)}`, t.review.status === 'done' ? 'ok' : 'warn', '') : '',
       t.checkFailures ? chip(`checks failed ×${t.checkFailures}`, 'warn') : '',
       t.budgetHit ? chip('over budget', 'warn') : t.budgetLight ? chip('light: daily budget', 'warn') : '',
-      t.status === 'done' && t.tokens ? chip(`${fmtTokens(t.tokens)} tok`) : '',
+      t.status === 'done' && t.tokens ? chip(`${fmt.tokens(t.tokens)} tok`) : '',
       t.pr ? `<a class="tchip pr" href="${esc(t.pr)}" title="Open the pull request">PR</a>` : '',
     ].join('');
     const B = (a, ic, tip) => `<button data-a="${a}" title="${tip}">${icon(ic, 14)}</button>`;
@@ -400,7 +400,6 @@ function renderTasks() {
 // ---------- Live progress ----------
 // Every second while the panel is open: what each running task (and each subagent it
 // opened) is doing right now, for how long, and any error line seen in its terminal.
-const fmtElapsed = (ms) => { const s = Math.max(0, Math.round(ms / 1000)); return s < 60 ? `${s}s` : s < 3600 ? `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s` : `${Math.floor(s / 3600)}h ${Math.floor(s / 60) % 60}m`; };
 const NOISE_RE = /^[\s─━│┃╭╮╰╯┌┐└┘├┤┬┴┼═║>❯›·•*✻✽✢⏺⎿-]*$|^\s*(\? for shortcuts|esc to interrupt|Context left|auto-accept)/i;
 function lastLine(c) {
   const lines = terminalTail(c, 14, true).split('\n').map((l) => l.replace(/\s+/g, ' ').trim()).filter((l) => l && !NOISE_RE.test(l));
@@ -422,10 +421,10 @@ function updateTaskLive() {
     const me = liveOf(c);
     const kids = cfg.cards.filter((k) => k.parent === c.id);
     const sameLine = me.alert && me.alert === me.line;
-    const ask = approvals.get(c.id);
+    const ask = approvalsInbox.get(c.id);
     el.innerHTML = (ask ? `<div class="lrow lask"><span class="lline" title="${esc(ask.context)}">${esc(ask.question)}</span>
         <button class="inline" data-approve="no" data-card="${esc(c.id)}" title="Reject (Esc)">Reject</button><button class="inline primary" data-approve="yes" data-card="${esc(c.id)}" title="Allow this once">Approve</button></div>` : '')
-      + `<div class="lrow${sameLine ? ' lalert' : ''}"${sameLine ? ` data-go="${esc(c.id)}"` : ''}><span class="status ${me.st}"></span><span class="ltime">${fmtElapsed(now - (t.startedAt || now))}${t.tokens ? ` · ${fmtTokens(t.tokens)} tok` : ''}</span><span class="lline">${esc(me.line || me.label)}</span>${sameLine ? icon('alert', 11) : ''}</div>`
+      + `<div class="lrow${sameLine ? ' lalert' : ''}"${sameLine ? ` data-go="${esc(c.id)}"` : ''}><span class="status ${me.st}"></span><span class="ltime">${fmt.elapsed(now - (t.startedAt || now))}${t.tokens ? ` · ${fmt.tokens(t.tokens)} tok` : ''}</span><span class="lline">${esc(me.line || me.label)}</span>${sameLine ? icon('alert', 11) : ''}</div>`
       + (me.alert && !sameLine ? `<div class="lrow lalert" data-go="${esc(c.id)}">${icon('alert', 11)}<span class="lline">${esc(me.alert)}</span></div>` : '')
       + kids.map((k) => {
         const s = liveOf(k);
@@ -451,8 +450,8 @@ function updateProgress() {
   $('span', bar).innerHTML = [
     `${done}/${list.length} done`, running.length && `${running.length} working`, kids && `${kids} subagent${kids === 1 ? '' : 's'}`,
     errors && `<b class="bad">${errors} with errors</b>`, blocked && `<b class="bad">${blocked} blocked</b>`,
-    running.some((t) => t.tokens) && `${fmtTokens(running.reduce((n, t) => n + (t.tokens || 0), 0))} tokens`,
-    overDailyBudget() && '<b class="warn" title="New tasks use light models until tomorrow">daily budget reached</b>',
+    running.some((t) => t.tokens) && `${fmt.tokens(running.reduce((n, t) => n + (t.tokens || 0), 0))} tokens`,
+    costTracker.overDailyBudget() && '<b class="warn" title="New tasks use light models until tomorrow">daily budget reached</b>',
   ].filter(Boolean).join(' · ') + (noBridge ? ' · <button class="inline" data-x="connect" title="Register AgentBoard in your CLIs so task agents can open subagents you can see">Enable subagents</button>' : '');
 }
 
@@ -460,7 +459,7 @@ function taskById(id) { return tasks().find((t) => t.id === id); }
 
 $('#taskList').addEventListener('click', (e) => {
   const ap = e.target.closest('[data-approve]');
-  if (ap) { answerApproval(ap.dataset.card, ap.dataset.approve === 'yes'); return; }
+  if (ap) { approvalsInbox.answer(ap.dataset.card, ap.dataset.approve === 'yes'); return; }
   const go = e.target.closest('[data-go]')?.dataset.go;
   const gc = go && cardData(go);
   if (gc) { if (diagramOpen()) toggleDiagram(false); focusCardView(gc); focusCard(gc.id); return; }
@@ -485,9 +484,9 @@ $('#taskList').addEventListener('click', (e) => {
   } else if (act === 'top') {
     cfg.tasks = [t, ...tasks().filter((x) => x !== t)]; save(); renderTasks();
   } else if (act === 'diff') {
-    openReview(t);
+    reviewDialog.open(t);
   } else if (act === 'restore') {
-    restoreCheckpoint(t);
+    reviewDialog.restore(t);
   } else if (act === 'retry') {
     Object.assign(t, { status: 'pending', cardId: null, assigned: null, summary: '', finishedAt: null });
     save(); renderTasks();
@@ -546,7 +545,7 @@ function addPlanned(list, d) {
 function planOptions() {
   return {
     agents: subscriptions().map(([k]) => k), projects: cfg.projects.map((p) => p.name),
-    local: subscriptions().filter(([, a]) => a.local).map(([k]) => k), history: historyForRouting(),
+    local: subscriptions().filter(([, a]) => a.local).map(([k]) => k), history: costTracker.historyForRouting(),
   };
 }
 
