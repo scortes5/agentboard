@@ -4,6 +4,17 @@ All notable changes to AgentBoard. The format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-18
+
+### Added
+- **Live task progress**: a progress bar at the top of Tasks (done, working, subagents, errors, blocked) and, under each running task, how long it has been working, the last line its agent printed and every subagent it opened with its own status. Click a line to jump to that card.
+- **Error alerts**: a card that prints an error (`npm ERR!`, `Error:`, `Traceback`, `FAIL`, `command not found`, API or rate-limit errors…) gets a red mark, a notice and a notification if you are in another app. Clicking the card clears it. Turn it off in *Settings → Tasks*.
+- **Visible subagents**: when Agent Connection is set up, task agents are told they may split the work with `start_agent`. Each helper opens as a card next to its parent (or in its group), titled `↳ Agent`, linked in the Diagram and listed under its task. *Settings → Tasks* sets whether they may and how many at once (4 by default).
+- **Close several cards**: ⌘/Ctrl or Shift + click title bars (or names in the agent list) to select them, then **Close** in the bar that appears. Also in the palette: *Close Cards of Finished Tasks*, *Close Stopped Cards* and *Close All Cards in This View*; and *Close Its Cards* in a group's menu. One confirmation for all of them.
+
+### Fixed
+- *Check for Updates* always asks GitHub again instead of using a cached answer, and its "up to date" message shows this copy's version, the latest release and where the running app is, so an old copy left in Downloads is easy to spot.
+
 ## [0.7.0] - 2026-10-18
 
 ### Added
@@ -121,7 +132,8 @@ Includes the 0.2.0 changes, which were not released separately.
 ### Added
 - First release: a board of terminals for CLI agents on Mac and Windows.
 
-[Unreleased]: https://github.com/scortes5/agentboard/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/scortes5/agentboard/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/scortes5/agentboard/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/scortes5/agentboard/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/scortes5/agentboard/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/scortes5/agentboard/compare/v0.4.0...v0.5.0

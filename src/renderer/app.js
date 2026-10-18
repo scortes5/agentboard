@@ -235,7 +235,7 @@ function mountCard(c, { resume }) {
       <span class="title">${esc(c.title)}</span>
       ${c.type === 'term' ? `<span class="proj" title="${esc(c.cwd || 'Home folder')}">${esc(basename(c.cwd) || '~')}</span>` : ''}
       <span class="spacer"></span>
-      ${c.type === 'term' ? `<span class="gitpill hidden"></span>
+      ${c.type === 'term' ? `<span class="alertpill hidden" title="">${icon('alert', 12)}</span><span class="gitpill hidden"></span>
         <button class="card-btn" data-act="open" title="Open the project folder in Finder">${icon('folder', 14)}</button>
         <button class="card-btn" data-act="restart" title="Restart the agent (resumes its session)">${icon('refresh', 14)}</button>` : ''}
       <button class="card-btn" data-act="edit" title="${c.type === 'term' ? 'Change name, agent, project or arguments; send context to another agent' : 'Edit or duplicate the note'}">${icon('more', 14)}</button>
@@ -246,7 +246,7 @@ function mountCard(c, { resume }) {
     <div class="resize"></div>`;
   world.appendChild(el);
 
-  const rt = { el, statusEl: $('.status', el), gitEl: $('.gitpill', el), lastData: 0, busySince: 0, alive: false };
+  const rt = { el, statusEl: $('.status', el), gitEl: $('.gitpill', el), alertEl: $('.alertpill', el), lastData: 0, busySince: 0, alive: false, scannedAt: 0, alert: null };
   runtime.set(c.id, rt);
   const body = $('.card-body', el);
 
@@ -387,16 +387,57 @@ function showOverlay(c, msg) {
   $('.card-body', rt.el).appendChild(ov);
 }
 
-function closeCard(c) {
-  const rt = runtime.get(c.id);
-  if (rt?.alive && !confirm(`Close "${c.title}"? Its process will be stopped.`)) return;
-  if (c.type !== 'group') ab.ptyKill(c.id);
-  rt?.term?.dispose();
-  rt?.el.remove();
-  runtime.delete(c.id);
-  cfg.cards = cfg.cards.filter((x) => x.id !== c.id);
-  if (focusedId === c.id) focusedId = null;
-  save(); updateEmpty(); renderSidebar();
+function closeCard(c) { return closeCards([c]); }
+
+// Close one or more cards with a single confirmation for the processes still running.
+function closeCards(list, { ask = true } = {}) {
+  list = list.filter(Boolean);
+  if (!list.length) return false;
+  const running = list.filter((c) => runtime.get(c.id)?.alive);
+  if (ask && running.length) {
+    const msg = list.length === 1
+      ? `Close "${list[0].title}"? Its process will be stopped.`
+      : `Close ${list.length} cards? ${running.length === 1 ? '1 running process' : `${running.length} running processes`} will be stopped.`;
+    if (!confirm(msg)) return false;
+  }
+  const ids = new Set(list.map((c) => c.id));
+  for (const c of list) {
+    const rt = runtime.get(c.id);
+    if (c.type !== 'group') ab.ptyKill(c.id);
+    rt?.term?.dispose();
+    rt?.el.remove();
+    runtime.delete(c.id);
+    selected.delete(c.id);
+    if (focusedId === c.id) focusedId = null;
+  }
+  cfg.cards = cfg.cards.filter((x) => !ids.has(x.id));
+  save(); updateEmpty(); renderSidebar(); updateSelBar();
+  return true;
+}
+
+// ---------- Selection: ⌘/Ctrl or Shift + click on a card's title bar (or in the agent list) ----------
+const selected = new Set();
+function toggleSelect(id, on = !selected.has(id)) {
+  if (on) selected.add(id); else selected.delete(id);
+  runtime.get(id)?.el.classList.toggle('selected', on);
+  sideItems.get(id)?.classList.toggle('selected', on);
+  updateSelBar();
+}
+function clearSelection() { for (const id of [...selected]) toggleSelect(id, false); }
+function updateSelBar() {
+  for (const id of [...selected]) if (!cardData(id)) selected.delete(id);
+  $('#selBar').classList.toggle('hidden', !selected.size);
+  $('#selCount').textContent = `${selected.size} selected`;
+}
+const finishedTaskCards = () => cfg.cards.filter((c) => c.taskId && (cfg.tasks || []).some((t) => t.id === c.taskId && t.status === 'done'));
+const stoppedCards = () => cfg.cards.filter((c) => c.type === 'term' && runtime.get(c.id) && !runtime.get(c.id).alive);
+function closeMany(kind) {
+  const list = kind === 'selected' ? [...selected].map(cardData)
+    : kind === 'finished' ? finishedTaskCards()
+    : kind === 'stopped' ? stoppedCards()
+    : kind === 'project' ? shownCards().filter((c) => c.type !== 'group') : [];
+  if (!list.filter(Boolean).length) return toast(kind === 'finished' ? 'No cards of finished tasks.' : kind === 'stopped' ? 'No stopped cards.' : 'Nothing to close.');
+  if (closeCards(list) && list.length > 1) toast(`Closed ${list.length} cards.`);
 }
 
 function focusCard(id, focusTerm = true) {
@@ -406,6 +447,7 @@ function focusCard(id, focusTerm = true) {
   const rt = runtime.get(id);
   if (!rt) return;
   rt.el.classList.add('focused');
+  if (rt.alert) setAlert(cardData(id), null);
   if (+rt.el.style.zIndex < zTop) rt.el.style.zIndex = ++zTop;
   if (focusTerm) (rt.term || rt.noteEl)?.focus();
 }
@@ -441,6 +483,7 @@ function wireCard(c, el) {
 
   head.addEventListener('pointerdown', (e) => {
     if (e.button !== 0 || e.target.closest('button, .gitpill') || titleEl.isContentEditable) return;
+    if (e.metaKey || e.ctrlKey || e.shiftKey) { e.preventDefault(); toggleSelect(c.id); return; }
     e.preventDefault();
     const start = { x: e.clientX, y: e.clientY, cx: c.x, cy: c.y };
     head.setPointerCapture(e.pointerId);
@@ -657,13 +700,20 @@ function groupMenu(c, anchor) {
     <label>Name <input name="title" value="${esc(c.title)}" /></label>
     <label>Color <div class="swatches">${GROUP_COLORS.map((col) => `<button type="button" data-col="${col}" class="${col === c.color ? 'on' : ''}" style="background:${col}"></button>`).join('')}</div></label>
     <div class="hint">Cards whose center sits inside the frame belong to the group. Write <code>#${esc(c.title.replace(/\s+/g, '-'))}</code> in a task to open its agent here.</div>
-    <div class="row"><button data-x="fit" title="Resize the frame around its cards">Fit to Cards</button><button data-x="ok" class="primary">Apply</button></div>`;
+    <div class="row"><button data-x="closeall" title="Close every card inside this group and stop their processes">Close Its Cards</button><button data-x="fit" title="Resize the frame around its cards">Fit to Cards</button><button data-x="ok" class="primary">Apply</button></div>`;
   openPopover(pop, anchor, 290);
   let color = c.color;
   pop.addEventListener('click', (e) => {
     const col = e.target.closest('[data-col]')?.dataset.col;
     if (col) { color = col; pop.querySelectorAll('[data-col]').forEach((b) => b.classList.toggle('on', b.dataset.col === col)); return; }
     const x = e.target.closest('[data-x]')?.dataset.x;
+    if (x === 'closeall') {
+      closePopover();
+      const m = membersOf(c);
+      if (!m.length) return toast('This group has no cards.');
+      if (closeCards(m)) toast(`Closed ${m.length} card${m.length === 1 ? '' : 's'}.`);
+      return;
+    }
     if (x === 'fit') {
       const m = membersOf(c);
       if (m.length) {
@@ -719,6 +769,35 @@ ab.onPtyExit((id, code) => {
   showOverlay(c, `The process exited (code ${code}).`);
 });
 
+// ---------- Error watch ----------
+// Lines that almost always mean something went wrong. Checked only on new output, every
+// couple of seconds, so a failing build or an API error shows up on the card right away.
+const ERROR_RE = /^\s*(?:[✗✘×⨯]\s|(?:error|fatal|panic)(?:\[\w+\])?:|npm ERR!|Traceback \(most recent call last\)|Uncaught |Unhandled |FAIL(?:ED)?\b|API Error|Error: |\w*(?:Error|Exception): )|command not found|Permission denied|EACCES|ENOENT|ECONNREFUSED|rate limit|overloaded_error|Request timed out/i;
+function scanForErrors(c, rt, now) {
+  if (rt.lastData <= rt.scannedAt) return;
+  rt.scannedAt = now;
+  const lines = terminalTail(c, 12, true).split('\n');
+  const hit = [...lines].reverse().find((l) => ERROR_RE.test(l) && l.trim().length > 3);
+  if (!hit || hit === rt.lastAlertLine) return;
+  rt.lastAlertLine = hit;
+  setAlert(c, hit.trim().slice(0, 200));
+}
+function setAlert(c, line) {
+  const rt = c && runtime.get(c.id);
+  if (!rt?.alertEl) return;
+  const was = rt.alert;
+  rt.alert = line ? { line, at: Date.now() } : null;
+  rt.alertEl.classList.toggle('hidden', !line);
+  rt.alertEl.title = line ? `Possible error (click the card to dismiss):\n${line}` : '';
+  rt.el.classList.toggle('alerted', !!line);
+  sideItems.get(c.id)?.classList.toggle('alerted', !!line);
+  if (line && !was && focusedId !== c.id) {
+    toast(`<b>${esc(c.title)}</b>: ${esc(line.slice(0, 120))}`, 6000);
+    if (!document.hasFocus()) { try { new Notification(`Possible error in ${c.title}`, { body: line.slice(0, 160) }); } catch {} }
+  }
+  if (typeof updateTaskLive === 'function') updateTaskLive();
+}
+
 // Status: working / waiting / stopped + notify when an agent finishes
 setInterval(() => {
   if (!cfg) return;
@@ -735,6 +814,7 @@ setInterval(() => {
     s.title = STATUS_LABEL[rt.status];
     const sideDot = sideItems.get(c.id)?.querySelector('.status');
     if (sideDot) { sideDot.className = 'status ' + rt.status; sideDot.title = s.title; }
+    if (cfg.watchErrors !== false && now - rt.scannedAt > 2000) scanForErrors(c, rt, now);
     // Notify if it worked for >8 s and you are not looking at it
     if (wasBusy && !busy && rt.lastData - rt.busySince > 8000 && (!document.hasFocus() || focusedId !== c.id)) {
       try { new Notification(`${c.title} finished`, { body: basename(c.cwd), silent: false }); } catch {}
@@ -1018,8 +1098,13 @@ function renderSidebar() {
       b.style.setProperty('--agent', c.type === 'note' ? 'var(--warn)' : a.color);
       b.innerHTML = (c.type === 'term' ? `<span class="status ${st}" title="${STATUS_LABEL[st] || ''}"></span>` : '')
         + `<span class="name">${esc(c.title)}</span><span class="kind">${c.type === 'note' ? 'note' : esc(a.label)}</span>`;
-      b.title = c.type === 'note' ? 'Go to the note' : `Go to the ${c.title} card (${a.label})`;
-      b.onclick = () => { focusCardView(c); focusCard(c.id); };
+      b.title = c.type === 'note' ? 'Go to the note' : `Go to the ${c.title} card (${a.label}) · ⌘/Shift-click to select`;
+      b.onclick = (e) => {
+        if (e.metaKey || e.ctrlKey || e.shiftKey) return toggleSelect(c.id);
+        focusCardView(c); focusCard(c.id);
+      };
+      b.classList.toggle('selected', selected.has(c.id));
+      b.classList.toggle('alerted', !!runtime.get(c.id)?.alert);
       list.appendChild(b);
       sideItems.set(c.id, b);
     }
@@ -1382,10 +1467,12 @@ function ping(id) {
 // Cards that can receive text: running agents, never plain terminals.
 const canReceive = (c) => c.type === 'term' && !c.startCmd && !!agentOf(c).command && c.bridge !== false && runtime.get(c.id)?.alive;
 
-function terminalTail(c, n = 40) {
+// The selection wins when the user marked something (for "Send to…"); pass screen=true to
+// always read what the terminal shows.
+function terminalTail(c, n = 40, screen = false) {
   const term = runtime.get(c.id)?.term;
   if (!term) return '';
-  if (term.hasSelection()) return term.getSelection().trim();
+  if (!screen && term.hasSelection()) return term.getSelection().trim();
   const b = term.buffer.active;
   const end = b.baseY + b.cursorY;
   const lines = [];
@@ -1451,11 +1538,38 @@ ab.onBridgeEvent((ev) => {
   else if (ev.kind === 'start') { toast(`${esc(from)} opened <b>${esc(to)}</b>`); }
 });
 
+// Where a subagent appears: inside its parent's group, or right next to the parent card,
+// so you can watch it work beside the agent that opened it.
+function spotNear(parent) {
+  const g = parent.groupId && cardData(parent.groupId);
+  if (g) return slotIn(g);
+  const free = (x, y) => !cfg.cards.some((o) => o.type !== 'group' && x < o.x + o.w + 20 && x + DEFAULT_W + 20 > o.x && y < o.y + o.h + 20 && y + DEFAULT_H + 20 > o.y);
+  // right of the parent, then below it, moving outwards until a free spot appears
+  for (let ring = 0; ring < 6; ring++) {
+    for (const [x, y] of [[parent.x + (parent.w + 28) * (ring + 1), parent.y], [parent.x, parent.y + (parent.h + 28) * (ring + 1)],
+      [parent.x + (parent.w + 28) * (ring + 1), parent.y + (parent.h + 28) * (ring + 1)]]) {
+      if (free(x, y)) return { x, y };
+    }
+  }
+  return looseSpot();
+}
+
 ab.onBridgeNewCard(async ({ reqId, agent, cwd, title, light, from }) => {
   // light: subagent on the cheap model; parent: who asked for it (drawn as a link in the diagram)
-  const c = cfg.agents[agent] ? newCard('term', agent, { cwd, ...(title ? { title } : {}), args: light ? (cfg.agents[agent].lightArgs || '') : '', parent: from }) : null;
+  const parent = from && cardData(from);
+  const max = cfg.maxSubagents || 4;
+  if (parent && cfg.cards.filter((x) => x.parent === parent.id && runtime.get(x.id)?.alive).length >= max) {
+    toast(`${esc(parent.title)} tried to open more than ${max} subagents at once.`, 5000);
+    return ab.bridgeCardCreated(reqId, null);
+  }
+  const c = cfg.agents[agent] ? newCard('term', agent, {
+    cwd, title: title || (parent ? `↳ ${cfg.agents[agent].label}` : undefined), args: light ? (cfg.agents[agent].lightArgs || '') : '', parent: from,
+    noFocus: !!parent, ...(parent ? spotNear(parent) : {}),
+  }) : null;
+  if (c && parent?.taskId) c.parentTask = parent.taskId;
   if (c) await saveNow(); // the bridge reads the saved board
   ab.bridgeCardCreated(reqId, c ? c.id : null);
+  if (c && typeof renderTasks === 'function') renderTasks();
 });
 
 // ---------- Skills and agents ----------
@@ -1672,6 +1786,8 @@ function renderConnect(bridge) {
 }
 
 $('#skillsBtn').onclick = () => openSkills();
+$('#selClose').onclick = () => closeMany('selected');
+$('#selNone').onclick = clearSelection;
 $('#skillsRefresh').onclick = refreshSkills;
 $('#skills .tabs').addEventListener('click', (e) => { const t = e.target.closest('[data-tab]')?.dataset.tab; if (t) showTab(t); });
 // Enter in a field must not close the dialog (it is a <form method="dialog">).
@@ -2013,6 +2129,9 @@ async function openSettings(section = 'general') {
   f.perAgentParallel.value = cfg.perAgentParallel || 2;
   f.taskWorktrees.checked = !!cfg.taskWorktrees;
   f.taskRoute.checked = cfg.taskRoute !== false;
+  f.taskSubagents.checked = cfg.taskSubagents !== false;
+  f.maxSubagents.value = cfg.maxSubagents || 4;
+  f.watchErrors.checked = cfg.watchErrors !== false;
   const rows = $('#agentRows'); rows.innerHTML = '';
   for (const [k, a] of Object.entries(cfg.agents)) rows.appendChild(agentRow(k, a));
   const prow = $('#projectRows'); prow.innerHTML = '';
@@ -2050,6 +2169,9 @@ $('#settings').addEventListener('close', async () => {
   cfg.perAgentParallel = clamp(+f.perAgentParallel.value || 2, 1, 6);
   cfg.taskWorktrees = f.taskWorktrees.checked;
   cfg.taskRoute = f.taskRoute.checked;
+  cfg.taskSubagents = f.taskSubagents.checked;
+  cfg.maxSubagents = clamp(+f.maxSubagents.value || 4, 1, 8);
+  cfg.watchErrors = f.watchErrors.checked;
   cfg.ui = { ...draftUi };
   cfg.shortcuts = Object.fromEntries(Object.entries(draftKeys).filter(([id, k]) => shortcutDefs.find((d) => d.id === id)?.key !== k));
 

@@ -41,6 +41,13 @@ refactor the payments module !!
 - **Usage limit**: if a subscription runs out, the task moves to another; the exhausted one waits for its reset time.
 - **Trust and Continue** answers the "trust this folder" prompt without going to the card.
 
+## Watching progress
+
+- The bar at the top of the panel shows how many tasks are done, working, blocked or **with errors**, and how many subagents are open.
+- Under each running task: time working, the last line its agent printed, and each **subagent** it opened with its status. Click any line to go to that card.
+- When a terminal prints an error (`npm ERR!`, `Error:`, `Traceback`, `FAIL`, an API or rate-limit error…), its card turns red, you get a notice (and a notification if you are in another app) and the task shows the line. Clicking the card clears the mark.
+- **Subagents**: with *Agent Connection* set up (*Skills and Agents*), a task agent may split its work with `start_agent`. Helpers open next to it as `↳ Agent` cards. *Settings → Tasks* sets whether they may and how many (4 by default).
+
 ## Worktree per task
 
 Each task works on its own branch `agentboard/<task>` in a separate git worktree, so several agents can change the same repository safely. When it finishes, **View changes** shows the diff and lets you **Merge** or **Discard**.

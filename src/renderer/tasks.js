@@ -4,7 +4,7 @@
 'use strict';
 /* global ab, cfg, $, esc, uid, basename, clamp, isMac, runtime, cardData, agentOf, newCard, focusCardView, focusCard, closeCard, closePopover, openPopover,
    ensureGroup, slotIn, looseSpot, terminalTail, toast, save, agentAvailable, visibleRect, applyViewport, drawMinimap, projectOfPath, icon,
-   diagramOpen, toggleDiagram */
+   diagramOpen, toggleDiagram, STATUS_LABEL, openSkills */
 
 const STATUS = {
   pending: 'Queued',
@@ -88,9 +88,26 @@ function pickAgent(t) {
   return cands[0];
 }
 
-function taskPrompt(t) {
+// Whether this subscription's CLI has the AgentBoard tools (MCP) registered, so it can open
+// subagents that show up on the board. Refreshed when tasks start; Settings registers it.
+let bridgeConnected = {};
+async function refreshBridgeStatus() {
+  try { bridgeConnected = (await ab.bridgeStatus())?.connected || {}; } catch { bridgeConnected = {}; }
+  return bridgeConnected;
+}
+function canOpenSubagents(key) {
+  if (cfg.taskSubagents === false) return false;
+  const cli = (cfg.agents[key]?.command || '').trim().split(/\s+/)[0].split(/[\\/]/).pop().replace(/\.(cmd|exe)$/i, '');
+  return !!(bridgeConnected[key] || bridgeConnected[cli]);
+}
+
+function taskPrompt(t, subagents = false) {
+  const max = cfg.maxSubagents || 4;
   return `[AgentBoard task ${t.id}] ${t.text}\n`
-    + '(Only this, keep it short; use the agentboard-task skill if you have it. When finished, call complete_task if available and end with the line «DONE: …» or «BLOCKED: …».)';
+    + '(Only this, keep it short; use the agentboard-task skill if you have it. When finished, call complete_task if available and end with the line «DONE: …» or «BLOCKED: …».)'
+    + (subagents && !t.light
+      ? `\n(If the task has parts that can be done at the same time, split it: open up to ${max} helpers with the AgentBoard tool start_agent — light=true for simple parts, each with a self-contained message — so they work in parallel on the user's board next to you. Follow them with read_agent_output, check and combine their work, then write your own DONE line. Do not split small tasks.)`
+      : '');
 }
 
 async function startTask(t, key) {
@@ -110,8 +127,9 @@ async function startTask(t, key) {
   const g = t.group ? ensureGroup(t.group, projectOfPath(t.cwd || cfg.selectedProject || '')) : null;
   const pos = g ? slotIn(g) : looseSpot();
   const title = t.text.length > 34 ? t.text.slice(0, 32).trim() + '…' : t.text;
+  await refreshBridgeStatus();
   const card = newCard('term', key, {
-    cwd, title, args: t.light ? (a.lightArgs || '') : t.heavy ? (a.heavyArgs || '') : '', prompt: taskPrompt(t), taskId: t.id, noFocus: true, ...pos,
+    cwd, title, args: t.light ? (a.lightArgs || '') : t.heavy ? (a.heavyArgs || '') : '', prompt: taskPrompt(t, canOpenSubagents(key)), taskId: t.id, noFocus: true, ...pos,
   });
   if (!card) { t.status = 'pending'; taskRt.delete(t.id); save(); renderTasks(); return; }
   t.cardId = card.id;
@@ -196,6 +214,7 @@ function finishTask(t, status, summary) {
 
 function tickTasks() {
   if (!cfg) return;
+  if (cfg.tasksOpen) updateTaskLive();
   let changed = false;
   const now = Date.now();
   for (const t of tasks()) {
@@ -320,6 +339,7 @@ function renderTasks() {
         <div class="ttext" title="Double-click to edit">${esc(t.text)}</div>
         <div class="tmeta">${meta}</div>
         ${t.summary ? `<div class="tsum">${esc(t.summary)}</div>` : ''}
+        ${t.status === 'running' || t.status === 'review' ? `<div class="tlive" data-live="${esc(t.id)}"></div>` : ''}
         ${t.needsTrust ? '<div class="tsum warn">It asks whether you trust the folder. <button class="inline" data-a="trust" title="Answer that you trust this folder so the task continues">Trust and Continue</button></div>'
           : t.status === 'review' ? '<div class="tsum warn">The agent is waiting: check whether it finished or asked you something.</div>' : ''}
       </div>
@@ -327,11 +347,69 @@ function renderTasks() {
     </div>`;
   }).join('');
   updateBadge();
+  updateTaskLive();
+}
+
+// ---------- Live progress ----------
+// Every second while the panel is open: what each running task (and each subagent it
+// opened) is doing right now, for how long, and any error line seen in its terminal.
+const fmtElapsed = (ms) => { const s = Math.max(0, Math.round(ms / 1000)); return s < 60 ? `${s}s` : s < 3600 ? `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s` : `${Math.floor(s / 3600)}h ${Math.floor(s / 60) % 60}m`; };
+const NOISE_RE = /^[\s─━│┃╭╮╰╯┌┐└┘├┤┬┴┼═║>❯›·•*✻✽✢⏺⎿-]*$|^\s*(\? for shortcuts|esc to interrupt|Context left|auto-accept)/i;
+function lastLine(c) {
+  const lines = terminalTail(c, 14, true).split('\n').map((l) => l.replace(/\s+/g, ' ').trim()).filter((l) => l && !NOISE_RE.test(l));
+  return (lines.pop() || '').slice(0, 140);
+}
+function liveOf(c) {
+  const rt = c && runtime.get(c.id);
+  if (!rt) return { st: 'dead', label: 'closed', line: '' };
+  const st = rt.status || 'idle';
+  return { st, label: STATUS_LABEL[st] || st, line: lastLine(c), alert: rt.alert?.line || '' };
+}
+function updateTaskLive() {
+  const els = document.querySelectorAll('#taskList [data-live]');
+  const now = Date.now();
+  for (const el of els) {
+    const t = taskById(el.dataset.live);
+    const c = t?.cardId && cardData(t.cardId);
+    if (!t || !c) { el.innerHTML = ''; continue; }
+    const me = liveOf(c);
+    const kids = cfg.cards.filter((k) => k.parent === c.id);
+    const sameLine = me.alert && me.alert === me.line;
+    el.innerHTML = `<div class="lrow${sameLine ? ' lalert' : ''}"${sameLine ? ` data-go="${esc(c.id)}"` : ''}><span class="status ${me.st}"></span><span class="ltime">${fmtElapsed(now - (t.startedAt || now))}</span><span class="lline">${esc(me.line || me.label)}</span>${sameLine ? icon('alert', 11) : ''}</div>`
+      + (me.alert && !sameLine ? `<div class="lrow lalert" data-go="${esc(c.id)}">${icon('alert', 11)}<span class="lline">${esc(me.alert)}</span></div>` : '')
+      + kids.map((k) => {
+        const s = liveOf(k);
+        return `<div class="lrow lkid" data-go="${esc(k.id)}" title="Go to ${esc(k.title)}"><span class="status ${s.st}" style="--agent:${esc(agentOf(k).color)}"></span><span class="lname">${esc(k.title)}</span><span class="lline">${esc(s.alert || s.line || s.label)}</span>${s.alert ? icon('alert', 11) : ''}</div>`;
+      }).join('');
+  }
+  updateProgress();
+}
+function updateProgress() {
+  const bar = $('#taskProgress');
+  if (!bar) return;
+  const list = tasks();
+  const done = list.filter((t) => t.status === 'done').length;
+  const running = list.filter((t) => t.status === 'running');
+  const errors = running.filter((t) => t.cardId && (runtime.get(t.cardId)?.alert || cfg.cards.some((k) => k.parent === t.cardId && runtime.get(k.id)?.alert))).length;
+  const blocked = list.filter((t) => t.status === 'blocked').length;
+  const kids = cfg.cards.filter((k) => k.parentTask && runtime.get(k.id)?.alive).length;
+  bar.classList.toggle('hidden', !list.length);
+  if (!list.length) return;
+  $('i', bar).style.width = `${Math.round((done / list.length) * 100)}%`;
+  bar.classList.toggle('bad', errors + blocked > 0);
+  const noBridge = cfg.taskSubagents !== false && running.length && !Object.values(bridgeConnected).some(Boolean);
+  $('span', bar).innerHTML = [
+    `${done}/${list.length} done`, running.length && `${running.length} working`, kids && `${kids} subagent${kids === 1 ? '' : 's'}`,
+    errors && `<b class="bad">${errors} with errors</b>`, blocked && `<b class="bad">${blocked} blocked</b>`,
+  ].filter(Boolean).join(' · ') + (noBridge ? ' · <button class="inline" data-x="connect" title="Register AgentBoard in your CLIs so task agents can open subagents you can see">Enable subagents</button>' : '');
 }
 
 function taskById(id) { return tasks().find((t) => t.id === id); }
 
 $('#taskList').addEventListener('click', (e) => {
+  const go = e.target.closest('[data-go]')?.dataset.go;
+  const gc = go && cardData(go);
+  if (gc) { if (diagramOpen()) toggleDiagram(false); focusCardView(gc); focusCard(gc.id); return; }
   const row = e.target.closest('.task');
   const act = e.target.closest('[data-a]')?.dataset.a;
   if (!row || !act) return;
@@ -555,7 +633,9 @@ function initTasks() {
   document.body.classList.toggle('tasks-open', !!cfg.tasksOpen);
   renderTaskOptions();
   renderTasks();
+  refreshBridgeStatus().then(updateProgress);
   setInterval(tickTasks, 1000);
+  $('#taskProgress').addEventListener('click', (e) => { if (e.target.closest('[data-x="connect"]')) openSkills('connect'); });
 
   $('#tasksClose').onclick = () => toggleTasks(false);
   $('#taskAdd').onclick = addFromComposer;

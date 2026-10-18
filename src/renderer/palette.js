@@ -3,7 +3,7 @@
 'use strict';
 /* global cfg, $, esc, basename, agentOf, runtime, focusCardView, focusCard, newCard, newGroup, toggleTasks, openTasks,
    toggleDiagram, diagramOpen, arrange, fitAll, openSettings, openAccounts, openSkills, addTask, parseLine, tickTasks,
-   STATUS_LABEL, toast, composerDefaults, toggleFlows, switchSpace, runFlow */
+   STATUS_LABEL, toast, composerDefaults, toggleFlows, switchSpace, runFlow, closeMany, openUsage */
 
 let palItems = [];
 let palSel = 0;
@@ -20,6 +20,10 @@ function palCommands() {
     { icon: 'note', label: 'New Note', hint: '⇧⌘N', run: () => newCard('note') },
     { icon: 'grid', label: 'Arrange Cards', hint: '⇧⌘O', run: () => arrange() },
     { icon: 'fit', label: 'Fit All', hint: '⌘0', run: () => fitAll() },
+    { icon: 'close', label: 'Close Selected Cards', sub: '⌘/Shift-click title bars to select', run: () => closeMany('selected') },
+    { icon: 'close', label: 'Close Cards of Finished Tasks', run: () => closeMany('finished') },
+    { icon: 'close', label: 'Close Stopped Cards', run: () => closeMany('stopped') },
+    { icon: 'close', label: 'Close All Cards in This View', run: () => closeMany('project') },
     { icon: 'agent', label: 'Subscriptions and Accounts', run: () => openAccounts() },
     { icon: 'layers', label: 'Skills and Token Saving', run: () => openSkills('saving') },
     { icon: 'gear', label: 'Settings', hint: '⌘,', run: () => openSettings() },
