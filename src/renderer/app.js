@@ -1,14 +1,14 @@
-// AgentBoard — UI del tablero (renderer)
+// AgentBoard — board UI (renderer)
 /* global Terminal, FitAddon, WebLinksAddon */
 'use strict';
 
-/* global ab */ // expuesto por preload.js como window.ab
+/* global ab */ // exposed by preload.js as window.ab
 const $ = (s, el = document) => el.querySelector(s);
 
 const MIN_ZOOM = 0.3, MAX_ZOOM = 2;
-const HEAD_H = 32;            // alto de la cabecera de una tarjeta (no escala)
+const HEAD_H = 32;            // card header height (does not scale)
 const DEFAULT_W = 720, DEFAULT_H = 440;
-const BUSY_MS = 1500;         // salida reciente => "trabajando"
+const BUSY_MS = 1500;         // recent output => "working"
 
 let cfg = null;
 let platform = 'darwin';
@@ -20,7 +20,7 @@ let focusedId = null;
 const board = $('#board');
 const world = $('#world');
 
-// ---------- Utilidades ----------
+// ---------- Utilities ----------
 const uid = () => Math.random().toString(36).slice(2, 10);
 const basename = (p) => (p || '').split(/[\\/]/).filter(Boolean).pop() || p;
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
@@ -42,9 +42,9 @@ function saveNow() {
 function cardData(id) { return cfg.cards.find((c) => c.id === id); }
 function agentOf(card) { return cfg.agents[card.agent] || cfg.agents.shell; }
 
-// ---------- Viewport (zoom semántico: escalamos posición, tamaño y fuente;
-// sin transform CSS, así el texto queda nítido y el mouse de xterm funciona) ----------
-// La trama de puntos se mueve con el tablero; los brillos de fondo quedan fijos.
+// ---------- Viewport (semantic zoom: we scale position, size and font size;
+// no CSS transform, so text stays sharp and xterm's mouse handling works) ----------
+// The dot grid moves with the board.
 function paintBackground() {
   const { x, y, zoom } = cfg.viewport;
   const g = 24 * zoom;
@@ -52,7 +52,7 @@ function paintBackground() {
   board.style.backgroundPosition = `${x}px ${y}px, 0 0, 0 0`;
 }
 
-// Zona del tablero que no tapan la barra, el dock ni el panel (los paneles flotan encima).
+// Board area not covered by the toolbar, the dock or the side panels (they float on top).
 function visibleRect() {
   const r = board.getBoundingClientRect();
   const left = cfg.sidebarOpen ? 248 : 0, top = 52, bottom = 66, right = cfg.tasksOpen ? 352 : 0;
@@ -88,7 +88,7 @@ function layoutCard(c) {
 function zoomAt(newZoom, sx, sy) {
   const vp = cfg.viewport;
   newZoom = clamp(newZoom, MIN_ZOOM, MAX_ZOOM);
-  // mantener fijo el punto del mundo bajo el cursor
+  // keep the world point under the cursor fixed
   const wx = (sx - vp.x) / vp.zoom, wy = (sy - vp.y) / vp.zoom;
   vp.zoom = newZoom;
   vp.x = sx - wx * newZoom;
@@ -125,8 +125,8 @@ function focusCardView(c) {
   applyViewport(); save();
 }
 
-// Ordena en grilla. Con grupos: cada grupo ordena sus tarjetas adentro y se ajusta
-// a ellas; los grupos van en fila y las tarjetas sueltas debajo.
+// Arrange in a grid. With groups: each group lays out its cards inside and fits
+// around them; groups go in a row and loose cards below.
 function gridLayout(cards, x0, y0, cols) {
   const gap = 28;
   const colW = Math.max(...cards.map((c) => c.w)), rowH = Math.max(...cards.map((c) => c.h));
@@ -155,7 +155,7 @@ function arrange() {
   fitAll();
 }
 
-// ---------- Fit de terminales (debounced) ----------
+// ---------- Terminal fitting (debounced) ----------
 const fitQueue = new Set();
 let fitTimer = null;
 function scheduleFit(id) { fitQueue.add(id); clearTimeout(fitTimer); fitTimer = setTimeout(flushFits, 60); }
@@ -172,7 +172,7 @@ function flushFits() {
   fitQueue.clear();
 }
 
-// ---------- Tarjetas ----------
+// ---------- Cards ----------
 // opts: { cwd, title, args, env, startCmd, text, x, y, w, h }
 function newCard(type, agentKey, opts = {}) {
   if (type === 'term' && !('cwd' in opts) && !cfg.selectedProject) {
@@ -181,7 +181,7 @@ function newCard(type, agentKey, opts = {}) {
     cfg.selectedProject = any.path;
   }
   const v = visibleRect();
-  const r = { width: v.left * 2 + v.width, height: v.top * 2 + v.height }; // centro del área visible
+  const r = { width: v.left * 2 + v.width, height: v.top * 2 + v.height }; // center of the visible area
   const vp = cfg.viewport;
   const offset = (cfg.cards.length % 8) * 30;
   const w = opts.w || (type === 'note' ? 360 : type === 'group' ? DEFAULT_W * 2 + 76 : DEFAULT_W);
@@ -189,7 +189,7 @@ function newCard(type, agentKey, opts = {}) {
   const c = {
     id: uid(), type, agent: agentKey || 'shell',
     cwd: type === 'term' ? ('cwd' in opts ? opts.cwd : cfg.selectedProject) : null,
-    title: opts.title || (type === 'note' ? 'Nota' : type === 'group' ? 'Grupo' : (cfg.agents[agentKey] || cfg.agents.shell).label),
+    title: opts.title || (type === 'note' ? 'Note' : type === 'group' ? 'Group' : (cfg.agents[agentKey] || cfg.agents.shell).label),
     args: opts.args || '',
     env: opts.env || null,
     startCmd: opts.startCmd || '',
@@ -214,14 +214,14 @@ function newCard(type, agentKey, opts = {}) {
 
 function duplicateCard(c) {
   newCard(c.type, c.agent, {
-    cwd: c.cwd, args: c.args, env: c.env, text: c.text, title: `${c.title} (copia)`,
+    cwd: c.cwd, args: c.args, env: c.env, text: c.text, title: `${c.title} (copy)`,
     x: c.x + c.w + 28, y: c.y, w: c.w, h: c.h,
   });
 }
 
 function mountCard(c, { resume }) {
   if (c.type === 'group') return mountGroup(c);
-  // Sin "reanudar al abrir": cada tarjeta de Claude parte una sesión nueva
+  // Without "resume on open": each Claude card starts a new session
   if (resume && !cfg.resumeOnOpen && c.sessionId) { c.sessionId = newSessionId(); c.sessionUsed = false; }
   const agent = agentOf(c);
   const el = document.createElement('div');
@@ -232,14 +232,14 @@ function mountCard(c, { resume }) {
     <div class="card-head">
       <span class="status"></span>
       <span class="title">${esc(c.title)}</span>
-      ${c.type === 'term' ? `<span class="proj" title="${esc(c.cwd || 'Carpeta personal')}">${esc(basename(c.cwd) || '~')}</span>` : ''}
+      ${c.type === 'term' ? `<span class="proj" title="${esc(c.cwd || 'Home folder')}">${esc(basename(c.cwd) || '~')}</span>` : ''}
       <span class="spacer"></span>
       ${c.type === 'term' ? `<span class="gitpill hidden"></span>
-        <button class="card-btn" data-act="open" title="Abrir la carpeta del proyecto en el Finder">${icon('folder', 14)}</button>
-        <button class="card-btn" data-act="restart" title="Reiniciar el agente (retoma su sesión)">${icon('refresh', 14)}</button>` : ''}
-      <button class="card-btn" data-act="edit" title="${c.type === 'term' ? 'Cambiar nombre, agente, proyecto o argumentos; pasar contexto a otro agente' : 'Editar o duplicar la nota'}">${icon('more', 14)}</button>
-      <button class="card-btn" data-act="zoom" title="Enfocar esta tarjeta (llena la vista)">${icon('focus', 14)}</button>
-      <button class="card-btn" data-act="close" title="Cerrar la tarjeta y detener su proceso">${icon('close', 14)}</button>
+        <button class="card-btn" data-act="open" title="Open the project folder in Finder">${icon('folder', 14)}</button>
+        <button class="card-btn" data-act="restart" title="Restart the agent (resumes its session)">${icon('refresh', 14)}</button>` : ''}
+      <button class="card-btn" data-act="edit" title="${c.type === 'term' ? 'Change name, agent, project or arguments; send context to another agent' : 'Edit or duplicate the note'}">${icon('more', 14)}</button>
+      <button class="card-btn" data-act="zoom" title="Focus this card (fills the view)">${icon('focus', 14)}</button>
+      <button class="card-btn" data-act="close" title="Close the card and stop its process">${icon('close', 14)}</button>
     </div>
     <div class="card-body"></div>
     <div class="resize"></div>`;
@@ -252,7 +252,7 @@ function mountCard(c, { resume }) {
   if (c.type === 'note') {
     const ta = document.createElement('textarea');
     ta.className = 'note';
-    ta.placeholder = 'Notas, prompts, TODOs…';
+    ta.placeholder = 'Notes, prompts, to-dos…';
     ta.value = c.text || '';
     ta.addEventListener('input', () => { c.text = ta.value; save(); });
     body.appendChild(ta);
@@ -285,10 +285,10 @@ function mountCard(c, { resume }) {
   wireCard(c, el);
 }
 
-// ---------- Comando de cada tarjeta ----------
-// Cada tarjeta de Claude tiene su propio id de sesión: al reabrir la app o reiniciar
-// la tarjeta vuelve a SU conversación (--resume <id>), aunque haya varios Claude en
-// el mismo proyecto. Las demás usan su "args al reanudar" (ej. codex resume --last).
+// ---------- Each card's command ----------
+// Every Claude card has its own session id: when the app reopens or the card restarts
+// it returns to ITS conversation (--resume <id>), even with several Claudes in the
+// same project. Other agents use their "resume args" (e.g. codex resume --last).
 const isClaude = (a) => !!a && /(^|[\\/])claude(\.cmd|\.exe)?$/i.test((a.command || '').trim().split(/\s+/)[0] || '');
 function newSessionId() {
   if (crypto.randomUUID) return crypto.randomUUID();
@@ -304,15 +304,15 @@ function shellQuote(s) {
   return "'" + s.replace(/'/g, "'\\''") + "'";
 }
 function orElse(a, b) { return usesPowerShell() ? `${a}; if (-not $?) { ${b} }` : `${a} || ${b}`; }
-// Cómo recibe un agente la tarea inicial: como argumento (no depende de cuándo
-// termina de arrancar la TUI) o pegada en la terminal (CLIs desconocidos, cmd.exe).
+// How an agent receives its first task: as an argument (independent of when the
+// TUI finishes starting) or pasted into the terminal (unknown CLIs, cmd.exe).
 function promptMode(a) {
   if (usesCmd()) return 'paste';
   return a.taskPrompt || ({ claude: 'arg', codex: 'arg', gemini: '-i' })[(a.command || '').trim().split(/\s+/)[0]] || 'paste';
 }
 
 function commandFor(c, resume) {
-  if (c.startCmd) return resume ? '' : c.startCmd; // ej. tarjeta de login: no se repite al reabrir
+  if (c.startCmd) return resume ? '' : c.startCmd; // e.g. a login card: not repeated on reopen
   const a = agentOf(c);
   if (!a.command) return '';
   const session = c.sessionId && isClaude(a);
@@ -324,7 +324,7 @@ function commandFor(c, resume) {
     parts.push((mode === 'arg' ? '' : mode + ' ') + shellQuote(c.prompt.replace(/\s*\n\s*/g, ' ').trim()));
   }
   const cmd = parts.filter(Boolean).join(' ');
-  // si la sesión guardada ya no existe (nunca se escribió nada), abre una nueva con el mismo id
+  // if the saved session no longer exists (nothing was ever typed), open a new one with the same id
   if (session && c.sessionUsed) return orElse(cmd, [a.command, c.args, `--session-id ${c.sessionId}`].filter(Boolean).join(' '));
   return cmd;
 }
@@ -335,7 +335,7 @@ async function startPty(c, resume) {
   try { rt.fit.fit(); } catch {}
   $('.overlay', rt.el)?.remove();
   const command = commandFor(c, resume);
-  const env = { ...(agentOf(c).env || {}), ...(c.env || {}) }; // ej. CLAUDE_CONFIG_DIR de una cuenta extra
+  const env = { ...(agentOf(c).env || {}), ...(c.env || {}) }; // e.g. CLAUDE_CONFIG_DIR of an extra account
   const res = await ab.ptyCreate({ id: c.id, cwd: c.cwd, command, env: Object.keys(env).length ? env : undefined, cols: rt.term.cols, rows: rt.term.rows });
   if (!res.ok) { showOverlay(c, res.error); return; }
   rt.alive = true;
@@ -353,7 +353,7 @@ async function startPty(c, resume) {
   if (dirty) save();
 }
 
-// Espera a que el CLI termine de arrancar: salida y luego ~1,5 s de silencio.
+// Wait for the CLI to finish starting: some output, then ~1.5 s of silence.
 async function waitReady(id, maxMs = 20000) {
   await waitAlive(id);
   const t0 = Date.now();
@@ -381,14 +381,14 @@ function showOverlay(c, msg) {
   $('.overlay', rt.el)?.remove();
   const ov = document.createElement('div');
   ov.className = 'overlay';
-  ov.innerHTML = `<div>${esc(msg)}</div><button class="primary" title="Volver a abrir el agente en esta tarjeta">Reiniciar</button>`;
+  ov.innerHTML = `<div>${esc(msg)}</div><button class="primary" title="Open the agent again in this card">Restart</button>`;
   $('button', ov).onclick = () => restartCard(c);
   $('.card-body', rt.el).appendChild(ov);
 }
 
 function closeCard(c) {
   const rt = runtime.get(c.id);
-  if (rt?.alive && !confirm(`¿Cerrar "${c.title}"? Se terminará el proceso.`)) return;
+  if (rt?.alive && !confirm(`Close "${c.title}"? Its process will be stopped.`)) return;
   if (c.type !== 'group') ab.ptyKill(c.id);
   rt?.term?.dispose();
   rt?.el.remove();
@@ -409,10 +409,10 @@ function focusCard(id, focusTerm = true) {
   if (focusTerm) (rt.term || rt.noteEl)?.focus();
 }
 
-// Copiar/pegar dentro de la terminal.
-// Mac: ⌘C copia la selección; ⌘V lo maneja el menú Editar (evento paste nativo).
-// Windows: Ctrl+C copia SOLO si hay selección (si no, interrumpe como siempre);
-// Ctrl+V usa el paste nativo; Ctrl+Shift+C/V también funcionan.
+// Copy/paste inside the terminal.
+// Mac: ⌘C copies the selection; ⌘V is handled by the Edit menu (native paste event).
+// Windows: Ctrl+C copies ONLY when there is a selection (otherwise it interrupts as usual);
+// Ctrl+V uses the native paste; Ctrl+Shift+C/V also work.
 function clipboardKeys(e, term) {
   if (e.type !== 'keydown') return true;
   const k = e.key.toLowerCase();
@@ -427,11 +427,11 @@ function clipboardKeys(e, term) {
     return false;
   }
   if (e.ctrlKey && e.shiftKey && k === 'v') { e.preventDefault(); ab.paste().then((t) => term.paste(t)); return false; }
-  if (e.ctrlKey && k === 'v') return false; // deja pasar el paste nativo
+  if (e.ctrlKey && k === 'v') return false; // let the native paste through
   return true;
 }
 
-// Arrastrar, redimensionar, botones
+// Drag, resize, buttons
 function wireCard(c, el) {
   const head = $('.card-head', el);
   const titleEl = $('.title', el);
@@ -502,9 +502,9 @@ function wireCard(c, el) {
   });
 }
 
-// ---------- Grupos (secciones del tablero) ----------
-// Un grupo es un marco detrás de las tarjetas. Una tarjeta pertenece al grupo que
-// contiene su centro; al mover el marco se mueven sus tarjetas.
+// ---------- Groups (board sections) ----------
+// A group is a frame behind the cards. A card belongs to the group that contains
+// its center; moving the frame moves its cards.
 const GROUP_COLORS = ['#ff6b3d', '#6c9cf5', '#3fbf8f', '#c49cf0', '#e7b05a', '#5fd0c8', '#f06a8a'];
 const groupsList = () => cfg.cards.filter((c) => c.type === 'group');
 const centerIn = (c, g) => { const x = c.x + c.w / 2, y = c.y + c.h / 2; return x >= g.x && x <= g.x + g.w && y >= g.y && y <= g.y + g.h; };
@@ -512,7 +512,7 @@ function groupAt(c) {
   let best = null;
   const sp = spaceOf(c);
   for (const g of groupsList()) {
-    if (spaceOf(g) && sp && spaceOf(g) !== sp) continue; // cada proyecto tiene sus grupos
+    if (spaceOf(g) && sp && spaceOf(g) !== sp) continue; // each project has its own groups
     if (centerIn(c, g) && (!best || g.w * g.h < best.w * best.h)) best = g;
   }
   return best;
@@ -524,7 +524,7 @@ function syncGroups() {
 }
 function groupName(c) { const g = c.groupId && cardData(c.groupId); return g ? g.title : ''; }
 
-// Proyecto al que pertenece una ruta (los worktrees de tareas cuentan como su proyecto).
+// Project a path belongs to (task worktrees count as their project).
 function projectOfPath(p) {
   if (!p) return '';
   const norm = (x) => x.replace(/[\\/]+$/, '');
@@ -538,10 +538,10 @@ function projectOfPath(p) {
 
 function newGroup(opts = {}) {
   const n = groupsList().length + 1;
-  return newCard('group', null, { title: opts.title || `Grupo ${n}`, noFocus: true, ...opts });
+  return newCard('group', null, { title: opts.title || `Group ${n}`, noFocus: true, ...opts });
 }
 
-// Busca un grupo por nombre o lo crea a la derecha de todo lo que hay.
+// Find a group by name, or create it to the right of everything else.
 function ensureGroup(name, space = currentSpace()) {
   const g = groupsList().find((x) => x.title.toLowerCase() === name.toLowerCase() && (!spaceOf(x) || !space || spaceOf(x) === space));
   if (g) return g;
@@ -551,7 +551,7 @@ function ensureGroup(name, space = currentSpace()) {
   return newGroup({ title: name, x: right, y: top, space });
 }
 
-// Lugar para una tarjeta suelta que no caiga dentro de un grupo.
+// Spot for a loose card that does not land inside a group.
 function looseSpot(w = DEFAULT_W, h = DEFAULT_H) {
   const groups = groupsList();
   if (!groups.length) return {};
@@ -562,7 +562,7 @@ function looseSpot(w = DEFAULT_W, h = DEFAULT_H) {
   return { x, y };
 }
 
-// Primer hueco libre dentro del grupo; si no cabe, el grupo crece hacia abajo.
+// First free slot inside the group; if none fits, the group grows downward.
 function slotIn(g, w = DEFAULT_W, h = DEFAULT_H) {
   const pad = 24, head = 24, gap = 24;
   const cols = Math.max(1, Math.floor((g.w - pad * 2 + gap) / (w + gap)));
@@ -587,9 +587,9 @@ function mountGroup(c) {
       <span class="frame-title">${esc(c.title)}</span>
       <span class="frame-meta"></span>
       <span class="spacer"></span>
-      <button class="card-btn" data-act="task" title="Nueva tarea para este grupo: su agente se abrirá dentro del marco">${icon('plus', 13)} Tarea</button>
-      <button class="card-btn" data-act="edit" title="Cambiar nombre o color, o ajustar el marco a sus tarjetas">${icon('more', 14)}</button>
-      <button class="card-btn" data-act="close" title="Quitar el grupo (las tarjetas se quedan en el tablero)">${icon('close', 14)}</button>
+      <button class="card-btn" data-act="task" title="New task for this group: its agent opens inside the frame">${icon('plus', 13)} Task</button>
+      <button class="card-btn" data-act="edit" title="Change the name or color, or fit the frame to its cards">${icon('more', 14)}</button>
+      <button class="card-btn" data-act="close" title="Remove the group (its cards stay on the board)">${icon('close', 14)}</button>
     </div>
     <div class="resize"></div>`;
   world.prepend(el);
@@ -653,10 +653,10 @@ function groupMenu(c, anchor) {
   const pop = document.createElement('div');
   pop.className = 'popover edit';
   pop.innerHTML = `
-    <label>Nombre <input name="title" value="${esc(c.title)}" /></label>
+    <label>Name <input name="title" value="${esc(c.title)}" /></label>
     <label>Color <div class="swatches">${GROUP_COLORS.map((col) => `<button type="button" data-col="${col}" class="${col === c.color ? 'on' : ''}" style="background:${col}"></button>`).join('')}</div></label>
-    <div class="hint">Las tarjetas cuyo centro queda dentro del marco son del grupo. Escribe <code>#${esc(c.title.replace(/\s+/g, '-'))}</code> en una tarea para que su agente se abra aquí.</div>
-    <div class="row"><button data-x="fit">Ajustar a sus tarjetas</button><button data-x="ok" class="primary">Aplicar</button></div>`;
+    <div class="hint">Cards whose center sits inside the frame belong to the group. Write <code>#${esc(c.title.replace(/\s+/g, '-'))}</code> in a task to open its agent here.</div>
+    <div class="row"><button data-x="fit" title="Resize the frame around its cards">Fit to Cards</button><button data-x="ok" class="primary">Apply</button></div>`;
   openPopover(pop, anchor, 290);
   let color = c.color;
   pop.addEventListener('click', (e) => {
@@ -690,15 +690,17 @@ function updateGroupMeta() {
     if (!rt) continue;
     const m = membersOf(g).filter((c) => c.type === 'term');
     const busy = m.filter((c) => runtime.get(c.id)?.status === 'busy').length;
-    const queued = (cfg.tasks || []).filter((t) => t.status === 'pendiente' && t.group && t.group.toLowerCase() === g.title.toLowerCase()).length;
-    const txt = m.length ? `${m.length} agente${m.length === 1 ? '' : 's'}${busy ? ` · ${busy} trabajando` : ''}` : 'vacío';
-    const full = queued ? `${txt} · ${queued} en cola` : txt;
+    const queued = (cfg.tasks || []).filter((t) => t.status === 'pending' && t.group && t.group.toLowerCase() === g.title.toLowerCase()).length;
+    const notes = membersOf(g).length - m.length;
+    const txt = m.length ? `${m.length} agent${m.length === 1 ? '' : 's'}${busy ? ` · ${busy} working` : ''}`
+      : notes ? `${notes} note${notes === 1 ? '' : 's'}` : 'empty';
+    const full = queued ? `${txt} · ${queued} queued` : txt;
     if (rt.metaEl.textContent !== full) rt.metaEl.textContent = full;
     rt.el.classList.toggle('busy', busy > 0);
   }
 }
 
-// ---------- Datos de los PTY ----------
+// ---------- PTY data ----------
 ab.onPtyData((id, data) => {
   const rt = runtime.get(id);
   if (!rt || !rt.term) return;
@@ -713,10 +715,10 @@ ab.onPtyExit((id, code) => {
   const c = cardData(id);
   if (!rt || !c) return;
   rt.alive = false;
-  showOverlay(c, `El proceso terminó (código ${code}).`);
+  showOverlay(c, `The process exited (code ${code}).`);
 });
 
-// Estado: trabajando / esperando / terminado + aviso cuando un agente termina
+// Status: working / waiting / stopped + notify when an agent finishes
 setInterval(() => {
   if (!cfg) return;
   const now = Date.now();
@@ -732,9 +734,9 @@ setInterval(() => {
     s.title = STATUS_LABEL[rt.status];
     const sideDot = sideItems.get(c.id)?.querySelector('.status');
     if (sideDot) { sideDot.className = 'status ' + rt.status; sideDot.title = s.title; }
-    // Avisar si trabajó >8 s y ya no lo estás mirando
+    // Notify if it worked for >8 s and you are not looking at it
     if (wasBusy && !busy && rt.lastData - rt.busySince > 8000 && (!document.hasFocus() || focusedId !== c.id)) {
-      try { new Notification(`${c.title} terminó`, { body: basename(c.cwd), silent: false }); } catch {}
+      try { new Notification(`${c.title} finished`, { body: basename(c.cwd), silent: false }); } catch {}
     }
   }
   updateGroupMeta();
@@ -744,7 +746,7 @@ setInterval(() => {
 }, 500);
 
 // ---------- Git ----------
-const gitCache = {}; // cwd -> último estado (lo usa también el diagrama)
+const gitCache = {}; // cwd -> last status (the diagram uses it too)
 async function refreshGit() {
   if (!cfg) return;
   const cwds = [...new Set(cfg.cards.filter((c) => c.type === 'term').map((c) => c.cwd))];
@@ -758,10 +760,10 @@ async function refreshGit() {
     if (!g) { rt.gitEl.classList.add('hidden'); continue; }
     rt.gitEl.classList.remove('hidden');
     rt.gitEl.innerHTML = `${icon('branch', 12)} ${esc(g.branch)}`
-      + (g.changes ? ` <span class="dirty">${g.changes} cambio${g.changes === 1 ? '' : 's'}</span>` : '')
+      + (g.changes ? ` <span class="dirty">${g.changes} change${g.changes === 1 ? '' : 's'}</span>` : '')
       + (g.ahead ? ` <span class="ab">↑${g.ahead}</span>` : '')
       + (g.behind ? ` <span class="ab">↓${g.behind}</span>` : '');
-    rt.gitEl.title = `${g.changes} cambios sin commit · ${g.ahead} adelante · ${g.behind} atrás — clic para cambiar de rama`;
+    rt.gitEl.title = `${g.changes} uncommitted changes · ${g.ahead} ahead · ${g.behind} behind — click to switch branch`;
   }
 }
 setInterval(refreshGit, 4000);
@@ -772,8 +774,8 @@ async function branchMenu(c, anchor) {
   const pop = document.createElement('div');
   pop.className = 'popover';
   pop.innerHTML = branches.map((b) =>
-    `<button data-b="${esc(b)}" class="${b === status?.branch ? 'current' : ''}">${esc(b)}${b === status?.branch ? ' (actual)' : ''}</button>`).join('')
-    + '<hr/><input id="newBranch" placeholder="Nueva rama… (Enter)" style="width:100%;background:var(--card);border:1px solid var(--border);border-radius:5px;padding:5px 8px;color:var(--text);font:12px var(--font-mono)"/>';
+    `<button data-b="${esc(b)}" class="${b === status?.branch ? 'current' : ''}">${esc(b)}${b === status?.branch ? ' (current)' : ''}</button>`).join('')
+    + '<hr/><input id="newBranch" placeholder="New branch… (Enter)" style="width:100%;background:var(--card);border:1px solid var(--border);border-radius:5px;padding:5px 8px;color:var(--text);font:12px var(--font-mono)"/>';
   const r = anchor.getBoundingClientRect();
   pop.style.left = Math.min(r.left, innerWidth - 230) + 'px';
   pop.style.top = r.bottom + 4 + 'px';
@@ -783,7 +785,7 @@ async function branchMenu(c, anchor) {
     const b = e.target.closest('[data-b]')?.dataset.b;
     if (!b) return;
     closePopover();
-    if (!(await ab.gitCheckout(c.cwd, b, false))) alert(`No pude cambiar a "${b}". ¿Hay cambios sin commit?`);
+    if (!(await ab.gitCheckout(c.cwd, b, false))) alert(`Could not switch to "${b}". Are there uncommitted changes?`);
     refreshGit();
   });
   const input = $('#newBranch', pop);
@@ -792,7 +794,7 @@ async function branchMenu(c, anchor) {
     if (e.key !== 'Enter' || !input.value.trim()) return;
     const name = input.value.trim();
     closePopover();
-    if (!(await ab.gitCheckout(c.cwd, name, true))) alert(`No pude crear la rama "${name}".`);
+    if (!(await ab.gitCheckout(c.cwd, name, true))) alert(`Could not create the branch "${name}".`);
     refreshGit();
   });
   setTimeout(() => document.addEventListener('pointerdown', outside, true));
@@ -800,7 +802,7 @@ async function branchMenu(c, anchor) {
 }
 function closePopover() { document.querySelectorAll('.popover').forEach((p) => p.remove()); }
 
-// ---------- Pan / zoom del tablero ----------
+// ---------- Board pan / zoom ----------
 board.addEventListener('pointerdown', (e) => {
   const onBackground = e.target === board || e.target === world;
   if (!(onBackground && e.button === 0) && e.button !== 1) return;
@@ -824,7 +826,7 @@ board.addEventListener('pointerdown', (e) => {
   board.addEventListener('pointerup', up);
 });
 
-// pan sin re-fit (el tamaño no cambia)
+// pan without re-fitting (the size does not change)
 function applyViewportFast() {
   const { x, y } = cfg.viewport;
   paintBackground();
@@ -837,12 +839,12 @@ function applyViewportFast() {
 
 board.addEventListener('wheel', (e) => {
   const r = board.getBoundingClientRect();
-  if (e.ctrlKey || e.metaKey) {           // pinch del trackpad o ⌘/Ctrl + rueda
+  if (e.ctrlKey || e.metaKey) {           // trackpad pinch or ⌘/Ctrl + wheel
     e.preventDefault();
     zoomAt(cfg.viewport.zoom * Math.exp(-e.deltaY * 0.01), e.clientX - r.left, e.clientY - r.top);
     return;
   }
-  if (e.target.closest('.card-body')) return;  // la terminal/nota hace su propio scroll
+  if (e.target.closest('.card-body')) return;  // the terminal/note scrolls on its own
   e.preventDefault();
   cfg.viewport.x -= e.deltaX;
   cfg.viewport.y -= e.deltaY;
@@ -851,7 +853,7 @@ board.addEventListener('wheel', (e) => {
 
 window.addEventListener('resize', scheduleFitAll);
 
-// Posiciona un popover bajo `anchor` y lo cierra al hacer clic fuera.
+// Position a popover under `anchor` and close it on an outside click.
 function openPopover(pop, anchor, width = 230) {
   const r = anchor.getBoundingClientRect();
   pop.style.left = clamp(r.right - width, 8, innerWidth - width - 8) + 'px';
@@ -864,7 +866,7 @@ function openPopover(pop, anchor, width = 230) {
   setTimeout(() => document.addEventListener('pointerdown', outside, true));
 }
 
-// ---------- Editar tarjeta ----------
+// ---------- Edit card ----------
 function editMenu(c, anchor) {
   closePopover();
   const isTerm = c.type === 'term';
@@ -874,20 +876,20 @@ function editMenu(c, anchor) {
   const pop = document.createElement('div');
   pop.className = 'popover edit';
   pop.innerHTML = `
-    <label>Nombre <input name="title" value="${esc(c.title)}" /></label>
+    <label>Name <input name="title" value="${esc(c.title)}" /></label>
     ${isTerm ? `
-      <label>Agente <select name="agent">${Object.entries(cfg.agents).map(([k, a]) =>
+      <label>Agent <select name="agent">${Object.entries(cfg.agents).map(([k, a]) =>
         `<option value="${esc(k)}" ${k === c.agent ? 'selected' : ''}>${esc(a.label)}</option>`).join('')}</select></label>
-      <label>Proyecto <select name="cwd"><option value="" ${c.cwd ? '' : 'selected'}>Carpeta personal (~)</option>${projects.map((p) =>
+      <label>Project <select name="cwd"><option value="" ${c.cwd ? '' : 'selected'}>Home folder (~)</option>${projects.map((p) =>
         `<option value="${esc(p.path)}" ${p.path === c.cwd ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></label>
-      <label>Argumentos extra <input name="args" value="${esc(c.args || '')}" placeholder="ej. --model opus" /></label>
-      ${agentOf(c).command ? `<label class="switch"><input type="checkbox" name="bridge" ${c.bridge !== false ? 'checked' : ''} /> Otros agentes pueden escribirle</label>` : ''}
+      <label>Extra arguments <input name="args" value="${esc(c.args || '')}" placeholder="e.g. --model opus" /></label>
+      ${agentOf(c).command ? `<label class="switch"><input type="checkbox" name="bridge" ${c.bridge !== false ? 'checked' : ''} /> Other agents can message it</label>` : ''}
       <div class="hint"></div>` : ''}
     <div class="row">
-      ${isTerm ? '<button data-x="handoff">Pasar a…</button>' : ''}
-      <button data-x="dup">Duplicar</button>
-      <button data-x="cancel">Cancelar</button>
-      <button data-x="ok" class="primary">Aplicar</button>
+      ${isTerm ? '<button data-x="handoff" title="Send the selection or the last lines to another agent, with an instruction">Send to…</button>' : ''}
+      <button data-x="dup" title="Create a copy of this card next to it">Duplicate</button>
+      <button data-x="cancel">Cancel</button>
+      <button data-x="ok" class="primary">Apply</button>
     </div>`;
   openPopover(pop, anchor, 280);
 
@@ -897,8 +899,8 @@ function editMenu(c, anchor) {
   const updateHint = () => {
     if (!isTerm) return;
     const d = draft();
-    const cmd = commandFor({ ...c, ...d, startCmd: changed(d) ? '' : c.startCmd }, false) || '(solo shell)';
-    $('.hint', pop).innerHTML = `Comando: <code>${esc(cmd)}</code>${changed(d) ? '<br/>Al aplicar se reinicia el agente.' : ''}`;
+    const cmd = commandFor({ ...c, ...d, startCmd: changed(d) ? '' : c.startCmd }, false) || '(shell only)';
+    $('.hint', pop).innerHTML = `Command: <code>${esc(cmd)}</code>${changed(d) ? '<br/>Applying restarts the agent.' : ''}`;
   };
   pop.addEventListener('input', (e) => { if (e.target.name !== 'bridge') updateHint(); });
   updateHint();
@@ -910,7 +912,7 @@ function editMenu(c, anchor) {
       const d = draft();
       restart = changed(d);
       if (restart) {
-        // si tenía el nombre por defecto, sigue al nuevo agente
+        // if it had the default name, follow the new agent
         if (title === agentOf(c).label && d.agent !== c.agent) title = cfg.agents[d.agent].label;
         const newSession = d.agent !== c.agent || d.cwd !== c.cwd;
         Object.assign(c, d, { startCmd: '' });
@@ -950,14 +952,14 @@ function refreshCardHead(c) {
   rt.el.style.setProperty('--agent', a.color);
   const proj = $('.proj', rt.el);
   proj.textContent = basename(c.cwd) || '~';
-  proj.title = c.cwd || 'Carpeta personal';
+  proj.title = c.cwd || 'Home folder';
   if (rt.term) rt.term.options.theme = termTheme(c);
 }
 
-// ---------- Panel de agentes ----------
-const STATUS_LABEL = { busy: 'Trabajando', idle: 'Esperando', dead: 'Terminado' };
-const NOTES_KEY = '\u0000notas';
-const sideItems = new Map(); // id -> botón en la lista
+// ---------- Agent list ----------
+const STATUS_LABEL = { busy: 'Working', idle: 'Waiting', dead: 'Stopped' };
+const NOTES_KEY = '\u0000notes';
+const sideItems = new Map(); // id -> button in the list
 
 function renderSidebar() {
   const list = $('#sideList');
@@ -975,19 +977,19 @@ function renderSidebar() {
     groups.get(key).push(c);
   }
   if (!groups.size) {
-    list.innerHTML = `<div class="side-empty">${cfg.cards.length ? 'Sin resultados.' : 'Aún no hay agentes en el tablero.'}</div>`;
+    list.innerHTML = `<div class="side-empty">${cfg.cards.length ? 'No results.' : 'No agents on the board yet.'}</div>`;
     updateSideCounts();
     return;
   }
 
-  const projName = (p) => cfg.projects.find((x) => x.path === p)?.name || basename(p) || 'Carpeta personal';
+  const projName = (p) => cfg.projects.find((x) => x.path === p)?.name || basename(p) || 'Home folder';
   const projOrder = (p) => { const i = cfg.projects.findIndex((x) => x.path === p); return i < 0 ? 999 : i; };
   const entries = [...groups].sort(([a], [b]) => (a === NOTES_KEY) - (b === NOTES_KEY) || projOrder(a) - projOrder(b));
   for (const [key, cards] of entries) {
     const h = document.createElement('div');
     h.className = 'side-group';
-    h.textContent = key === NOTES_KEY ? 'Notas' : projName(key);
-    if (key !== NOTES_KEY) h.title = key || 'Carpeta personal';
+    h.textContent = key === NOTES_KEY ? 'Notes' : projName(key);
+    if (key !== NOTES_KEY) h.title = key || 'Home folder';
     list.appendChild(h);
     cards.sort((x, y) => groupName(x).localeCompare(groupName(y)));
     let lastGroup = null;
@@ -997,7 +999,7 @@ function renderSidebar() {
       if (gname !== lastGroup && (gname || lastGroup)) {
         const sub = document.createElement('div');
         sub.className = 'side-sub';
-        sub.textContent = gname || 'Sin grupo';
+        sub.textContent = gname || 'No group';
         list.appendChild(sub);
       }
       lastGroup = gname;
@@ -1006,8 +1008,8 @@ function renderSidebar() {
       b.className = 'side-item';
       b.style.setProperty('--agent', c.type === 'note' ? 'var(--warn)' : a.color);
       b.innerHTML = (c.type === 'term' ? `<span class="status ${st}" title="${STATUS_LABEL[st] || ''}"></span>` : '')
-        + `<span class="name">${esc(c.title)}</span><span class="kind">${c.type === 'note' ? 'nota' : esc(a.label)}</span>`;
-      b.title = c.type === 'note' ? 'Ir a la nota' : `Ir a la tarjeta de ${c.title} (${a.label})`;
+        + `<span class="name">${esc(c.title)}</span><span class="kind">${c.type === 'note' ? 'note' : esc(a.label)}</span>`;
+      b.title = c.type === 'note' ? 'Go to the note' : `Go to the ${c.title} card (${a.label})`;
       b.onclick = () => { focusCardView(c); focusCard(c.id); };
       list.appendChild(b);
       sideItems.set(c.id, b);
@@ -1024,7 +1026,7 @@ function markSidebarFocus() {
 function updateSideCounts() {
   const terms = cfg.cards.filter((c) => c.type === 'term');
   const busy = terms.filter((c) => runtime.get(c.id)?.status === 'busy').length;
-  $('#sideCounts').textContent = terms.length ? `${terms.length} · ${busy} trabajando` : '';
+  $('#sideCounts').textContent = terms.length ? `${terms.length} · ${busy} working` : '';
 }
 
 function toggleSidebar(force) {
@@ -1036,10 +1038,10 @@ function toggleSidebar(force) {
 $('#sideFilter').addEventListener('input', renderSidebar);
 $('#sidebarBtn').onclick = () => toggleSidebar();
 
-// ---------- Minimapa ----------
+// ---------- Minimap ----------
 const mini = $('#minimap');
 const mctx = mini.getContext('2d');
-let miniDrag = null; // transformación congelada mientras se arrastra
+let miniDrag = null; // transform frozen while dragging
 
 function miniTransform() {
   const r = board.getBoundingClientRect();
@@ -1111,10 +1113,10 @@ mini.addEventListener('pointerdown', (e) => {
   mini.addEventListener('pointerup', up);
 });
 
-// ---------- Agentes y modelos ----------
+// ---------- Agents and models ----------
 let catalog = [];
 
-// Agrega (o vuelve a mostrar) un agente del catálogo en la barra de abajo.
+// Add (or show again) a catalog agent in the bottom bar.
 function ensureAgent(item, show = true) {
   const cur = cfg.agents[item.key];
   if (!cur) {
@@ -1136,8 +1138,8 @@ async function openAccounts() {
 }
 
 async function renderAccounts() {
-  $('#catalogRows').innerHTML = '<span class="muted small">Revisando qué tienes instalado…</span>';
-  $('#localRows').innerHTML = '<span class="muted small">Buscando modelos locales…</span>';
+  $('#catalogRows').innerHTML = '<span class="muted small">Checking what you have installed…</span>';
+  $('#localRows').innerHTML = '<span class="muted small">Looking for local models…</span>';
   const [cat, local, avail] = await Promise.all([ab.catalogStatus(), ab.localModels(), ab.checkAgents()]);
   catalog = cat;
   agentAvailable = avail;
@@ -1147,9 +1149,9 @@ async function renderAccounts() {
   renderClaudeAccounts();
 }
 
-// ---------- Varias cuentas de Claude ----------
-// Cada cuenta extra es un agente con su propio CLAUDE_CONFIG_DIR: su login, historial
-// y skills por separado. La cola de tareas las trata como suscripciones distintas.
+// ---------- Multiple Claude accounts ----------
+// Each extra account is an agent with its own CLAUDE_CONFIG_DIR: separate login,
+// history and skills. The task queue treats them as different subscriptions.
 const ACCOUNT_COLORS = ['#f0a070', '#d97757', '#f4c77d', '#e8875f', '#c96442'];
 async function renderClaudeAccounts() {
   const box = $('#claudeAccounts');
@@ -1158,12 +1160,12 @@ async function renderClaudeAccounts() {
   const main = catalog.find((i) => i.key === 'claude');
   box.innerHTML = [
     `<div class="hub-row"><span class="dot" style="background:${esc(cfg.agents.claude?.color || '#e8875f')};color:${esc(cfg.agents.claude?.color || '#e8875f')}"></span>
-      <span class="meta"><strong>${esc(cfg.agents.claude?.label || 'Claude')}</strong><small>Cuenta principal · <code>~/.claude</code></small></span>
-      <span class="badge ${main?.loggedIn ? 'ok' : 'no'}">${main?.loggedIn ? 'Sesión iniciada' : 'Sin sesión'}</span><span></span></div>`,
+      <span class="meta"><strong>${esc(cfg.agents.claude?.label || 'Claude')}</strong><small>Main account · <code>~/.claude</code></small></span>
+      <span class="badge ${main?.loggedIn ? 'ok' : 'no'}">${main?.loggedIn ? 'Signed in' : 'Signed out'}</span><span></span></div>`,
     ...extra.map(([k, a]) => `<div class="hub-row" data-k="${esc(k)}"><span class="dot" style="background:${esc(a.color)};color:${esc(a.color)}"></span>
       <span class="meta"><strong>${esc(a.label)}</strong><small><code>${esc(a.env.CLAUDE_CONFIG_DIR)}</code></small></span>
-      <span class="badge ${status[a.env.CLAUDE_CONFIG_DIR] ? 'ok' : 'no'}">${status[a.env.CLAUDE_CONFIG_DIR] ? 'En uso' : 'Falta iniciar sesión'}</span>
-      <span class="acts"><button type="button" data-x="login" title="Abrir esta cuenta en una tarjeta; la primera vez, inicia sesión con /login">Abrir o iniciar sesión</button><button type="button" class="icon" data-x="remove" title="Quitar de AgentBoard (no borra la carpeta ni la sesión)">${icon('close', 13)}</button></span></div>`),
+      <span class="badge ${status[a.env.CLAUDE_CONFIG_DIR] ? 'ok' : 'no'}">${status[a.env.CLAUDE_CONFIG_DIR] ? 'In use' : 'Sign-in needed'}</span>
+      <span class="acts"><button type="button" data-x="login" title="Open this account in a card; the first time, sign in with /login">Open or Sign In</button><button type="button" class="icon" data-x="remove" title="Remove from AgentBoard (keeps the folder and the session)">${icon('close', 13)}</button></span></div>`),
   ].join('');
 }
 
@@ -1173,7 +1175,7 @@ $('#claudeAccounts').addEventListener('click', (e) => {
   if (!row || !x) return;
   const k = row.dataset.k;
   if (x === 'login') { $('#accounts').close(); newCard('term', k, { title: `${cfg.agents[k].label}` }); }
-  if (x === 'remove' && confirm(`¿Quitar "${cfg.agents[k].label}" de AgentBoard? La carpeta y su sesión quedan en el disco.`)) {
+  if (x === 'remove' && confirm(`Remove "${cfg.agents[k].label}" from AgentBoard? Its folder and session stay on disk.`)) {
     delete cfg.agents[k];
     cfg.autoAgents = (cfg.autoAgents || []).filter((a) => a !== k);
     save(); renderAgentButtons(); renderClaudeAccounts();
@@ -1187,7 +1189,7 @@ $('#addClaudeAccount').onclick = async () => {
   const r = await ab.claudeAccountDir(name);
   if (!r.ok) return toast(esc(r.error));
   const key = `claude-${r.value.slug}`;
-  if (cfg.agents[key]) return toast('Ya existe una cuenta con ese nombre.');
+  if (cfg.agents[key]) return toast('An account with that name already exists.');
   const base = cfg.agents.claude || {};
   const n = Object.values(cfg.agents).filter((a) => a.env?.CLAUDE_CONFIG_DIR).length;
   cfg.agents[key] = {
@@ -1200,40 +1202,40 @@ $('#addClaudeAccount').onclick = async () => {
   await saveNow();
   renderAgentButtons(); renderClaudeAccounts();
   $('#accounts').close();
-  newCard('term', key, { title: `${cfg.agents[key].label} · iniciar sesión` });
-  toast(`Inicia sesión con tu otra cuenta en esta tarjeta (<code>/login</code>). Desde ahí, "auto" reparte entre tus cuentas.`, 7000);
+  newCard('term', key, { title: `${cfg.agents[key].label} · sign in` });
+  toast(`Sign in with your other account in this card (<code>/login</code>). From then on, "auto" spreads tasks across your accounts.`, 7000);
 };
 
 function renderCatalog() {
   const box = $('#catalogRows');
   box.innerHTML = '';
   for (const item of catalog) {
-    if (item.key === 'ollama') continue; // va en "Modelos locales"
+    if (item.key === 'ollama') continue; // listed under "Local Models"
     const row = document.createElement('div');
     row.className = 'hub-row';
     const pinned = !!cfg.agents[item.key] && !cfg.agents[item.key].hidden;
-    const [cls, badge] = !item.installed ? ['no', 'No instalado']
-      : item.loggedIn === true ? ['ok', 'Sesión iniciada']
-      : item.loggedIn === false ? ['no', 'Sin sesión'] : ['', 'Instalado'];
+    const [cls, badge] = !item.installed ? ['no', 'Not installed']
+      : item.loggedIn === true ? ['ok', 'Signed in']
+      : item.loggedIn === false ? ['no', 'Signed out'] : ['', 'Installed'];
     const detail = !item.installed ? `<code>${esc(item.install)}</code>`
-      : item.where ? `${esc(item.plan)} · sesión en ${esc(item.where)}` : `${esc(item.plan)} · inicia sesión dentro del CLI`;
-    const action = !item.installed ? 'Instalar' : item.loggedIn === false ? 'Iniciar sesión' : 'Abrir';
+      : item.where ? `${esc(item.plan)} · session in ${esc(item.where)}` : `${esc(item.plan)} · sign in inside the CLI`;
+    const action = !item.installed ? 'Install' : item.loggedIn === false ? 'Sign In' : 'Open';
     row.innerHTML = `
       <span class="dot" style="background:${esc(item.color)};color:${esc(item.color)}"></span>
       <span class="meta"><strong>${esc(item.label)}</strong><small title="${esc(item.install)}">${detail}</small></span>
       <span class="badge ${cls}">${badge}</span>
       <span class="acts">
-        <label class="pin" title="Mostrar en la barra de abajo"><input type="checkbox" ${pinned ? 'checked' : ''}/> barra</label>
-        <button type="button" title="${action === 'Instalar' ? 'Abrir una terminal con el comando de instalación' : action === 'Iniciar sesión' ? 'Abrir el CLI para iniciar sesión con tu cuenta' : 'Abrir este agente en el proyecto actual'}">${action}</button>
+        <label class="pin" title="Show it in the bottom bar"><input type="checkbox" ${pinned ? 'checked' : ''}/> bar</label>
+        <button type="button" title="${action === 'Install' ? 'Open a terminal with the install command' : action === 'Sign In' ? 'Open the CLI to sign in with your account' : 'Open this agent in the current project'}">${action}</button>
       </span>`;
     $('input', row).onchange = (e) => setPinned(item, e.target.checked);
     $('button', row).onclick = () => {
       $('#accounts').close();
       if (!item.installed) {
-        newCard('term', 'shell', { cwd: null, title: `Instalar ${item.label}`, startCmd: item.install });
+        newCard('term', 'shell', { cwd: null, title: `Install ${item.label}`, startCmd: item.install });
       } else if (item.loggedIn === false) {
         ensureAgent(item); renderAgentButtons();
-        newCard('term', item.key, { cwd: null, title: `Login ${item.label}`, startCmd: item.login });
+        newCard('term', item.key, { cwd: null, title: `Sign in · ${item.label}`, startCmd: item.login });
       } else {
         ensureAgent(item); renderAgentButtons();
         newCard('term', item.key);
@@ -1243,8 +1245,8 @@ function renderCatalog() {
   }
 }
 
-// Formas de usar un modelo local. Los nombres vienen del servidor local:
-// solo aceptamos caracteres seguros porque terminan en la línea de comando.
+// Ways to use a local model. Names come from the local server: only safe
+// characters are accepted because they end up on the command line.
 const SAFE_MODEL = /^[\w.:/@+-]+$/;
 const OLLAMA_BASE = 'http://127.0.0.1:11434';
 const HARNESSES = {
@@ -1273,13 +1275,13 @@ function modelRow(provider, model) {
   row.className = 'hub-row';
   const opts = HARNESSES[provider].map((h) => {
     const ok = catalog.find((i) => i.key === h.agent)?.installed !== false;
-    return `<option value="${h.id}" ${ok ? '' : 'disabled'}>${esc(h.label)}${ok ? '' : ' — no instalado'}</option>`;
+    return `<option value="${h.id}" ${ok ? '' : 'disabled'}>${esc(h.label)}${ok ? '' : ' — not installed'}</option>`;
   }).join('');
   row.innerHTML = `
     <span class="dot" style="background:var(--text);color:var(--text)"></span>
-    <span class="meta"><strong>${esc(model)}</strong><small>${provider === 'ollama' ? 'Ollama' : 'LM Studio'} · corre en tu máquina</small></span>
-    <select>${opts}</select>
-    <span class="acts"><button type="button">Abrir</button></span>`;
+    <span class="meta"><strong>${esc(model)}</strong><small>${provider === 'ollama' ? 'Ollama' : 'LM Studio'} · runs on your machine</small></span>
+    <select title="How to open this model">${opts}</select>
+    <span class="acts"><button type="button" title="Open the model in a new card">Open</button></span>`;
   $('button', row).onclick = () => launchLocal(provider, model, $('select', row).value);
   return row;
 }
@@ -1298,22 +1300,22 @@ function renderLocal(local) {
   // Ollama
   const o = local.ollama;
   const oModels = o.models.filter((x) => SAFE_MODEL.test(x));
-  head('Ollama', o.running ? 'ok' : 'no', o.running ? `Activo · ${oModels.length} modelos` : o.installed ? 'Apagado' : 'No instalado');
+  head('Ollama', o.running ? 'ok' : 'no', o.running ? `Running · ${oModels.length} models` : o.installed ? 'Stopped' : 'Not installed');
   if (!o.installed) {
-    note('Descárgalo en <a href="https://ollama.com/download" target="_blank">ollama.com/download</a> y vuelve a revisar.');
+    note('Download it from <a href="https://ollama.com/download" target="_blank">ollama.com/download</a> and refresh.');
   } else if (!o.running) {
-    const n = note('Ollama está instalado pero no está corriendo. ');
+    const n = note('Ollama is installed but not running. ');
     const b = document.createElement('button');
-    b.type = 'button'; b.textContent = 'Encender Ollama';
+    b.type = 'button'; b.textContent = 'Start Ollama'; b.title = 'Run ollama serve in a new card';
     b.onclick = () => { $('#accounts').close(); newCard('term', 'shell', { cwd: null, title: 'ollama serve', startCmd: 'ollama serve' }); };
     n.appendChild(b);
   }
   if (o.installed) {
-    if (o.running && !oModels.length) note('Aún no tienes modelos. Descarga uno aquí abajo.');
+    if (o.running && !oModels.length) note('You have no models yet. Download one below.');
     for (const m of oModels) box.appendChild(modelRow('ollama', m));
     const pull = document.createElement('div');
     pull.className = 'pull-row';
-    pull.innerHTML = `<input placeholder="Descargar modelo, ej. qwen3-coder, gpt-oss:20b, llama3.2" /><button type="button">Descargar</button>`;
+    pull.innerHTML = `<input placeholder="Download a model, e.g. qwen3-coder, gpt-oss:20b, llama3.2" /><button type="button" title="Run ollama pull in a new card">Download</button>`;
     const go = () => {
       const m = $('input', pull).value.trim();
       if (!SAFE_MODEL.test(m)) { $('input', pull).focus(); return; }
@@ -1328,8 +1330,8 @@ function renderLocal(local) {
   // LM Studio
   const l = local.lmstudio;
   const lModels = l.models.filter((x) => SAFE_MODEL.test(x));
-  head('LM Studio', l.running ? 'ok' : '', l.running ? `Servidor activo · ${lModels.length} modelos` : 'Servidor apagado');
-  if (!l.running) note('Abre LM Studio → Developer → inicia el servidor local (puerto 1234) y vuelve a revisar.');
+  head('LM Studio', l.running ? 'ok' : '', l.running ? `Server running · ${lModels.length} models` : 'Server stopped');
+  if (!l.running) note('Open LM Studio → Developer → start the local server (port 1234) and refresh.');
   for (const m of lModels) box.appendChild(modelRow('lmstudio', m));
 }
 
@@ -1337,7 +1339,7 @@ $('#accountsBtn').onclick = openAccounts;
 $('#moreAgents').onclick = openAccounts;
 $('#accountsRefresh').onclick = renderAccounts;
 
-// ---------- Avisos ----------
+// ---------- Notifications ----------
 function toast(html, ms = 3200) {
   const t = document.createElement('div');
   t.className = 'toast';
@@ -1350,12 +1352,12 @@ function ping(id) {
   const el = runtime.get(id)?.el;
   if (!el) return;
   el.classList.remove('pinged');
-  void el.offsetWidth; // reinicia la animación
+  void el.offsetWidth; // restart the animation
   el.classList.add('pinged');
 }
 
-// ---------- Pasar a… (traspasar contexto a otro agente) ----------
-// Tarjetas que pueden recibir texto: agentes vivos, nunca terminales normales.
+// ---------- Send to… (hand context to another agent) ----------
+// Cards that can receive text: running agents, never plain terminals.
 const canReceive = (c) => c.type === 'term' && !c.startCmd && !!agentOf(c).command && c.bridge !== false && runtime.get(c.id)?.alive;
 
 function terminalTail(c, n = 40) {
@@ -1376,14 +1378,14 @@ function handoffMenu(c, anchor) {
   const pop = document.createElement('div');
   pop.className = 'popover handoff';
   pop.innerHTML = `
-    <label>Para
+    <label>To
       <select name="to">
         ${targets.map((x) => `<option value="card:${esc(x.id)}">${esc(x.title)} · ${esc(agentOf(x).label)}</option>`).join('')}
-        ${fresh.map(([k, a]) => `<option value="new:${esc(k)}">Nuevo ${esc(a.label)} en ${esc(basename(c.cwd) || '~')}</option>`).join('')}
+        ${fresh.map(([k, a]) => `<option value="new:${esc(k)}">New ${esc(a.label)} in ${esc(basename(c.cwd) || '~')}</option>`).join('')}
       </select></label>
-    <label>Instrucción <input name="ask" value="Continúa con esto:" /></label>
-    <label>Contexto (selección o últimas líneas) <textarea name="ctx"></textarea></label>
-    <div class="row"><button data-x="cancel">Cancelar</button><button data-x="send" class="primary">Enviar</button></div>`;
+    <label>Instruction <input name="ask" value="Continue with this:" /></label>
+    <label>Context (selection or last lines) <textarea name="ctx"></textarea></label>
+    <div class="row"><button data-x="cancel">Cancel</button><button data-x="send" class="primary" title="Paste the instruction and context into the chosen agent">Send</button></div>`;
   $('[name=ctx]', pop).value = terminalTail(c);
   openPopover(pop, anchor, 380);
   $('[name=ask]', pop).focus();
@@ -1394,20 +1396,20 @@ function handoffMenu(c, anchor) {
     if (x !== 'send') return;
     const to = $('[name=to]', pop).value;
     const ctx = $('[name=ctx]', pop).value.trim();
-    const text = `${$('[name=ask]', pop).value.trim()}\n\n[Contexto de ${c.title} (${agentOf(c).label})]\n${ctx}`.trim();
+    const text = `${$('[name=ask]', pop).value.trim()}\n\n[Context from ${c.title} (${agentOf(c).label})]\n${ctx}`.trim();
     closePopover();
     if (to.startsWith('card:')) {
       const target = cardData(to.slice(5));
       await ab.ptyPaste(target.id, text);
       ping(target.id);
       toast(`${esc(c.title)} <b>→</b> ${esc(target.title)}`);
-      addLink(c.id, target.id, 'pasó contexto');
+      addLink(c.id, target.id, 'sent context');
     } else {
       const target = newCard('term', to.slice(4), { cwd: c.cwd, x: c.x + c.w + 28, y: c.y });
-      addLink(c.id, target.id, 'pasó contexto');
-      toast(`Abriendo ${esc(target.title)} y enviándole el contexto…`);
+      addLink(c.id, target.id, 'sent context');
+      toast(`Opening ${esc(target.title)} and sending it the context…`);
       await waitAlive(target.id);
-      await new Promise((r) => setTimeout(r, 3500)); // que el CLI termine de arrancar
+      await new Promise((r) => setTimeout(r, 3500)); // let the CLI finish starting
       await ab.ptyPaste(target.id, text);
       ping(target.id);
     }
@@ -1419,27 +1421,27 @@ async function waitAlive(id, ms = 8000) {
   while (!runtime.get(id)?.alive && Date.now() - t0 < ms) await new Promise((r) => setTimeout(r, 150));
 }
 
-// ---------- Eventos del puente entre agentes ----------
+// ---------- Agent bridge events ----------
 ab.onBridgeEvent((ev) => {
-  const from = cardData(ev.from)?.title || 'Un agente';
-  const to = cardData(ev.to)?.title || 'otro agente';
+  const from = cardData(ev.from)?.title || 'An agent';
+  const to = cardData(ev.to)?.title || 'another agent';
   if (ev.kind === 'send') { ping(ev.to); toast(`${esc(from)} <b>→</b> ${esc(to)}`); }
-  else if (ev.kind === 'start') { toast(`${esc(from)} abrió <b>${esc(to)}</b>`); }
+  else if (ev.kind === 'start') { toast(`${esc(from)} opened <b>${esc(to)}</b>`); }
 });
 
 ab.onBridgeNewCard(async ({ reqId, agent, cwd, title }) => {
   const c = cfg.agents[agent] ? newCard('term', agent, { cwd, ...(title ? { title } : {}) }) : null;
-  if (c) await saveNow(); // el puente lee el tablero guardado
+  if (c) await saveNow(); // the bridge reads the saved board
   ab.bridgeCardCreated(reqId, c ? c.id : null);
 });
 
-// ---------- Skills y agentes ----------
+// ---------- Skills and agents ----------
 const PROVIDERS = {
   claude: { label: 'Claude Code', color: () => cfg.agents.claude?.color || '#e8875f' },
   codex: { label: 'Codex', color: () => cfg.agents.codex?.color || '#3fbf8f' },
   gemini: { label: 'Gemini CLI', color: () => cfg.agents.gemini?.color || '#6c9cf5' },
 };
-const KIND_LABEL = { skill: 'skill', command: 'comando', extension: 'extensión' };
+const KIND_LABEL = { skill: 'skill', command: 'command', extension: 'extension' };
 let skillItems = [];
 let agentDefs = [];
 let skillProvider = 'all';
@@ -1457,35 +1459,35 @@ async function openSkills(tab = 'skills') {
 }
 
 async function refreshSkills() {
-  $('#skillRows').innerHTML = '<div class="empty-note">Leyendo tus skills…</div>';
+  $('#skillRows').innerHTML = '<div class="empty-note">Reading your skills…</div>';
   const [items, defs, bridge, avail] = await Promise.all([ab.skillsScan(), ab.agentsList(), ab.bridgeStatus(), ab.checkAgents()]);
   skillItems = items; agentDefs = defs; agentAvailable = avail;
   renderSkillList(); renderAgentDefs(); renderConnect(bridge);
   renderPack(await ab.packStatus());
 }
 
-// Skills de ahorro de tokens incluidas con AgentBoard
+// Token-saving skills bundled with AgentBoard
 function renderPack(pack) {
-  const label = { ok: 'instalada', old: 'desactualizada' };
+  const label = { ok: 'installed', old: 'outdated' };
   $('#packRows').innerHTML = pack.map((p) => `
     <div class="hub-row skill">
       <span class="dot" style="background:var(--accent);color:var(--accent)"></span>
       <div class="meta"><strong>${esc(p.name)}</strong><span class="desc">${esc(p.description)}</span></div>
-      <div class="acts">${Object.keys(PROVIDERS).map((k) => `<span class="badge ${p.installed[k] === 'ok' ? 'ok' : 'no'}" title="${esc(PROVIDERS[k].label)}">${esc(PROVIDERS[k].label)}: ${label[p.installed[k]] || 'no'}</span>`).join('')}</div>
+      <div class="acts">${Object.keys(PROVIDERS).map((k) => `<span class="badge ${p.installed[k] === 'ok' ? 'ok' : 'no'}" title="${esc(PROVIDERS[k].label)}">${esc(PROVIDERS[k].label)}: ${label[p.installed[k]] || 'not installed'}</span>`).join('')}</div>
       <span></span>
-    </div>`).join('') || '<div class="empty-note">No encontré la carpeta skills-pack.</div>';
+    </div>`).join('') || '<div class="empty-note">The skills-pack folder was not found.</div>';
 }
 $('#packInstall').onclick = async () => {
   const r = await ab.packInstall(Object.keys(PROVIDERS));
-  if (!r.ok) return toast(`No pude instalar: ${esc(r.error)}`);
-  toast(`Skills de ahorro instaladas (${r.value.length}). Reinicia los agentes abiertos para que las vean.`, 5000);
+  if (!r.ok) return toast(`Could not install: ${esc(r.error)}`);
+  toast(`Token-saving skills installed (${r.value.length}). Restart open agents so they pick them up.`, 5000);
   renderPack(await ab.packStatus());
 };
 
 function renderSkillList() {
   const count = (p) => skillItems.filter((x) => p === 'all' || x.provider === p).length;
   $('#skillProviders').innerHTML = ['all', ...Object.keys(PROVIDERS)].map((p) =>
-    `<button type="button" data-p="${p}" class="${p === skillProvider ? 'active' : ''}">${p === 'all' ? 'Todas' : esc(PROVIDERS[p].label)}<span class="n">${count(p)}</span></button>`).join('');
+    `<button type="button" data-p="${p}" class="${p === skillProvider ? 'active' : ''}">${p === 'all' ? 'All' : esc(PROVIDERS[p].label)}<span class="n">${count(p)}</span></button>`).join('');
 
   const q = $('#skillFilter').value.trim().toLowerCase();
   const list = skillItems.filter((x) => (skillProvider === 'all' || x.provider === skillProvider)
@@ -1493,10 +1495,10 @@ function renderSkillList() {
   const box = $('#skillRows');
   box.innerHTML = '';
   if (!list.length) {
-    box.innerHTML = `<div class="empty-note">${q ? 'Sin resultados.'
-      : skillProvider === 'claude' ? 'No encontré skills de Claude Code en este computador (<code>~/.claude/skills</code>, tus proyectos o plugins activos). Las skills que activas en claude.ai viven en tu cuenta web, no en el disco. Puedes copiar aquí una skill de Codex.'
-      : skillProvider === 'gemini' ? 'No encontré skills, comandos ni extensiones de Gemini CLI en este computador.'
-      : 'No encontré skills en este computador.'}</div>`;
+    box.innerHTML = `<div class="empty-note">${q ? 'No results.'
+      : skillProvider === 'claude' ? 'No Claude Code skills found on this computer (<code>~/.claude/skills</code>, your projects or active plugins). Skills you enable on claude.ai live in your web account, not on disk. You can copy a Codex skill here.'
+      : skillProvider === 'gemini' ? 'No Gemini CLI skills, commands or extensions found on this computer.'
+      : 'No skills found on this computer.'}</div>`;
     return;
   }
   for (const prov of Object.keys(PROVIDERS)) {
@@ -1517,12 +1519,12 @@ function skillRow(s) {
   row.innerHTML = `
     <span class="dot" style="background:${esc(PROVIDERS[s.provider].color())};color:${esc(PROVIDERS[s.provider].color())}"></span>
     <span class="meta"><strong>${esc(s.name)}<span class="tag">${KIND_LABEL[s.kind] || s.kind}</span></strong>
-      <span class="desc" title="${esc(s.description)}">${esc(s.description) || '<i>Sin descripción</i>'}</span></span>
+      <span class="desc" title="${esc(s.description)}">${esc(s.description) || '<i>No description</i>'}</span></span>
     <span class="badge">${esc(s.scope)}</span>
     <span class="acts">
-      ${s.kind === 'skill' ? `<select class="copy" title="Copiar esta skill a otra suscripción">
-        <option value="">Copiar a…</option>${others.map((p) => `<option value="${p}">${esc(PROVIDERS[p].label)}</option>`).join('')}</select>` : ''}
-      <button type="button" class="icon" title="Mostrar en el Finder">${icon('folder', 14)}</button>
+      ${s.kind === 'skill' ? `<select class="copy" title="Copy this skill to another subscription">
+        <option value="">Copy to…</option>${others.map((p) => `<option value="${p}">${esc(PROVIDERS[p].label)}</option>`).join('')}</select>` : ''}
+      <button type="button" class="icon" title="Show in Finder">${icon('folder', 14)}</button>
     </span>`;
   $('button', row).onclick = () => ab.skillsReveal(s.path);
   const sel = $('select', row);
@@ -1531,7 +1533,7 @@ function skillRow(s) {
     sel.value = '';
     if (!target) return;
     const r = await ab.skillsCopy(s.path, target);
-    if (r.ok) { toast(`Skill <b>${esc(s.name)}</b> copiada a ${esc(PROVIDERS[target].label)}`); await refreshSkills(); }
+    if (r.ok) { toast(`Skill <b>${esc(s.name)}</b> copied to ${esc(PROVIDERS[target].label)}`); await refreshSkills(); }
     else toast(esc(r.error), 4500);
   };
   return row;
@@ -1545,22 +1547,22 @@ $('#skillFilter').addEventListener('input', renderSkillList);
 
 function renderAgentDefs() {
   const box = $('#agentDefRows');
-  box.innerHTML = agentDefs.length ? '' : '<div class="empty-note">Aún no tienes agentes propios. Crea uno con <b>Nuevo agente</b>.</div>';
+  box.innerHTML = agentDefs.length ? '' : '<div class="empty-note">You have no agents of your own yet. Create one with <b>New Agent</b>.</div>';
   for (const a of agentDefs) {
     const row = document.createElement('div');
     row.className = 'hub-row skill';
     row.innerHTML = `
       <span class="dot" style="background:${esc(PROVIDERS.claude.color())};color:${esc(PROVIDERS.claude.color())}"></span>
       <span class="meta"><strong>${esc(a.name)}${a.model ? `<span class="tag">${esc(a.model)}</span>` : ''}</strong>
-        <span class="desc">${esc(a.description) || '<i>Sin descripción</i>'}</span></span>
+        <span class="desc">${esc(a.description) || '<i>No description</i>'}</span></span>
       <span class="badge">${esc(a.scope)}</span>
-      <span class="acts"><button type="button" data-a="edit">Editar</button><button type="button" data-a="del" class="icon" title="Mover a la papelera">${icon('trash', 14)}</button></span>`;
+      <span class="acts"><button type="button" data-a="edit" title="Edit this subagent">Edit</button><button type="button" data-a="del" class="icon" title="Move to the Trash">${icon('trash', 14)}</button></span>`;
     row.addEventListener('click', async (e) => {
       const act = e.target.closest('[data-a]')?.dataset.a;
       if (act === 'edit') openAgentForm(a);
-      if (act === 'del' && confirm(`¿Mover "${a.name}" a la papelera?`)) {
+      if (act === 'del' && confirm(`Move "${a.name}" to the Trash?`)) {
         const r = await ab.agentsDelete(a.file);
-        if (r.ok) { toast(`<b>${esc(a.name)}</b> se movió a la papelera`); await refreshSkills(); } else toast(esc(r.error), 4500);
+        if (r.ok) { toast(`<b>${esc(a.name)}</b> moved to the Trash`); await refreshSkills(); } else toast(esc(r.error), 4500);
       }
     });
     box.appendChild(row);
@@ -1570,8 +1572,8 @@ function renderAgentDefs() {
 function openAgentForm(a = null) {
   editingAgent = a;
   const f = $('#skillsForm');
-  f.adProject.innerHTML = '<option value="">Usuario (todos los proyectos)</option>'
-    + cfg.projects.map((p) => `<option value="${esc(p.path)}">Proyecto · ${esc(p.name)}</option>`).join('');
+  f.adProject.innerHTML = '<option value="">User (all projects)</option>'
+    + cfg.projects.map((p) => `<option value="${esc(p.path)}">Project · ${esc(p.name)}</option>`).join('');
   f.adName.value = a?.name || '';
   f.adProject.value = a?.project || '';
   f.adDescription.value = a?.description || '';
@@ -1600,7 +1602,7 @@ $('#agentFormSave').onclick = async () => {
     description: f.adDescription.value, model: f.adModel.value, tools: f.adTools.value, prompt: f.adPrompt.value,
   });
   if (!r.ok) { $('#agentFormError').textContent = r.error; return; }
-  toast(`Agente <b>${esc(f.adName.value.trim())}</b> guardado`);
+  toast(`Agent <b>${esc(f.adName.value.trim())}</b> saved`);
   closeAgentForm();
   await refreshSkills();
 };
@@ -1616,20 +1618,20 @@ function renderConnect(bridge) {
     row.innerHTML = `
       <span class="dot" style="background:${esc(PROVIDERS[key].color())};color:${esc(PROVIDERS[key].color())}"></span>
       <span class="meta"><strong>${esc(PROVIDERS[key].label)}</strong>
-        <small>${!installed ? 'No instalado' : on ? 'Puede ver y escribirle a los demás agentes del tablero' : 'Aún no conoce a los demás agentes'}</small></span>
-      <span class="badge ${on ? 'ok' : ''}">${on ? 'Conectado' : 'Sin conectar'}</span>
-      <span class="acts"><button type="button" ${installed ? '' : 'disabled'}>${on ? 'Desconectar' : 'Conectar'}</button></span>`;
+        <small>${!installed ? 'Not installed' : on ? 'Can see and message the other agents on the board' : 'Does not know the other agents yet'}</small></span>
+      <span class="badge ${on ? 'ok' : ''}">${on ? 'Connected' : 'Not connected'}</span>
+      <span class="acts"><button type="button" ${installed ? '' : 'disabled'} title="${on ? 'Remove the AgentBoard MCP server from this CLI' : 'Register the AgentBoard MCP server in this CLI'}">${on ? 'Disconnect' : 'Connect'}</button></span>`;
     $('button', row).onclick = () => {
       $('#skills').close();
-      newCard('term', 'shell', { cwd: null, title: `${on ? 'Desconectar' : 'Conectar'} ${PROVIDERS[key].label}`, startCmd: bridge.commands[key][on ? 'remove' : 'add'] });
-      toast(on ? 'Desconectando…' : 'Conectando… Reinicia los agentes que ya estaban abiertos para que vean la conexión.', 5000);
+      newCard('term', 'shell', { cwd: null, title: `${on ? 'Disconnect' : 'Connect'} ${PROVIDERS[key].label}`, startCmd: bridge.commands[key][on ? 'remove' : 'add'] });
+      toast(on ? 'Disconnecting…' : 'Connecting… Restart the agents that were already open so they see the connection.', 5000);
     };
     box.appendChild(row);
   }
 
   const list = $('#boardAgentRows');
   const agents = cfg.cards.filter((c) => c.type === 'term' && agentOf(c).command && !c.startCmd);
-  list.innerHTML = agents.length ? '' : '<div class="empty-note">No hay agentes abiertos en el tablero.</div>';
+  list.innerHTML = agents.length ? '' : '<div class="empty-note">No agents are open on the board.</div>';
   for (const c of agents) {
     const st = runtime.get(c.id)?.status || '';
     const row = document.createElement('div');
@@ -1638,8 +1640,8 @@ function renderConnect(bridge) {
     row.innerHTML = `
       <span class="status ${st}" title="${STATUS_LABEL[st] || ''}"></span>
       <span class="meta"><strong>${esc(c.title)}</strong><small>${esc(agentOf(c).label)} · ${esc(basename(c.cwd) || '~')}</small></span>
-      <label class="switch"><input type="checkbox" ${c.bridge !== false ? 'checked' : ''}/> recibe mensajes</label>
-      <span class="acts"><button type="button">Ir</button></span>`;
+      <label class="switch"><input type="checkbox" ${c.bridge !== false ? 'checked' : ''}/> accepts messages</label>
+      <span class="acts"><button type="button" title="Go to this agent's card">Go</button></span>`;
     $('input', row).onchange = (e) => { c.bridge = e.target.checked; save(); };
     $('button', row).onclick = () => { $('#skills').close(); focusCardView(c); focusCard(c.id); };
     list.appendChild(row);
@@ -1649,13 +1651,13 @@ function renderConnect(bridge) {
 $('#skillsBtn').onclick = () => openSkills();
 $('#skillsRefresh').onclick = refreshSkills;
 $('#skills .tabs').addEventListener('click', (e) => { const t = e.target.closest('[data-tab]')?.dataset.tab; if (t) showTab(t); });
-// Enter en un campo no debe cerrar el diálogo (es un <form method="dialog">).
+// Enter in a field must not close the dialog (it is a <form method="dialog">).
 $('#skillsForm').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.tagName === 'INPUT') e.preventDefault(); });
 
-// ---------- Barra superior ----------
-// ---------- Espacios: una pestaña por proyecto (como un IDE) ----------
-// Todas las pestañas siguen corriendo; la pestaña solo decide qué tarjetas ves y
-// dónde se abre el próximo agente. "Todos" muestra el tablero completo.
+// ---------- Toolbar ----------
+// ---------- Spaces: one tab per project (like an IDE) ----------
+// Every tab keeps running; the tab only decides which cards you see and where the
+// next agent opens. "All" shows the whole board.
 const spaceOf = (c) => (c.type === 'term' ? projectOfPath(c.cwd) : (c.space ?? ''));
 const currentSpace = () => (cfg.activeSpace && cfg.activeSpace !== '*' ? cfg.activeSpace : (cfg.selectedProject || ''));
 function inSpace(c) {
@@ -1681,15 +1683,15 @@ function switchSpace(key, { keepView = false } = {}) {
   if (typeof renderTaskOptions === 'function') renderTaskOptions();
   save();
 }
-const spaceName = (p) => cfg.projects.find((x) => x.path === p)?.name || basename(p) || 'Carpeta personal';
+const spaceName = (p) => cfg.projects.find((x) => x.path === p)?.name || basename(p) || 'Home folder';
 
 function renderSpaces() {
   const box = $('#spaceTabs');
   const active = cfg.activeSpace || '*';
-  const tabs = [['*', 'Todos'], ...cfg.projects.map((p) => [p.path, p.name])];
-  box.innerHTML = tabs.map(([k, name]) => `<button type="button" data-space="${esc(k)}" class="${k === active ? 'active' : ''}" title="${esc(k === '*' ? 'Todos los proyectos' : k)}">
+  const tabs = [['*', 'All'], ...cfg.projects.map((p) => [p.path, p.name])];
+  box.innerHTML = tabs.map(([k, name]) => `<button type="button" data-space="${esc(k)}" class="${k === active ? 'active' : ''}" title="${esc(k === '*' ? 'All projects' : k)}">
     <span class="sp-name">${esc(name)}</span><span class="sp-badge" data-badge="${esc(k)}"></span></button>`).join('')
-    || '<span class="muted small">Agrega un proyecto →</span>';
+    || '<span class="muted small">Add a project →</span>';
   updateSpaceBadges();
 }
 
@@ -1709,7 +1711,7 @@ function updateSpaceBadges() {
     const txt = x.n ? String(x.n) : '';
     if (el.textContent !== txt) el.textContent = txt;
     el.classList.toggle('busy', x.busy > 0);
-    el.title = x.n ? `${x.n} agente${x.n === 1 ? '' : 's'} · ${x.busy} trabajando` : '';
+    el.title = x.n ? `${x.n} agent${x.n === 1 ? '' : 's'} · ${x.busy} working` : '';
   }
 }
 const renderProjects = renderSpaces;
@@ -1735,8 +1737,8 @@ function renderAgentButtons() {
     b.className = 'chip' + (missing ? ' missing' : '');
     b.innerHTML = `<span class="dot" style="background:${esc(a.color)};color:${esc(a.color)}"></span>${esc(a.label)}`;
     b.title = missing
-      ? `"${a.command}" no está en el PATH de este computador`
-      : `Abrir ${a.label} en el proyecto${shortcuts[key] ? ` (${mod}${shortcuts[key]})` : ''}`;
+      ? `"${a.command}" is not on this computer's PATH`
+      : `Open ${a.label} in the project${shortcuts[key] ? ` (${mod}${shortcuts[key]})` : ''}`;
     b.onclick = () => newCard('term', key);
     box.appendChild(b);
   }
@@ -1785,7 +1787,7 @@ ab.onMenu((action) => {
   else if (action === 'quick-task') { if (diagramOpen()) toggleDiagram(false); openTasks(); }
 });
 
-// ---------- Ajustes ----------
+// ---------- Settings rows ----------
 function agentRow(key, a) {
   const row = document.createElement('div');
   row.className = 'agent-row';
@@ -1793,12 +1795,12 @@ function agentRow(key, a) {
   const builtin = ['claude', 'codex', 'gemini', 'shell'].includes(key);
   row.innerHTML = `
     <input type="color" name="color" value="${esc(a.color)}" />
-    <input name="label" value="${esc(a.label)}" placeholder="Nombre" />
-    <input name="command" value="${esc(a.command)}" placeholder="${key === 'shell' ? '(solo shell)' : 'comando'}" ${key === 'shell' ? 'disabled' : ''}/>
-    <input name="resumeArgs" value="${esc(a.resumeArgs)}" placeholder="args al reanudar" ${key === 'shell' ? 'disabled' : ''}/>
-    <input name="lightArgs" value="${esc(a.lightArgs || '')}" placeholder="args ligero (!)" title="Tareas marcadas con ! (modelo más barato)" ${key === 'shell' ? 'disabled' : ''}/>
-    <input name="heavyArgs" value="${esc(a.heavyArgs || '')}" placeholder="args potente (!!)" title="Tareas marcadas con !! (modelo más capaz)" ${key === 'shell' ? 'disabled' : ''}/>
-    ${builtin ? '<span></span>' : `<button type="button" class="card-btn" title="Eliminar este agente personalizado">${icon('close', 13)}</button>`}`;
+    <input name="label" value="${esc(a.label)}" placeholder="Name" />
+    <input name="command" value="${esc(a.command)}" placeholder="${key === 'shell' ? '(shell only)' : 'command'}" ${key === 'shell' ? 'disabled' : ''}/>
+    <input name="resumeArgs" value="${esc(a.resumeArgs)}" placeholder="resume args" ${key === 'shell' ? 'disabled' : ''}/>
+    <input name="lightArgs" value="${esc(a.lightArgs || '')}" placeholder="light args (!)" title="Tasks marked with ! (cheaper model)" ${key === 'shell' ? 'disabled' : ''}/>
+    <input name="heavyArgs" value="${esc(a.heavyArgs || '')}" placeholder="heavy args (!!)" title="Tasks marked with !! (most capable model)" ${key === 'shell' ? 'disabled' : ''}/>
+    ${builtin ? '<span></span>' : `<button type="button" class="card-btn" title="Delete this custom agent">${icon('close', 13)}</button>`}`;
   row.querySelector('button')?.addEventListener('click', () => row.remove());
   return row;
 }
@@ -1808,12 +1810,12 @@ function projectRow(p) {
   row.className = 'project-row';
   row.dataset.path = p.path;
   row.innerHTML = `<input name="name" value="${esc(p.name)}" /><span class="path" title="${esc(p.path)}">${esc(p.path)}</span>
-    <button type="button" class="card-btn" title="Quitar el proyecto de la lista (no borra la carpeta)">${icon('close', 13)}</button>`;
+    <button type="button" class="card-btn" title="Remove the project from the list (keeps the folder)">${icon('close', 13)}</button>`;
   row.querySelector('button').addEventListener('click', () => row.remove());
   return row;
 }
 
-// ---------- Apariencia ----------
+// ---------- Appearance ----------
 // cfg.ui = { theme: auto|light|dark, accent, uiSize, font: system|geist, termTheme: auto|light|dark, lineHeight }
 const ACCENTS = ['#0a84ff', '#bf5af2', '#ff375f', '#ff453a', '#ff9f0a', '#ffd60a', '#30d158', '#64d2ff', '#8e8e93'];
 const TERM_THEMES = {
@@ -1831,13 +1833,13 @@ const TERM_THEMES = {
 const ui = () => ({ theme: 'auto', accent: ACCENTS[0], uiSize: 13, font: 'system', termTheme: 'auto', lineHeight: 1.15, ...(cfg.ui || {}) });
 const darkMQ = matchMedia('(prefers-color-scheme: dark)');
 const resolvedTheme = (mode) => (mode === 'auto' ? (darkMQ.matches ? 'dark' : 'light') : mode);
-function termTheme(c) {
-  const t = TERM_THEMES[resolvedTheme(ui().termTheme === 'auto' ? ui().theme : ui().termTheme)];
+function termTheme(c, u = lastUi || ui()) {
+  const t = TERM_THEMES[resolvedTheme(u.termTheme === 'auto' ? u.theme : u.termTheme)];
   return { ...t, cursor: agentOf(c).color };
 }
 function hexRgb(h) { const m = /^#?([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(h || ''); return m ? m.slice(1).map((x) => parseInt(x, 16)).join(', ') : '10, 132, 255'; }
 
-let lastUi = null; // lo último aplicado (incluye la vista previa de Configuración)
+let lastUi = null; // last applied appearance (includes the Settings preview)
 function applyAppearance(u = ui()) {
   lastUi = u;
   const root = document.documentElement;
@@ -1850,16 +1852,16 @@ function applyAppearance(u = ui()) {
   for (const c of cfg.cards) {
     const rt = runtime.get(c.id);
     if (!rt?.term) continue;
-    rt.term.options.theme = termTheme(c);
+    rt.term.options.theme = termTheme(c, u);
     rt.term.options.lineHeight = u.lineHeight;
     rt.term.options.fontFamily = getComputedStyle(root).getPropertyValue('--font-mono');
   }
   applyViewport();
 }
-// el sistema cambió claro/oscuro (o lo cambiamos nosotros con nativeTheme): reaplica lo que se está mostrando
+// the system switched light/dark (or we did, via nativeTheme): re-apply what is on screen
 darkMQ.addEventListener('change', () => applyAppearance(lastUi || ui()));
 
-// ---------- Configuración ----------
+// ---------- Settings ----------
 let shortcutDefs = [];
 let draftKeys = {};
 let draftUi = null;
@@ -1874,13 +1876,13 @@ $('.set-nav').addEventListener('click', (e) => { const s = e.target.closest('[da
 function prettyKey(acc) {
   if (!acc) return '—';
   if (!isMac()) return acc.replace(/CmdOrCtrl|CommandOrControl/g, 'Ctrl').replace(/\+/g, ' + ');
-  const sym = { CmdOrCtrl: '⌘', CommandOrControl: '⌘', Cmd: '⌘', Command: '⌘', Ctrl: '⌃', Control: '⌃', Alt: '⌥', Option: '⌥', Shift: '⇧', Right: '→', Left: '←', Up: '↑', Down: '↓', Space: 'Espacio', Plus: '+' };
+  const sym = { CmdOrCtrl: '⌘', CommandOrControl: '⌘', Cmd: '⌘', Command: '⌘', Ctrl: '⌃', Control: '⌃', Alt: '⌥', Option: '⌥', Shift: '⇧', Right: '→', Left: '←', Up: '↑', Down: '↓', Space: 'Space', Plus: '+' };
   const parts = acc.split('+').map((p) => sym[p] || p);
   const order = ['⌃', '⌥', '⇧', '⌘'];
   const mods = parts.filter((p) => order.includes(p)).sort((a, b) => order.indexOf(a) - order.indexOf(b));
   return mods.join('') + parts.filter((p) => !order.includes(p)).join('');
 }
-// Tecla presionada → acelerador de Electron
+// Pressed key → Electron accelerator
 function accelFromEvent(e) {
   const k = e.key;
   if (['Meta', 'Control', 'Alt', 'Shift'].includes(k)) return null;
@@ -1891,7 +1893,7 @@ function accelFromEvent(e) {
   if (isMac() && e.ctrlKey) mods.push('Control');
   if (e.altKey) mods.push('Alt');
   if (e.shiftKey) mods.push('Shift');
-  if (!mods.length && !/^F\d+$/.test(key)) return null; // sin modificador no es atajo
+  if (!mods.length && !/^F\d+$/.test(key)) return null; // without a modifier it is not a shortcut
   return [...mods, key].join('+');
 }
 
@@ -1903,8 +1905,8 @@ function renderKeyRows() {
   box.innerHTML = sections.map((sec) => `<h3>${esc(sec)}</h3><div class="set-group">${shortcutDefs.filter((d) => d.section === sec).map((d) => {
     const key = d.id in draftKeys ? draftKeys[d.id] : d.key;
     const clash = key && used[key].length > 1;
-    return `<div class="set-row">${esc(d.label)}<span class="key-cell">${key !== d.key ? `<button type="button" class="card-btn" data-reset="${esc(d.id)}" title="Restaurar ${esc(prettyKey(d.key))}">${icon('refresh', 13)}</button>` : ''}
-      <button type="button" class="keycap ${clash ? 'clash' : ''}" data-key="${esc(d.id)}" title="${clash ? 'También lo usa: ' + esc(used[key].filter((l) => l !== d.label).join(', ')) : 'Clic para cambiar'}">${esc(prettyKey(key))}</button></span></div>`;
+    return `<div class="set-row">${esc(d.label)}<span class="key-cell">${key !== d.key ? `<button type="button" class="card-btn" data-reset="${esc(d.id)}" title="Restore ${esc(prettyKey(d.key))}">${icon('refresh', 13)}</button>` : ''}
+      <button type="button" class="keycap ${clash ? 'clash' : ''}" data-key="${esc(d.id)}" title="${clash ? 'Also used by: ' + esc(used[key].filter((l) => l !== d.label).join(', ')) : 'Click to change'}">${esc(prettyKey(key))}</button></span></div>`;
   }).join('')}</div>`).join('');
 }
 $('#keyRows').addEventListener('click', (e) => {
@@ -1912,7 +1914,7 @@ $('#keyRows').addEventListener('click', (e) => {
   if (r) { delete draftKeys[r.dataset.reset]; renderKeyRows(); return; }
   const b = e.target.closest('[data-key]');
   if (!b) return;
-  b.classList.add('recording'); b.textContent = 'Presiona…';
+  b.classList.add('recording'); b.textContent = 'Press keys…';
   const onKey = (ev) => {
     ev.preventDefault(); ev.stopPropagation();
     if (ev.key === 'Escape') return done();
@@ -1926,7 +1928,7 @@ $('#keyRows').addEventListener('click', (e) => {
 });
 $('#keysReset').onclick = () => { draftKeys = {}; renderKeyRows(); };
 
-// Apariencia: vista previa en vivo
+// Appearance: live preview
 function renderAppearanceForm() {
   const f = $('#settingsForm');
   const u = draftUi;
@@ -1934,7 +1936,7 @@ function renderAppearanceForm() {
     for (const b of $('#' + id).querySelectorAll('[data-v]')) b.classList.toggle('active', b.dataset.v === u[key]);
   }
   $('#accentSwatches').innerHTML = ACCENTS.map((c) => `<button type="button" data-accent="${c}" class="${c === u.accent ? 'on' : ''}" style="background:${c}"></button>`).join('')
-    + `<input type="color" id="accentCustom" value="${esc(u.accent)}" title="Otro color" />`;
+    + `<input type="color" id="accentCustom" value="${esc(u.accent)}" title="Custom color" />`;
   f.uiSize.value = u.uiSize; $('#uiSizeOut').textContent = `${u.uiSize}px`;
   f.lineHeight.value = u.lineHeight; $('#lineHeightOut').textContent = (+u.lineHeight).toFixed(2);
   $('#fontSizeOut').textContent = `${f.fontSize.value}px`;
@@ -1952,7 +1954,7 @@ $('#settingsForm').fontSize.addEventListener('input', (e) => {
   cfg.fontSizePreview = +e.target.value; for (const c of cfg.cards) layoutCard(c);
 });
 
-// Avanzado: JSON de los ajustes (sin tarjetas, tareas ni flujos)
+// Advanced: settings as JSON (without cards, tasks or flows)
 const BULKY = ['cards', 'tasks', 'flows', 'viewport', 'viewports', 'version'];
 function settingsJson() {
   const o = {};
@@ -1961,15 +1963,15 @@ function settingsJson() {
 }
 $('#cfgJsonApply').onclick = async () => {
   let obj;
-  try { obj = JSON.parse($('#cfgJson').value); } catch (err) { $('#cfgJsonError').textContent = 'JSON inválido: ' + err.message; return; }
-  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) { $('#cfgJsonError').textContent = 'Debe ser un objeto { … }.'; return; }
-  if (obj.agents && typeof obj.agents !== 'object') { $('#cfgJsonError').textContent = '"agents" debe ser un objeto.'; return; }
-  for (const k of Object.keys(cfg)) if (!BULKY.includes(k) && !(k in obj)) delete cfg[k]; // claves quitadas
+  try { obj = JSON.parse($('#cfgJson').value); } catch (err) { $('#cfgJsonError').textContent = 'Invalid JSON: ' + err.message; return; }
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) { $('#cfgJsonError').textContent = 'It must be an object { … }.'; return; }
+  if (obj.agents && typeof obj.agents !== 'object') { $('#cfgJsonError').textContent = '"agents" must be an object.'; return; }
+  for (const k of Object.keys(cfg)) if (!BULKY.includes(k) && !(k in obj)) delete cfg[k]; // removed keys
   for (const [k, v] of Object.entries(obj)) if (!BULKY.includes(k)) cfg[k] = v;
   if (!cfg.agents?.shell) cfg.agents = { ...(cfg.agents || {}), shell: { label: 'Terminal', command: '', resumeArgs: '', color: '#8e8e93' } };
   await ab.saveConfig(cfg);
   $('#settings').close('cancel');
-  location.reload(); // vuelve a leer todo; las terminales se reanudan
+  location.reload(); // re-read everything; terminals resume
 };
 
 async function openSettings(section = 'general') {
@@ -1989,7 +1991,7 @@ async function openSettings(section = 'general') {
   for (const [k, a] of Object.entries(cfg.agents)) rows.appendChild(agentRow(k, a));
   const prow = $('#projectRows'); prow.innerHTML = '';
   cfg.projects.forEach((p) => prow.appendChild(projectRow(p)));
-  if (!cfg.projects.length) prow.innerHTML = '<span class="muted small">Sin proyectos todavía.</span>';
+  if (!cfg.projects.length) prow.innerHTML = '<span class="muted small">No projects yet.</span>';
   shortcutDefs = await ab.shortcutsList();
   draftKeys = { ...(cfg.shortcuts || {}) };
   renderKeyRows();
@@ -2052,12 +2054,25 @@ $('#settings').addEventListener('close', async () => {
   applyViewport();
 });
 
-// ---------- Arranque ----------
+// ---------- Startup ----------
+// Boards saved by Spanish-language versions (before 0.4) used Spanish values.
+const LEGACY_TASK_STATUS = { pendiente: 'pending', en_curso: 'running', revisar: 'review', hecho: 'done', bloqueado: 'blocked' };
+const LEGACY_MODE = { ligero: 'light', potente: 'heavy' };
+function migrateLegacy(c) {
+  for (const t of c.tasks || []) if (LEGACY_TASK_STATUS[t.status]) t.status = LEGACY_TASK_STATUS[t.status];
+  for (const f of c.flows || []) {
+    for (const n of f.nodes || []) if (n.config && LEGACY_MODE[n.config.mode]) n.config.mode = LEGACY_MODE[n.config.mode];
+    for (const e of f.edges || []) if (e.branch === 'si') e.branch = 'yes';
+    if (f.lastRun) f.lastRun.results = {};
+  }
+}
+
 (async function init() {
   const res = await ab.loadConfig();
-  // tasks.js y diagram.js se cargan después de este archivo
+  // tasks.js and diagram.js load after this file
   if (document.readyState === 'loading') await new Promise((r) => document.addEventListener('DOMContentLoaded', r, { once: true }));
   cfg = res.config;
+  migrateLegacy(cfg);
   platform = res.platform;
   document.body.classList.toggle('mac', isMac());
   $('#cfgPath').textContent = res.configPath;
@@ -2067,14 +2082,14 @@ $('#settings').addEventListener('close', async () => {
   renderAgentButtons();
   ab.checkAgents().then((r) => { agentAvailable = r; renderAgentButtons(); });
 
-  // Sin texto en el placeholder vacío de Windows
+  // Windows shortcuts in the empty-board hint
   if (!isMac()) $('#empty').innerHTML = $('#empty').innerHTML.replace(/⇧⌘/g, 'Ctrl+Shift+');
 
   applyAppearance();
   renderSpaces();
   document.title = cfg.activeSpace && cfg.activeSpace !== '*' ? `${spaceName(cfg.activeSpace)} — AgentBoard` : 'AgentBoard';
   document.body.classList.toggle('sidebar-open', !!cfg.sidebarOpen);
-  // los grupos primero: quedan detrás de las tarjetas
+  // groups first, so they sit behind the cards
   for (const c of [...cfg.cards].sort((a, b) => (b.type === 'group') - (a.type === 'group'))) {
     mountCard(c, { resume: true });
     if (!inSpace(c)) runtime.get(c.id).el.style.display = 'none';

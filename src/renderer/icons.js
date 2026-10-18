@@ -1,5 +1,5 @@
-// AgentBoard — íconos de línea (monocromos, mismo grosor), al estilo de SF Symbols.
-// Uso en HTML: <button data-icon="search">; en JS: icon('search').
+// AgentBoard — line icons (monochrome, same stroke), in the style of SF Symbols.
+// In HTML: <button data-icon="search">; in JS: icon('search').
 'use strict';
 
 const ICON_PATHS = {
@@ -55,7 +55,7 @@ function icon(name, size = 15) {
   return `<svg class="ic" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
 }
 
-// <button data-icon="search">Texto</button> → ícono + texto
+// <button data-icon="search">Text</button> → icon + text
 function hydrateIcons(root = document) {
   for (const el of root.querySelectorAll('[data-icon]:not([data-icon-done])')) {
     el.insertAdjacentHTML('afterbegin', icon(el.dataset.icon, +el.dataset.iconSize || 15));
@@ -63,9 +63,9 @@ function hydrateIcons(root = document) {
   }
 }
 
-// ---------- Ayuda contextual ----------
-// Tras 2 s con el cursor sobre un control que tiene `title`, muestra un recuadro que
-// explica qué hace. Reemplaza al tooltip nativo (que aparece antes y con otro estilo).
+// ---------- Contextual help ----------
+// After 2 s with the cursor over a control that has a `title`, show a box explaining
+// what it does. Replaces the native tooltip (which appears sooner and looks different).
 (function helpTips() {
   const DELAY = 2000;
   const tip = document.createElement('div');
@@ -73,7 +73,7 @@ function hydrateIcons(root = document) {
   tip.setAttribute('role', 'tooltip');
   let target = null, timer = null;
 
-  // mueve title → data-tip para que el sistema no muestre su propio tooltip
+  // move title → data-tip so the system does not show its own tooltip
   const textOf = (el) => {
     const t = el.getAttribute('title');
     if (t) { el.dataset.tip = t; el.removeAttribute('title'); }
@@ -91,7 +91,7 @@ function hydrateIcons(root = document) {
     const w = tip.offsetWidth, h = tip.offsetHeight;
     let x = r.left + r.width / 2 - w / 2;
     let y = r.bottom + 8;
-    if (y + h > innerHeight - 8) y = r.top - h - 8; // no cabe abajo: arriba
+    if (y + h > innerHeight - 8) y = r.top - h - 8; // no room below: show above
     x = Math.max(8, Math.min(x, innerWidth - w - 8));
     tip.style.left = `${Math.round(x)}px`;
     tip.style.top = `${Math.round(Math.max(8, y))}px`;

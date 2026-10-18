@@ -1,11 +1,11 @@
-// AgentBoard — vista de diagrama: paquetes por proyecto → grupos → agentes
-// (como un diagrama de componentes UML), con su tarea, estado, rama y última salida,
-// y flechas de quién le pasó trabajo a quién.
+// AgentBoard — diagram view: packages per project → groups → agents
+// (like a UML component diagram), with each agent's task, status, branch and last
+// output, and arrows showing who handed work to whom.
 'use strict';
 /* global cfg, $, esc, basename, runtime, cardData, agentOf, focusCardView, focusCard, terminalTail, gitCache,
-   projectOfPath, groupsList, STATUS_LABEL, openTasks, ab */
+   projectOfPath, groupsList, STATUS_LABEL, openTasks, ab, icon */
 
-const links = [];               // { from, to, kind, at } — envíos, tareas y agentes abiertos por otros
+const links = [];               // { from, to, kind, at } — messages, tasks and agents opened by others
 const LINK_TTL = 30 * 60_000;
 let dgProject = '*';
 let dgTimer = null;
@@ -19,9 +19,9 @@ function addLink(from, to, kind) {
 }
 
 ab.onBridgeEvent((ev) => {
-  if (ev.kind === 'send') addLink(ev.from, ev.to, 'le pidió');
-  else if (ev.kind === 'start') addLink(ev.from, ev.to, 'abrió');
-  else if (ev.kind === 'read') addLink(ev.from, ev.to, 'lee');
+  if (ev.kind === 'send') addLink(ev.from, ev.to, 'asked');
+  else if (ev.kind === 'start') addLink(ev.from, ev.to, 'opened');
+  else if (ev.kind === 'read') addLink(ev.from, ev.to, 'reads');
   if (diagramOpen()) renderDiagram();
 });
 
@@ -34,7 +34,7 @@ function since(ms) {
 
 function lastLine(c) {
   const lines = terminalTail(c, 14).split('\n').map((l) => l.replace(/[│╭╮╰╯─┃━]+/g, ' ').trim())
-    .filter((l) => l.length > 2 && !/^[>\s?]*$/.test(l) && !/^\[Tarea AgentBoard/.test(l));
+    .filter((l) => l.length > 2 && !/^[>\s?]*$/.test(l) && !/^\[(AgentBoard task|Tarea AgentBoard)/.test(l));
   const l = lines.pop() || '';
   return l.length > 110 ? l.slice(0, 108) + '…' : l;
 }
@@ -43,18 +43,18 @@ function nodeHtml(c) {
   const a = agentOf(c);
   const rt = runtime.get(c.id);
   const st = rt?.status || 'dead';
-  const task = (cfg.tasks || []).find((t) => t.cardId === c.id && t.status !== 'hecho')
+  const task = (cfg.tasks || []).find((t) => t.cardId === c.id && t.status !== 'done')
     || (cfg.tasks || []).find((t) => t.cardId === c.id);
   const g = gitCache[c.cwd];
   const busyFor = st === 'busy' && rt?.busySince ? ` · ${since(Date.now() - rt.busySince)}` : '';
   const attrs = [
-    task ? `<div class="dg-attr"><i>tarea</i> ${esc(task.text.length > 90 ? task.text.slice(0, 88) + '…' : task.text)}</div>` : '',
-    `<div class="dg-attr"><i>estado</i> <span class="st-${st}">${STATUS_LABEL[st] || st}${busyFor}</span>${task ? ` · ${esc(task.status.replace('_', ' '))}` : ''}</div>`,
-    g ? `<div class="dg-attr"><i>rama</i> ${esc(g.branch)}${g.changes ? ` <span class="dirty">${g.changes} cambio${g.changes === 1 ? '' : 's'}</span>` : ''}</div>` : '',
+    task ? `<div class="dg-attr"><i>task</i> ${esc(task.text.length > 90 ? task.text.slice(0, 88) + '…' : task.text)}</div>` : '',
+    `<div class="dg-attr"><i>status</i> <span class="st-${st}">${STATUS_LABEL[st] || st}${busyFor}</span>${task ? ` · ${esc(task.status)}` : ''}</div>`,
+    g ? `<div class="dg-attr"><i>branch</i> ${esc(g.branch)}${g.changes ? ` <span class="dirty">${g.changes} change${g.changes === 1 ? '' : 's'}</span>` : ''}</div>` : '',
     c.args ? `<div class="dg-attr"><i>args</i> <code>${esc(c.args)}</code></div>` : '',
   ].join('');
   const out = lastLine(c);
-  return `<button class="dg-node st-${st}" data-id="${esc(c.id)}" style="--agent:${esc(a.color)}" title="Clic: ir a la tarjeta">
+  return `<button class="dg-node st-${st}" data-id="${esc(c.id)}" style="--agent:${esc(a.color)}" title="Click to go to the card">
     <div class="dg-node-head"><span class="status ${st}"></span><span class="stereo">«${esc(a.label)}»</span></div>
     <div class="dg-node-name">${esc(c.title)}</div>
     <div class="dg-attrs">${attrs}</div>
@@ -68,39 +68,39 @@ function queueHtml(list, label) {
     const a = t.agent !== 'auto' ? cfg.agents[t.agent] : null;
     return `<li><span class="tdot st-${t.status}"></span>${esc(t.text.length > 70 ? t.text.slice(0, 68) + '…' : t.text)}${a ? ` <em>@${esc(a.label)}</em>` : ''}</li>`;
   }).join('');
-  return `<div class="dg-note"><div class="dg-note-title">${esc(label)} · ${list.length}</div><ul>${items}</ul>${list.length > 5 ? `<div class="muted small">+${list.length - 5} más</div>` : ''}</div>`;
+  return `<div class="dg-note"><div class="dg-note-title">${esc(label)} · ${list.length}</div><ul>${items}</ul>${list.length > 5 ? `<div class="muted small">+${list.length - 5} more</div>` : ''}</div>`;
 }
 
-let dgPressed = false; // no redibujar mientras se hace clic (se perdería el clic)
+let dgPressed = false; // do not redraw during a click (the click would be lost)
 
 function renderDiagram() {
   if (dgPressed) return;
   const box = $('#dgContent');
   const showIdle = $('#dgShowIdle').checked;
   const terms = cfg.cards.filter((c) => c.type === 'term');
-  const projects = new Map(); // ruta -> { name, groups: Map(groupId|'' -> cards) }
-  const projName = (p) => cfg.projects.find((x) => x.path === p)?.name || basename(p) || 'Carpeta personal';
+  const projects = new Map(); // path -> { name, cards }
+  const projName = (p) => cfg.projects.find((x) => x.path === p)?.name || basename(p) || 'Home folder';
   for (const p of cfg.projects) projects.set(p.path, { name: p.name, cards: [] });
   for (const c of terms) {
     const key = projectOfPath(c.cwd) || '';
     if (!projects.has(key)) projects.set(key, { name: projName(key), cards: [] });
     projects.get(key).cards.push(c);
   }
-  const pending = (cfg.tasks || []).filter((t) => t.status === 'pendiente');
+  const pending = (cfg.tasks || []).filter((t) => t.status === 'pending');
   for (const t of pending) {
     const key = projectOfPath(t.cwd) || '';
     if (!projects.has(key)) projects.set(key, { name: projName(key), cards: [] });
   }
 
-  // pestañas: un diagrama por proyecto o todos juntos
+  // tabs: one diagram per project, or all of them together
   const used = [...projects].filter(([k, p]) => p.cards.length || pending.some((t) => (projectOfPath(t.cwd) || '') === k));
   if (dgProject !== '*' && !used.some(([k]) => k === dgProject)) dgProject = '*';
-  $('#dgTabs').innerHTML = [['*', { name: 'Todos', cards: terms }], ...used].map(([k, p]) =>
-    `<button type="button" data-p="${esc(k)}" class="${k === dgProject ? 'active' : ''}">${esc(p.name)}<span class="n">${p.cards.length}</span></button>`).join('');
+  $('#dgTabs').innerHTML = [['*', { name: 'All', cards: terms }], ...used].map(([k, p]) =>
+    `<button type="button" data-p="${esc(k)}" class="${k === dgProject ? 'active' : ''}" title="${k === '*' ? 'Show every project' : 'Show only this project'}">${esc(p.name)}<span class="n">${p.cards.length}</span></button>`).join('');
 
   const shown = used.filter(([k]) => dgProject === '*' || k === dgProject);
   if (!shown.length) {
-    box.innerHTML = `<div class="dg-empty"><h2>Todavía no hay agentes.</h2><p>Abre agentes en el tablero o escribe tareas en <a href="#" data-open-tasks>Tareas</a>: aquí verás cada proyecto, sus grupos y qué está haciendo cada agente.</p></div>`;
+    box.innerHTML = `<div class="dg-empty"><h2>No agents yet.</h2><p>Open agents on the board or write tasks in <a href="#" data-open-tasks>Tasks</a>: this view shows each project, its groups and what each agent is doing.</p></div>`;
     $('#dgEdges').innerHTML = '';
     return;
   }
@@ -109,13 +109,13 @@ function renderDiagram() {
   box.innerHTML = shown.map(([key, p]) => {
     const byGroup = new Map();
     for (const c of p.cards) {
-      if (!showIdle && runtime.get(c.id)?.status !== 'busy' && !(cfg.tasks || []).some((t) => t.cardId === c.id && t.status !== 'hecho')) continue;
+      if (!showIdle && runtime.get(c.id)?.status !== 'busy' && !(cfg.tasks || []).some((t) => t.cardId === c.id && t.status !== 'done')) continue;
       const gid = c.groupId || '';
       if (!byGroup.has(gid)) byGroup.set(gid, []);
       byGroup.get(gid).push(c);
     }
     const projPending = pending.filter((t) => (projectOfPath(t.cwd) || '') === key);
-    // grupos con tareas en cola aunque aún no tengan agentes
+    // groups with queued tasks even if they have no agents yet
     for (const t of projPending) {
       const g = t.group && groups.find((x) => x.title.toLowerCase() === t.group.toLowerCase());
       if (g && !byGroup.has(g.id)) byGroup.set(g.id, []);
@@ -128,14 +128,14 @@ function renderDiagram() {
       const gPending = projPending.filter((t) => g ? t.group.toLowerCase() === g.title.toLowerCase() : !t.group || !groups.some((x) => x.title.toLowerCase() === t.group.toLowerCase()));
       const gBusy = cards.filter((c) => runtime.get(c.id)?.status === 'busy').length;
       return `<div class="dg-sub" style="--gcolor:${esc(g?.color || '#8f8577')}">
-        <div class="dg-sub-tab">«grupo» <b>${esc(g ? g.title : 'Sin grupo')}</b> <span class="muted">${cards.length} agente${cards.length === 1 ? '' : 's'}${gBusy ? ` · ${gBusy} trabajando` : ''}</span>
-          ${g ? `<button class="card-btn" data-task-group="${esc(g.title)}" title="Nueva tarea para este grupo: su agente se abrirá dentro del marco">${icon('plus', 12)} Tarea</button>` : ''}</div>
-        <div class="dg-nodes">${cards.map(nodeHtml).join('')}${queueHtml(gPending, 'Cola')}</div>
+        <div class="dg-sub-tab">«group» <b>${esc(g ? g.title : 'No group')}</b> <span class="muted">${cards.length} agent${cards.length === 1 ? '' : 's'}${gBusy ? ` · ${gBusy} working` : ''}</span>
+          ${g ? `<button class="card-btn" data-task-group="${esc(g.title)}" title="New task for this group: its agent opens inside the frame">${icon('plus', 12)} Task</button>` : ''}</div>
+        <div class="dg-nodes">${cards.map(nodeHtml).join('')}${queueHtml(gPending, 'Queue')}</div>
       </div>`;
     }).join('');
     return `<div class="dg-pkg">
-      <div class="dg-pkg-tab">«proyecto» <b>${esc(p.name)}</b> <span class="muted">${p.cards.length} agentes · ${busy} trabajando</span></div>
-      <div class="dg-pkg-body">${subs || '<div class="muted small">Sin agentes activos.</div>'}</div>
+      <div class="dg-pkg-tab">«project» <b>${esc(p.name)}</b> <span class="muted">${p.cards.length} agents · ${busy} working</span></div>
+      <div class="dg-pkg-body">${subs || '<div class="muted small">No active agents.</div>'}</div>
     </div>`;
   }).join('');
   drawEdges();
@@ -147,9 +147,9 @@ function drawEdges() {
   const base = canvas.getBoundingClientRect();
   const now = Date.now();
   for (let i = links.length - 1; i >= 0; i--) if (now - links[i].at > LINK_TTL) links.splice(i, 1);
-  // tareas que un agente creó para otro (add_task)
+  // tasks one agent created for another (add_task)
   const all = [...links];
-  for (const t of cfg.tasks || []) if (t.from && t.cardId) all.push({ from: t.from, to: t.cardId, kind: 'tarea' });
+  for (const t of cfg.tasks || []) if (t.from && t.cardId) all.push({ from: t.from, to: t.cardId, kind: 'task' });
   const pos = (id) => {
     const el = canvas.querySelector(`.dg-node[data-id="${CSS.escape(id)}"]`);
     if (!el) return null;
@@ -163,7 +163,7 @@ function drawEdges() {
     const a = pos(l.from), b = pos(l.to);
     if (!a || !b) continue;
     const ax = a.x + a.w / 2, ay = a.y + a.h / 2, bx = b.x + b.w / 2, by = b.y + b.h / 2;
-    // salir/entrar por el borde más cercano
+    // leave/enter through the nearest edge
     const horiz = Math.abs(bx - ax) > Math.abs(by - ay);
     const sx = horiz ? (bx > ax ? a.x + a.w : a.x) : ax, sy = horiz ? ay : (by > ay ? a.y + a.h : a.y);
     const ex = horiz ? (bx > ax ? b.x : b.x + b.w) : bx, ey = horiz ? by : (by > ay ? b.y : b.y + b.h);

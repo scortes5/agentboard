@@ -1,4 +1,4 @@
-// Puente seguro entre la UI y el proceso principal.
+// Safe bridge between the UI and the main process.
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('ab', {
@@ -23,7 +23,7 @@ contextBridge.exposeInMainWorld('ab', {
   catalogStatus: () => ipcRenderer.invoke('catalog:status'),
   ptyPaste: (id, text) => ipcRenderer.invoke('pty:paste', id, text),
 
-  // Skills, agentes y puente entre agentes
+  // Skills, agents and the bridge between agents
   skillsScan: () => ipcRenderer.invoke('skills:scan'),
   skillsCopy: (src, target) => ipcRenderer.invoke('skills:copy', src, target),
   skillsReveal: (p) => ipcRenderer.invoke('skills:reveal', p),
@@ -37,7 +37,7 @@ contextBridge.exposeInMainWorld('ab', {
   onBridgeAsk: (cb) => ipcRenderer.on('bridge:ask', (_e, req) => cb(req)),
   bridgeAnswer: (reqId, value) => ipcRenderer.send('bridge:answer', reqId, value),
 
-  // Tareas, worktrees y skills de ahorro
+  // Tasks, worktrees and token-saving skills
   planTasks: (text, opts) => ipcRenderer.invoke('tasks:plan', text, opts),
   gitWorktree: (cwd, slug) => ipcRenderer.invoke('git:worktree', cwd, slug),
   worktreeInfo: (dir, branch) => ipcRenderer.invoke('git:worktreeInfo', dir, branch),
@@ -60,7 +60,7 @@ contextBridge.exposeInMainWorld('ab', {
   onMenu: (cb) => ipcRenderer.on('menu', (_e, action) => cb(action)),
 
   // Portapapeles
-  // Electron 44 ya no expone `clipboard` en el preload: va por el proceso principal
+  // Electron 44 no longer exposes `clipboard` in the preload: go through the main process
   copy: (text) => ipcRenderer.send('clip:write', String(text ?? '')),
-  paste: () => ipcRenderer.invoke('clip:read'), // asíncrono: macOS puede preguntar "¿Permitir pegar?"
+  paste: () => ipcRenderer.invoke('clip:read'), // async: macOS may ask "Allow paste?"
 });
