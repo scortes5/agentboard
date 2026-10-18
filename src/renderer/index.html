@@ -42,6 +42,7 @@
     </div>
 
     <div class="group right">
+      <button id="usageBtn" title="Usage and savings: activity per day, tokens and effectiveness (⇧⌘U)">Usage</button>
       <button id="skillsBtn" title="Skills, your agents and the connection between agents">Skills and Agents</button>
       <button id="accountsBtn" title="Subscriptions, CLIs and local models">Subscriptions</button>
       <button id="settingsBtn" class="icon" data-icon="gear" title="Settings: appearance, shortcuts, agents and more (⌘,)"></button>
@@ -149,6 +150,14 @@
 
   <canvas id="minimap" class="glass" width="200" height="130" title="Click or drag to move around the board"></canvas>
   <div id="toasts"></div>
+  <div id="updateBanner" class="glass hidden" role="status">
+    <img src="icon.png" width="36" height="36" alt="" aria-hidden="true" draggable="false" />
+    <div class="ub-text"><b id="updateTitle"></b><span id="updateDetail" class="muted small"></span></div>
+    <div class="ub-actions">
+      <button id="updateLater" type="button" title="Hide this message; AgentBoard reminds you again later">Later</button>
+      <button id="updateGo" type="button" class="primary"></button>
+    </div>
+  </div>
 
   <!-- Settings (System Settings style) -->
   <dialog id="settings" class="settings-sheet">
@@ -174,6 +183,7 @@
           <div class="set-group">
             <label class="set-row check"><span>Resume each agent's session when the app opens</span><input name="resumeOnOpen" type="checkbox" class="switch-input" /></label>
             <label class="set-row check"><span>Keep running in the background when the window closes</span><input name="keepRunning" type="checkbox" class="switch-input" /></label>
+            <label class="set-row check" title="Look for a new AgentBoard release when the app opens and every few hours"><span>Check for updates automatically</span><input name="checkUpdates" type="checkbox" class="switch-input" /></label>
           </div>
           <p class="set-note">Your subscriptions stay signed in even if you quit the app: each CLI keeps its login on this computer. Quitting stops the processes; they resume when you open the app again.</p>
         </section>
@@ -287,6 +297,18 @@
   </dialog>
 
   <!-- Skills and agents -->
+  <dialog id="usage" class="wide">
+    <form method="dialog">
+      <span class="eyebrow">Your activity with agents, on this computer</span>
+      <h2>Usage and Savings</h2>
+      <div id="usageBody"></div>
+      <div class="actions">
+        <button type="button" id="usageRefresh" class="ghost" data-icon="refresh" title="Read the logs again">Refresh</button>
+        <button value="ok" class="primary">Done</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog id="skills" class="wide">
     <form method="dialog" id="skillsForm">
       <span class="eyebrow">Everything your agents know</span>
@@ -374,5 +396,6 @@
   <script src="diagram.js"></script>
   <script src="palette.js"></script>
   <script src="flows.js"></script>
+  <script src="usage.js"></script>
 </body>
 </html>

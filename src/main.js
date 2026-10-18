@@ -9,7 +9,9 @@ const { execFile, spawn } = require('child_process');
 const http = require('http');
 const pty = require('node-pty');
 const skills = require('./skills');
+const usage = require('./usage');
 const { createBridge } = require('./bridge');
+const { createUpdater } = require('./updates');
 
 const IS_WIN = process.platform === 'win32';
 // If AgentBoard was launched from inside a Claude Code session (e.g. `npm start` in its
@@ -63,6 +65,7 @@ function defaultConfig() {
     perAgentParallel: 2,     // tasks running at once per subscription
     taskWorktrees: false,    // each task in its own git worktree, so agents don't step on each other
     quickKey: 'Control+Alt+Space', // global shortcut: add a task from any app
+    checkUpdates: true,      // look for a new release on start and every few hours
     tasks: [],               // to-do list: [{ id, text, status, agent, cwd, group, light, cardId, ... }]
     agents: DEFAULT_AGENTS,
     projects: [],            // [{ path, name }]
@@ -341,6 +344,10 @@ ipcMain.handle('clip:read', () => clipboard.readText());
 const projectsOf = () => loadConfig().projects || [];
 const wrap = (fn) => async (...args) => { try { return { ok: true, value: await fn(...args) }; } catch (err) { return { ok: false, error: err.message }; } };
 
+ipcMain.handle('usage:scan', wrap((_e, tasks) => usage.scanUsage({
+  tasks, historyFile: path.join(app.getPath('userData'), 'task-history.json'),
+  claudeDirs: [skills.claudeDir(), ...claudeAccountDirs()], codexDir: skills.codexDir(),
+})));
 ipcMain.handle('skills:scan', () => skills.scanSkills(projectsOf()));
 ipcMain.handle('skills:copy', wrap((_e, src, target) => skills.copySkill(src, target, projectsOf())));
 ipcMain.handle('agents:list', () => skills.listAgents(projectsOf()));
@@ -640,10 +647,10 @@ function startBridge() {
     loadConfig,
     notify: (ev) => send('bridge:event', ev),
     askRenderer,
-    requestNewCard: ({ agent, cwd, title }) => new Promise((resolve) => {
+    requestNewCard: ({ agent, cwd, title, light, from }) => new Promise((resolve) => {
       const reqId = Math.random().toString(36).slice(2);
       pendingCards.set(reqId, resolve);
-      send('bridge:new-card', { reqId, agent, cwd, title });
+      send('bridge:new-card', { reqId, agent, cwd, title, light, from });
       setTimeout(() => { if (pendingCards.delete(reqId)) resolve(null); }, 5000);
     }),
   });
@@ -663,6 +670,7 @@ const SHORTCUTS = [
   { id: 'tasks', label: 'Tasks', key: 'CmdOrCtrl+Shift+T', section: 'Panels' },
   { id: 'diagram', label: 'Diagram', key: 'CmdOrCtrl+Shift+D', section: 'Panels' },
   { id: 'flows', label: 'Automations', key: 'CmdOrCtrl+Shift+F', section: 'Panels' },
+  { id: 'usage', label: 'Usage and Savings', key: 'CmdOrCtrl+Shift+U', section: 'Panels' },
   { id: 'palette', label: 'Search or Run…', key: 'CmdOrCtrl+Shift+P', section: 'Panels' },
   { id: 'sidebar', label: 'Agent List', key: 'CmdOrCtrl+Shift+A', section: 'Panels' },
   { id: 'space:next', label: 'Next Project', key: 'CmdOrCtrl+Alt+Right', section: 'Projects' },
@@ -687,19 +695,26 @@ function buildMenu() {
     return { label: sc.label, ...(key ? { accelerator: key } : {}), click: cmd(id) };
   };
   const sep = { type: 'separator' };
+  const checkUpdates = { label: 'Check for Updates…', click: () => updater?.check(true) };
   const template = [
-    ...(IS_MAC ? [{ role: 'appMenu' }] : []),
+    ...(IS_MAC ? [{
+      label: app.name,
+      submenu: [
+        { role: 'about' }, checkUpdates, sep, { role: 'services' }, sep,
+        { role: 'hide' }, { role: 'hideOthers' }, { role: 'unhide' }, sep, { role: 'quit' },
+      ],
+    }] : []),
     {
       label: 'Board',
       submenu: [
         item('new:claude'), item('new:codex'), item('new:gemini'), item('new:shell'), item('new:note'), item('new:group'), sep,
-        item('tasks'), item('diagram'), item('flows'), item('palette'), sep,
+        item('tasks'), item('diagram'), item('flows'), item('usage'), item('palette'), sep,
         item('sidebar'),
         { label: 'Skills and Agents…', click: cmd('skills') },
         { label: 'Subscriptions and Accounts…', click: cmd('accounts') }, sep,
         item('arrange'), item('fit'), item('zoom:in'), item('zoom:out'), sep,
         item('shortcuts'), item('settings'),
-        ...(IS_MAC ? [] : [sep, { role: 'quit', label: 'Quit' }]),
+        ...(IS_MAC ? [] : [sep, checkUpdates, { role: 'quit', label: 'Quit' }]),
       ],
     },
     { label: 'Projects', submenu: [item('space:next'), item('space:prev'), item('space:all')] },
@@ -720,6 +735,11 @@ function buildMenu() {
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
+
+// ---------- Updates ----------
+let updater = null;
+ipcMain.on('update:download', (_e, url) => updater?.download(url));
+ipcMain.on('update:install', () => updater?.install());
 
 // The window theme (traffic lights, menus, dialogs) follows the app's theme.
 const { nativeTheme } = require('electron');
@@ -828,6 +848,12 @@ if (!app.requestSingleInstanceLock()) {
     createWindow();
     createTray();
     registerQuickKey();
+    updater = createUpdater({
+      send, loadConfig,
+      // Restarting to install stops the agents: ask first, like ⌘Q
+      onBeforeInstall: () => { if (!confirmQuit()) return false; quitting = true; return true; },
+    });
+    updater.start();
     app.on('activate', showWindow);
   });
 }

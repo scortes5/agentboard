@@ -150,6 +150,7 @@ function drawEdges() {
   // tasks one agent created for another (add_task)
   const all = [...links];
   for (const t of cfg.tasks || []) if (t.from && t.cardId) all.push({ from: t.from, to: t.cardId, kind: 'task' });
+  for (const c of cfg.cards) if (c.parent && !all.some((l) => l.from === c.parent && l.to === c.id)) all.push({ from: c.parent, to: c.id, kind: 'subagent' });
   const pos = (id) => {
     const el = canvas.querySelector(`.dg-node[data-id="${CSS.escape(id)}"]`);
     if (!el) return null;

@@ -85,6 +85,10 @@ You need:
 
 From then on you open it like any app: Launchpad, Spotlight (⌘ + Space → *AgentBoard*) or the Start menu. You can keep it in the Dock.
 
+**New versions.** You don't need to come back to this page. When there is a new version, AgentBoard shows a notice in the top-right corner:
+- **Windows**: it has already downloaded it; click **Restart to Update**.
+- **Mac**: click **Download**, open the file and drag AgentBoard to *Applications* again (choose *Replace*). Your board, projects and settings stay as they were.
+
 ---
 
 ## 5. Install your first agent

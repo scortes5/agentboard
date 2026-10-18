@@ -1,5 +1,6 @@
-# Builds the installers (Mac .dmg and Windows .exe).
-# Runs when a v* tag is pushed (e.g. git tag v0.4.0 && git push --tags) or by hand from Actions.
+# Builds the installers on GitHub (Mac .dmg and Windows .exe).
+# Runs when a v* tag is pushed (e.g. git tag v0.1.0 && git push --tags) or by hand from Actions.
+# latest.yml and the .blockmap go with the .exe: the Windows app reads them to update itself.
 name: build
 
 on:
@@ -37,6 +38,8 @@ jobs:
           path: |
             dist/*.dmg
             dist/*.exe
+            dist/*.blockmap
+            dist/latest.yml
       - name: Attach to the tag's Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v3
@@ -45,3 +48,5 @@ jobs:
           files: |
             dist/*.dmg
             dist/*.exe
+            dist/*.exe.blockmap
+            dist/latest.yml

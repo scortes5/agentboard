@@ -201,6 +201,7 @@ function newCard(type, agentKey, opts = {}) {
   if (type === 'group') c.color = opts.color || GROUP_COLORS[cfg.cards.filter((x) => x.type === 'group').length % GROUP_COLORS.length];
   if (type === 'term' && isClaude(cfg.agents[c.agent])) c.sessionId = newSessionId();
   if (opts.prompt) c.prompt = opts.prompt;
+  if (opts.parent) c.parent = opts.parent;
   if (opts.taskId) c.taskId = opts.taskId;
   cfg.cards.push(c);
   mountCard(c, { resume: false });
@@ -883,6 +884,7 @@ function editMenu(c, anchor) {
       <label>Project <select name="cwd"><option value="" ${c.cwd ? '' : 'selected'}>Home folder (~)</option>${projects.map((p) =>
         `<option value="${esc(p.path)}" ${p.path === c.cwd ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></label>
       <label>Extra arguments <input name="args" value="${esc(c.args || '')}" placeholder="e.g. --model opus" /></label>
+      ${agentOf(c).lightArgs ? `<label class="switch" title="Adds ${esc(agentOf(c).lightArgs)} to the arguments"><input type="checkbox" name="light" ${c.args && c.args.includes(agentOf(c).lightArgs) ? 'checked' : ''} /> Saving mode (cheaper model)</label>` : ''}
       ${agentOf(c).command ? `<label class="switch"><input type="checkbox" name="bridge" ${c.bridge !== false ? 'checked' : ''} /> Other agents can message it</label>` : ''}
       <div class="hint"></div>` : ''}
     <div class="row">
@@ -902,7 +904,14 @@ function editMenu(c, anchor) {
     const cmd = commandFor({ ...c, ...d, startCmd: changed(d) ? '' : c.startCmd }, false) || '(shell only)';
     $('.hint', pop).innerHTML = `Command: <code>${esc(cmd)}</code>${changed(d) ? '<br/>Applying restarts the agent.' : ''}`;
   };
-  pop.addEventListener('input', (e) => { if (e.target.name !== 'bridge') updateHint(); });
+  pop.addEventListener('input', (e) => {
+    if (e.target.name === 'light') {
+      const la = (cfg.agents[field('agent').value] || {}).lightArgs || '';
+      const rest = field('args').value.replace(la, '').trim();
+      field('args').value = e.target.checked ? [la, rest].filter(Boolean).join(' ') : rest;
+    }
+    if (e.target.name !== 'bridge') updateHint();
+  });
   updateHint();
 
   const apply = () => {
@@ -1348,6 +1357,19 @@ function toast(html, ms = 3200) {
   setTimeout(() => t.remove(), ms);
 }
 
+// A new release: on Windows it is already downloaded (restart installs it);
+// on macOS the button opens the .dmg for this Mac in the browser.
+ab.onUpdate((u) => {
+  $('#updateTitle').textContent = `AgentBoard ${u.version} is available`;
+  $('#updateDetail').textContent = u.detail;
+  const go = $('#updateGo');
+  go.textContent = u.ready ? 'Restart to Update' : 'Download';
+  go.title = u.ready ? 'Quit AgentBoard, install the update and open it again' : 'Open the installer for this computer in your browser';
+  go.onclick = () => { $('#updateBanner').classList.add('hidden'); u.ready ? ab.updateInstall() : ab.updateDownload(u.url); };
+  $('#updateBanner').classList.remove('hidden');
+});
+$('#updateLater').onclick = () => $('#updateBanner').classList.add('hidden');
+
 function ping(id) {
   const el = runtime.get(id)?.el;
   if (!el) return;
@@ -1429,8 +1451,9 @@ ab.onBridgeEvent((ev) => {
   else if (ev.kind === 'start') { toast(`${esc(from)} opened <b>${esc(to)}</b>`); }
 });
 
-ab.onBridgeNewCard(async ({ reqId, agent, cwd, title }) => {
-  const c = cfg.agents[agent] ? newCard('term', agent, { cwd, ...(title ? { title } : {}) }) : null;
+ab.onBridgeNewCard(async ({ reqId, agent, cwd, title, light, from }) => {
+  // light: subagent on the cheap model; parent: who asked for it (drawn as a link in the diagram)
+  const c = cfg.agents[agent] ? newCard('term', agent, { cwd, ...(title ? { title } : {}), args: light ? (cfg.agents[agent].lightArgs || '') : '', parent: from }) : null;
   if (c) await saveNow(); // the bridge reads the saved board
   ab.bridgeCardCreated(reqId, c ? c.id : null);
 });
@@ -1771,6 +1794,7 @@ ab.onMenu((action) => {
   else if (action === 'sidebar') toggleSidebar();
   else if (action === 'accounts') openAccounts();
   else if (action === 'skills') openSkills();
+  else if (action === 'usage') openUsage();
   else if (action === 'tasks') toggleTasks();
   else if (action === 'diagram') toggleDiagram();
   else if (action === 'palette') openPalette();
@@ -1982,6 +2006,7 @@ async function openSettings(section = 'general') {
   f.fontSize.value = cfg.fontSize;
   f.resumeOnOpen.checked = cfg.resumeOnOpen;
   f.keepRunning.checked = cfg.keepRunning !== false;
+  f.checkUpdates.checked = cfg.checkUpdates !== false;
   f.quickKey.value = cfg.quickKey ?? 'Control+Alt+Space';
   f.taskAuto.checked = !!cfg.taskAuto;
   f.maxParallel.value = cfg.maxParallel || 3;
@@ -2017,6 +2042,7 @@ $('#settings').addEventListener('close', async () => {
   cfg.fontSize = clamp(+f.fontSize.value || 13, 9, 24);
   cfg.resumeOnOpen = f.resumeOnOpen.checked;
   cfg.keepRunning = f.keepRunning.checked;
+  cfg.checkUpdates = f.checkUpdates.checked;
   cfg.quickKey = f.quickKey.value.trim();
   cfg.taskAuto = f.taskAuto.checked;
   cfg.maxParallel = clamp(+f.maxParallel.value || 3, 1, 12);

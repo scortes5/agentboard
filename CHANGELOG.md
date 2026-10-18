@@ -8,6 +8,22 @@ All notable changes to AgentBoard. The format follows [Keep a Changelog](https:/
 - Repository setup: CI workflow, Dependabot for npm and GitHub Actions, issue and pull request templates, contributing guide, code of conduct, security policy and a [wiki](https://github.com/scortes5/agentboard/wiki) published from `wiki/`.
 - Release notes are generated automatically on tagged builds.
 
+## [0.6.0] - 2026-10-17
+
+### Added
+- **Updates**: AgentBoard checks for a new release when it opens and every six hours. On Windows it downloads the update in the background and installs it on restart (**Restart to Update**). On Mac it shows a notice with a **Download** button that opens the `.dmg` for your Mac; silent installs need an Apple Developer ID signature, which the app does not have yet.
+- **Check for Updates…** in the app menu (Mac) or the Board menu (Windows), and **Settings → General → Check for updates automatically** (on by default).
+
+### Changed
+- The Windows installer is now named `AgentBoard-Setup-x.y.z.exe`, and each release also includes `latest.yml` and a `.blockmap` for updates.
+
+## [0.5.0] - 2026-10-17
+
+### Added
+- **Usage and Savings** panel (⇧⌘U): a GitHub-style heatmap of daily activity (tokens, sessions or tasks done), totals, cache savings and hit rate, task success rate, median time and tokens per task, and usage by subscription and project. It reads the Claude Code and Codex logs on this computer (all Claude accounts included); nothing leaves it.
+- **Light subagents**: `start_agent` accepts `light: true` to open the agent with its cheap model, and the diagram draws which agent opened which.
+- A **Saving mode** switch in each card's options menu.
+
 ## [0.4.0] - 2026-10-17
 
 ### Added
@@ -96,7 +112,9 @@ Includes the 0.2.0 changes, which were not released separately.
 ### Added
 - First release: a board of terminals for CLI agents on Mac and Windows.
 
-[Unreleased]: https://github.com/scortes5/agentboard/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/scortes5/agentboard/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/scortes5/agentboard/compare/v0.5.0...v0.6.0
+[0.5.0]: https://github.com/scortes5/agentboard/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/scortes5/agentboard/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/scortes5/agentboard/compare/v0.1.2...v0.3.0
 [0.2.0]: https://github.com/scortes5/agentboard/compare/v0.1.2...v0.3.0

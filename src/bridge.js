@@ -45,7 +45,7 @@ function parentPid(pid) {
 /**
  * deps: {
  *   dataDir, ptys: Map<id, IPty>, loadConfig(), notify(event),
- *   requestNewCard({ agent, cwd, title }) -> Promise<id|null>
+ *   requestNewCard({ agent, cwd, title, light, from }) -> Promise<id|null>
  *   askRenderer(kind, payload) -> Promise<any>   (tasks: the UI stores them)
  * }
  */
@@ -145,7 +145,7 @@ function createBridge(deps) {
       if (message.length > 20000) throw new Error('Message too long (max 20,000 characters).');
       if (target.id === ctx.from) throw new Error('You cannot send messages to yourself.');
       if (!canReceive(cfg, target)) throw new Error(`"${target.title}" does not accept messages (it is a terminal, it is closed, or the user disabled it).`);
-      if (!rateOk(ctx.from || 'desconocido')) throw new Error('Demasiados mensajes seguidos; espera un minuto.');
+      if (!rateOk(ctx.from || 'unknown')) throw new Error('Too many messages in a row; wait a minute.');
       const from = cfg.cards.find((c) => c.id === ctx.from);
       const header = `[Message from ${from ? from.title : 'another agent'} via AgentBoard]\n`;
       paste(target.id, header + message);
@@ -173,8 +173,8 @@ function createBridge(deps) {
         if (!p) throw new Error(`Unknown project. Options: ${cfg.projects.map((x) => x.name).join(', ')}`);
         cwd = p.path;
       }
-      if (!rateOk(ctx.from || 'desconocido')) throw new Error('Demasiadas acciones seguidas; espera un minuto.');
-      const id = await deps.requestNewCard({ agent: key, cwd, title: args.title ? String(args.title).slice(0, 60) : null });
+      if (!rateOk(ctx.from || 'unknown')) throw new Error('Too many actions in a row; wait a minute.');
+      const id = await deps.requestNewCard({ agent: key, cwd, title: args.title ? String(args.title).slice(0, 60) : null, light: !!args.light, from: ctx.from || null });
       if (!id) throw new Error('Could not open the agent.');
       deps.notify({ kind: 'start', from: ctx.from, to: id });
       if (args.message) {
@@ -185,7 +185,7 @@ function createBridge(deps) {
         const from = cfg.cards.find((c) => c.id === ctx.from);
         paste(id, `[Task from ${from ? from.title : 'another agent'} via AgentBoard]\n${String(args.message).slice(0, 20000)}`);
       }
-      return `Opened a ${cfg.agents[key].label} agent (id ${id}).${args.message ? ' Sent it the task.' : ''} Use read_agent_output with that id to follow its progress.`;
+      return `Opened a ${cfg.agents[key].label} agent${args.light ? ' in saving mode' : ''} (id ${id}).${args.message ? ' Sent it the task.' : ''} Use read_agent_output with that id to follow its progress.`;
     },
 
     // ---- The user's task list ----
@@ -204,7 +204,7 @@ function createBridge(deps) {
       const text = String(args.text || '').trim();
       if (!text) throw new Error('The task is empty.');
       if (text.length > 8000) throw new Error('Task too long (max 8,000 characters).');
-      if (!rateOk(ctx.from || 'desconocido')) throw new Error('Demasiadas acciones seguidas; espera un minuto.');
+      if (!rateOk(ctx.from || 'unknown')) throw new Error('Too many actions in a row; wait a minute.');
       const r = await deps.askRenderer('task-add', {
         text, agent: args.agent ? String(args.agent) : 'auto', project: args.project ? String(args.project) : '',
         group: args.group ? String(args.group).slice(0, 40) : '', light: !!args.light, from: ctx.from,
