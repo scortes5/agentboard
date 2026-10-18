@@ -1,0 +1,1 @@
+[AgentBoard](https://github.com/scortes5/agentboard) · MIT License · Found a mistake? [Edit the source](https://github.com/scortes5/agentboard/tree/main/wiki) · If AgentBoard helps you, [give it a ⭐](https://github.com/scortes5/agentboard)

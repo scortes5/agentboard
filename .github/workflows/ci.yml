@@ -1,0 +1,41 @@
+# Fast checks on every push and pull request: install from the lockfile
+# and make sure every JavaScript file parses.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # Native modules (node-pty) are built by the release workflow; skip them here.
+      - run: npm ci --ignore-scripts
+      - name: Syntax check
+        run: |
+          git ls-files '*.js' | while read -r f; do
+            node --check "$f" || exit 1
+          done
+      - name: Validate JSON
+        run: |
+          for f in package.json; do node -e "JSON.parse(require('fs').readFileSync('$f','utf8'))"; done
+      - name: Skills have front matter
+        run: |
+          for f in skills-pack/*/SKILL.md; do
+            head -1 "$f" | grep -qx -- '---' || { echo "::error file=$f::missing YAML front matter"; exit 1; }
+          done
