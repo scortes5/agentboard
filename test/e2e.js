@@ -200,9 +200,13 @@ function mcpSession(dataDir, requests) {
     const links = await until(async () => (await win.evaluate(() => ab.remoteStatus())).running && win.evaluate(() => $('#remoteLinks').textContent), 10000);
     assert.ok(links, 'the remote server starts from Settings');
     const token = await win.evaluate(() => cfg.remote.token);
-    // HTTPS with the certificate made on this computer (a phone accepts it once)
+    // HTTPS trusting only the certificate made on this computer, checked by its fingerprint (as on a phone)
+    const tls = JSON.parse(fs.readFileSync(path.join(data, 'remote-tls.json'), 'utf8'));
+    const fingerprint = new (require('crypto').X509Certificate)(tls.cert).fingerprint256;
+    assert.ok(links.includes(fingerprint), 'Settings shows the fingerprint of the certificate the remote uses');
     const phone = (p, body, auth = token) => new Promise((resolve, reject) => {
-      const req = require('https').request({ host: '127.0.0.1', port, path: `/api/${p}`, method: body ? 'POST' : 'GET', rejectUnauthorized: false,
+      const req = require('https').request({ host: '127.0.0.1', port, path: `/api/${p}`, method: body ? 'POST' : 'GET', ca: tls.cert,
+        checkServerIdentity: (_host, cert) => (cert.fingerprint256 === fingerprint ? undefined : new Error('Unexpected certificate')),
         headers: { Authorization: `Bearer ${auth}`, 'Content-Type': 'application/json' } }, (res) => {
         let data = '';
         res.on('data', (d) => { data += d; });

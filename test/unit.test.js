@@ -48,11 +48,15 @@ test('the webhook payload carries the text for Slack/Teams (text) and Discord (c
   assert.equal(WebhookNotifier.payload('hi').content, 'hi');
 });
 
-// HTTPS requests to the remote with a self-signed certificate (the phone accepts it once).
-function call(port, p, { auth, body } = {}) {
+// HTTPS requests to the remote, trusting only its own certificate: like the phone, which
+// accepts it once after checking its fingerprint.
+function pinned(id) {
+  return { ca: id.cert, checkServerIdentity: (_host, cert) => (cert.fingerprint256 === id.fingerprint ? undefined : new Error('Unexpected certificate')) };
+}
+function request(port, p, { auth, body, id } = {}) {
   const https = require('https');
   return new Promise((resolve, reject) => {
-    const req = https.request({ host: '127.0.0.1', port, path: p, method: body ? 'POST' : 'GET', rejectUnauthorized: false,
+    const req = https.request({ host: '127.0.0.1', port, path: p, method: body ? 'POST' : 'GET', ...pinned(id),
       headers: { Authorization: `Bearer ${auth}`, 'Content-Type': 'application/json' } }, (res) => {
       let data = '';
       res.on('data', (d) => { data += d; });
@@ -82,18 +86,20 @@ test('the remote serves HTTPS, needs the token, shows the snapshot and forwards 
   const st = await remote.apply();
   try {
     const port = remote.server.address().port;
+    const id = await remote.tls.get();
+    const call = (p, opts = {}) => request(port, p, { ...opts, id });
     assert.match(st.fingerprint, /^([0-9A-F]{2}:){31}[0-9A-F]{2}$/);
     assert.ok(st.expiresAt > Date.now() + 7 * 3600_000, 'it turns off by itself after the hours set');
-    assert.equal((await call(port, '/')).status, 200);
-    assert.equal((await call(port, '/api/state', { auth: 'b'.repeat(48) })).status, 401);
+    assert.equal((await call('/')).status, 200);
+    assert.equal((await call('/api/state', { auth: 'b'.repeat(48) })).status, 401);
     remote.snapshot = { tasks: [{ id: 't1', text: 'Fix it' }], approvals: [{ card: 'c1', question: 'Run?' }, { card: 'c2', question: 'rm -rf?', danger: true }], counts: {} };
-    assert.deepEqual((await call(port, '/api/state', { auth: token })).json().tasks, [{ id: 't1', text: 'Fix it' }]);
-    assert.equal((await call(port, '/api/task', { auth: token, body: { text: 'From the phone' } })).status, 202);
-    assert.equal((await call(port, '/api/task', { auth: token, body: { text: '  ' } })).status, 400);
-    assert.equal((await call(port, '/api/approve', { auth: token, body: { card: 'gone', yes: true } })).status, 404);
-    assert.equal((await call(port, '/api/approve', { auth: token, body: { card: 'c2', yes: true } })).status, 403, 'dangerous requests are approved at the computer');
-    assert.equal((await call(port, '/api/approve', { auth: token, body: { card: 'c2', yes: false } })).status, 202, 'but can be rejected from the phone');
-    assert.equal((await call(port, '/api/approve', { auth: token, body: { card: 'c1', yes: true } })).status, 202);
+    assert.deepEqual((await call('/api/state', { auth: token })).json().tasks, [{ id: 't1', text: 'Fix it' }]);
+    assert.equal((await call('/api/task', { auth: token, body: { text: 'From the phone' } })).status, 202);
+    assert.equal((await call('/api/task', { auth: token, body: { text: '  ' } })).status, 400);
+    assert.equal((await call('/api/approve', { auth: token, body: { card: 'gone', yes: true } })).status, 404);
+    assert.equal((await call('/api/approve', { auth: token, body: { card: 'c2', yes: true } })).status, 403, 'dangerous requests are approved at the computer');
+    assert.equal((await call('/api/approve', { auth: token, body: { card: 'c2', yes: false } })).status, 202, 'but can be rejected from the phone');
+    assert.equal((await call('/api/approve', { auth: token, body: { card: 'c1', yes: true } })).status, 202);
     assert.deepEqual(sent.filter(([ch]) => ch === 'remote:action').map(([, a]) => a), [
       { kind: 'task', text: 'From the phone' }, { kind: 'approve', card: 'c2', yes: false }, { kind: 'approve', card: 'c1', yes: true }]);
     assert.equal(sent.filter(([ch]) => ch === 'remote:device').length, 1, 'a new device is announced once');
@@ -112,8 +118,10 @@ test('the remote blocks an address after too many wrong tokens', async () => {
   await remote.apply();
   try {
     const port = remote.server.address().port;
-    for (let i = 0; i < 3; i++) assert.equal((await call(port, '/api/state', { auth: `wrong${i}` })).status, 401);
-    assert.equal((await call(port, '/api/state', { auth: token })).status, 429, 'even the right token waits once blocked');
+    const id = await remote.tls.get();
+    const call = (p, opts = {}) => request(port, p, { ...opts, id });
+    for (let i = 0; i < 3; i++) assert.equal((await call('/api/state', { auth: `wrong${i}` })).status, 401);
+    assert.equal((await call('/api/state', { auth: token })).status, 429, 'even the right token waits once blocked');
     assert.ok(events.some(([k]) => k === 'remote-blocked'));
   } finally {
     await remote.stop();
