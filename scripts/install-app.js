@@ -2,9 +2,10 @@
 // Installs AgentBoard as a desktop app, with its icon, so it opens with one click.
 //   Mac:     builds AgentBoard.app and copies it to /Applications (or ~/Applications).
 //   Windows: builds the installer (.exe) and opens it; it adds desktop and Start menu shortcuts.
-// Uso: npm run app
+//   Linux:   builds the .AppImage in dist/.
+// Usage: npm run app
 'use strict';
-const { execFileSync, execSync } = require('child_process');
+const { execFileSync, execSync, spawn } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -31,10 +32,14 @@ if (process.platform === 'darwin') {
   if (!process.argv.includes('--no-open')) execFileSync('open', [dest]);
 } else if (process.platform === 'win32') {
   run('npx electron-builder --win nsis --x64 --publish never');
-  const exe = fs.readdirSync(path.join(ROOT, 'dist')).find((f) => /^AgentBoard Setup .*\.exe$/.test(f));
+  // AgentBoard-Setup-x.y.z.exe (AgentBoard Setup x.y.z.exe before 0.6)
+  const exe = fs.readdirSync(path.join(ROOT, 'dist')).find((f) => /^AgentBoard[- ]Setup[- ][\d.]+\.exe$/.test(f));
   if (!exe) { console.error('Installer not found in dist/'); process.exit(1); }
   console.log(`\n✓ Installer ready: dist\\${exe}. Opening it…`);
-  execFileSync('cmd.exe', ['/c', 'start', '""', path.join(ROOT, 'dist', exe)]);
+  // started directly, not through cmd.exe, so the file name is never parsed as a command
+  spawn(path.join(ROOT, 'dist', exe), [], { detached: true, stdio: 'ignore' }).unref();
 } else {
   run('npx electron-builder --linux AppImage --publish never');
+  const image = fs.readdirSync(path.join(ROOT, 'dist')).find((f) => f.endsWith('.AppImage'));
+  console.log(`\n✓ Built dist/${image}. Run it with: ./dist/${image}`);
 }

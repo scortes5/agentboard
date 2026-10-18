@@ -119,6 +119,7 @@ function mcpSession(dataDir, requests) {
     assert.match(done.summary, /fixed the check · checks passed/);
     assert.ok(done.checkpoint, 'a checkpoint was taken');
     step('failed checks go back to the agent, then pass');
+    assert.equal(await win.evaluate(() => approvalsInbox.pending().length), 0, 'an answered request does not come back while still on screen');
     const ext = await win.evaluate(() => ({ step: window.__stepSaw, watched: window.__watched }));
     assert.ok(ext.step?.includes('done') && ext.watched, `extensions not called: ${JSON.stringify(ext)}`);
     step('a new pipeline step and a new watcher plug in without changing the queue or the status loop');
@@ -204,6 +205,18 @@ function mcpSession(dataDir, requests) {
     assert.match(await win.evaluate(() => groundRules.forTask({ assigned: 'fake' })), /Commit as me/);
     assert.equal(await win.evaluate(() => groundRules.forTask({ assigned: 'claude' })), '');
     step('ground rules: written once, read by every agent');
+
+    // Secrets: saved encrypted from Settings, or refused when there is no keychain (headless Linux).
+    await win.evaluate(() => openSettings('secrets'));
+    await win.evaluate(() => { $('#secretName').value = 'app_password'; $('#secretValue').value = 'hunter2-very-secret'; $('#secretAdd').click(); });
+    const vaultResult = await until(() => win.evaluate(() => $('#secretError').textContent || ($('#secretRows').textContent.includes('APP_PASSWORD') && 'saved')), 5000);
+    assert.ok(vaultResult === 'saved' || /keychain/.test(vaultResult), vaultResult);
+    const secretsFile = path.join(data, 'secrets.json');
+    if (fs.existsSync(secretsFile)) assert.doesNotMatch(fs.readFileSync(secretsFile, 'utf8'), /hunter2/);
+    await win.evaluate(() => $('#settings').close());
+    const ran = await win.evaluate(() => ab.flowExec('echo "[$APP_PASSWORD]"', null, ['APP_PASSWORD']));
+    assert.ok(ran.ok && !ran.value.out.includes('hunter2'), JSON.stringify(ran));
+    step(`secrets: ${vaultResult === 'saved' ? 'saved encrypted and hidden in command output' : 'refused without a keychain, never stored as plain text'}`);
 
     // Daily summary time and GitHub issues (no gh remote here: the popover explains why).
     assert.deepEqual(await win.evaluate(() => [DailySummary.minutes('07:30'), DailySummary.minutes('')]), [450, 1080]);

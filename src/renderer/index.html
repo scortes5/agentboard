@@ -188,6 +188,7 @@
         <button type="button" data-sec="keys" data-icon="keyboard" title="View and change keyboard shortcuts">Shortcuts</button>
         <button type="button" data-sec="projects" data-icon="folder" title="Rename or remove projects">Projects</button>
         <button type="button" data-sec="tasks" data-icon="tasks" title="Queue, parallelism and worktrees for tasks">Tasks</button>
+        <button type="button" data-sec="secrets" data-icon="lock" title="Passwords and keys for automations, encrypted with your system keychain">Secrets</button>
         <button type="button" data-sec="integrations" data-icon="send" title="Control AgentBoard from your phone and send a daily summary to Slack or Discord">Integrations</button>
         <button type="button" data-sec="advanced" data-icon="code" title="Edit every setting as JSON">Advanced</button>
       </nav>
@@ -292,6 +293,17 @@
             <label class="set-row check"><span>Send light tasks to local models first (agents marked "local")</span><input name="preferLocalForLight" type="checkbox" class="switch-input" /></label>
             <label class="set-row check"><span>When a subscription hits its limit, move even tasks pinned to it (<code>@name</code>) to another one</span><input name="limitFallback" type="checkbox" class="switch-input" /></label>
             <div class="set-row">Subscriptions out of usage <span id="exhaustedList" class="muted">None</span></div>
+          </div>
+        </section>
+
+        <section data-sec="secrets" class="hidden">
+          <h2>Secrets</h2>
+          <p class="set-note">Passwords, API keys and logins your automations need. Each value is encrypted with your system keychain and never shown again. A <b>Command</b> step gets a secret as an environment variable when it mentions it (<code>$APP_PASSWORD</code>) or lists it under <i>Secrets it can use</i>, and the value is hidden in its output. Agents never see them.</p>
+          <div class="set-group" id="secretRows"></div>
+          <div class="set-group">
+            <label class="set-row">Name <input id="secretName" placeholder="APP_PASSWORD" autocomplete="off" spellcheck="false" /></label>
+            <label class="set-row">Value <input id="secretValue" type="password" autocomplete="new-password" /></label>
+            <div class="row-end"><span id="secretError" class="form-error"></span><button type="button" id="secretAdd" class="primary" title="Encrypt and save it now">Save Secret</button></div>
           </div>
         </section>
 
@@ -540,6 +552,7 @@
   <script src="integrations/IssueImporter.js"></script>
   <script src="integrations/IntegrationSettings.js"></script>
   <script src="agents/GroundRules.js"></script>
+  <script src="secrets/SecretsSettings.js"></script>
   <script src="onboarding/Onboarding.js"></script>
 </body>
 </html>

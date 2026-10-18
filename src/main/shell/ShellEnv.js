@@ -81,9 +81,10 @@ class ShellEnv {
   }
 
   // A command inside a folder; resolves with its exit code and the end of its output.
-  runInShell(cmd, cwd, timeoutMs = 10 * 60_000) {
+  // env: extra variables for this command only (e.g. secrets).
+  runInShell(cmd, cwd, { timeoutMs = 10 * 60_000, env = {} } = {}) {
     return new Promise((resolve) => {
-      const child = this.spawnInShell(cmd, { cwd: cwd && fs.existsSync(cwd) ? cwd : os.homedir() });
+      const child = this.spawnInShell(cmd, { cwd: cwd && fs.existsSync(cwd) ? cwd : os.homedir(), env: { ...process.env, ...env } });
       let out = '';
       const keep = (d) => { out = (out + d).slice(-8000); };
       child.stdout.on('data', keep); child.stderr.on('data', keep);

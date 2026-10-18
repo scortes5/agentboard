@@ -54,8 +54,6 @@ class TaskPlanner {
   register(ipcMain) {
     ipcMain.handle('tasks:plan', wrap((_e, text, opts) => this.plan(text, opts)));
     ipcMain.handle('ai:ask', wrap((_e, prompt, model) => this.ask(prompt, model)));
-    // An automation's "Command" step and a task's checks run in the user's shell, inside the project.
-    ipcMain.handle('flow:exec', wrap((_e, cmd, cwd) => this.shellEnv.runInShell(cmd, cwd)));
   }
 }
 

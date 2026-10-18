@@ -47,6 +47,7 @@ const ICON_PATHS = {
   send: '<path d="M4 12l16-7.5-6 16-2.5-6.5z"/>',
   list: '<path d="M8.5 7h11M8.5 12h11M8.5 17h11"/><path d="M4.5 7h.01M4.5 12h.01M4.5 17h.01"/>',
   pause: '<path d="M9 6v12M15 6v12"/>',
+  lock: '<rect x="5" y="11" width="14" height="9.5" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
   dot: '<circle cx="12" cy="12" r="4" fill="currentColor" stroke="none"/>',
 };
 

@@ -232,6 +232,7 @@ function finishTask(t, status, summary) {
     try { new Notification(status === 'done' ? 'Task done' : 'Task blocked', { body: `${t.text.slice(0, 80)}\n${t.summary}` }); } catch {}
   }
   taskPipeline.afterFinish(t);
+  save(); renderTasks(); // the pipeline may finish it after the tick that saw the marker has drawn
 }
 
 // Back to work in the same card (review comments, failed checks): the DONE line on screen

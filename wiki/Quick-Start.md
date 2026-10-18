@@ -1,6 +1,6 @@
 # Quick Start
 
-Five minutes from install to your first parallel agents.
+Five minutes from install to your first parallel agents. On a new board, the **Welcome Guide** walks you through these steps (open it again from the palette, ⇧⌘P).
 
 1. **Add a project.** Press `+` next to the tabs at the top and pick your code folder.
 2. **Open an agent.** Press **Claude** in the bottom bar (⇧⌘1 / Ctrl+Shift+1). The first time in a folder, answer *Yes, I trust this folder*.
