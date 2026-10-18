@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions and ideas
+    url: https://github.com/scortes5/agentboard/discussions
+    about: Ask how to do something or share an idea before opening an issue.
+  - name: Getting started guide
+    url: https://github.com/scortes5/agentboard/blob/main/docs/GUIDE.md
+    about: Step-by-step guide and troubleshooting table.
+  - name: Security vulnerability
+    url: https://github.com/scortes5/agentboard/security/advisories/new
+    about: Report security problems privately, not as a public issue.

@@ -1,5 +1,5 @@
-# Genera los instaladores en GitHub (Mac .dmg y Windows .exe).
-# Se ejecuta al crear un tag v* (ej: git tag v0.1.0 && git push --tags) o a mano desde Actions.
+# Builds the installers (Mac .dmg and Windows .exe).
+# Runs when a v* tag is pushed (e.g. git tag v0.4.0 && git push --tags) or by hand from Actions.
 name: build
 
 on:
@@ -10,9 +10,14 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
         os: [macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
@@ -32,10 +37,11 @@ jobs:
           path: |
             dist/*.dmg
             dist/*.exe
-      - name: Publicar en el Release del tag
+      - name: Attach to the tag's Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          generate_release_notes: true
           files: |
             dist/*.dmg
             dist/*.exe
