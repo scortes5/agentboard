@@ -5,7 +5,7 @@ All notable changes to AgentBoard. The format follows [Keep a Changelog](https:/
 ## [Unreleased]
 
 ### Added
-- Repository setup: CI and CodeQL workflows, Dependabot for npm and GitHub Actions, issue and pull request templates, contributing guide, code of conduct, security policy and a [wiki](https://github.com/scortes5/agentboard/wiki) published from `wiki/`.
+- Repository setup: CI workflow, Dependabot for npm and GitHub Actions, issue and pull request templates, contributing guide, code of conduct, security policy and a [wiki](https://github.com/scortes5/agentboard/wiki) published from `wiki/`.
 - Release notes are generated automatically on tagged builds.
 
 ## [0.4.0] - 2026-10-17

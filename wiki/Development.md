@@ -20,7 +20,7 @@ npm ci --ignore-scripts
 git ls-files '*.js' | xargs -n1 node --check
 ```
 
-CodeQL scans JavaScript and workflows weekly and on every pull request. Dependabot opens weekly update PRs for npm packages and GitHub Actions.
+CodeQL code scanning (GitHub default setup) analyzes JavaScript and workflows on every push and pull request. Dependabot opens weekly update PRs for npm packages and GitHub Actions.
 
 ## Releasing
 
