@@ -1,7 +1,8 @@
 // AgentBoard — Settings → Integrations: remote control from a phone and the daily summary to
-// a chat webhook. Plugs into Settings through settingsSections.
+// a chat webhook, whose URL is kept in the secrets vault. Plugs into Settings through
+// settingsSections.
 'use strict';
-/* global $, ab, cfg, esc, toast, icon, saveNow, settingsSections, RemoteBridge, dailySummaryJob */
+/* global $, ab, cfg, esc, toast, icon, saveNow, settingsSections, RemoteBridge, dailySummaryJob, DailySummary */
 
 class IntegrationSettings {
   constructor() {
@@ -16,22 +17,33 @@ class IntegrationSettings {
   load(f) {
     const r = cfg.remote || {};
     f.remoteEnabled.checked = !!r.enabled;
+    f.remoteHours.value = r.hours ?? 8;
     f.remotePort.value = r.port || 7777;
-    f.summaryWebhook.value = cfg.summaryWebhook || '';
+    f.summaryEnabled.checked = !!cfg.summaryEnabled;
+    f.summaryWebhook.value = '';
     f.summaryTime.value = cfg.summaryTime || '18:00';
     this.renderLinks();
+    this.renderSummary();
   }
 
   save(f) {
     cfg.remote = {
       enabled: f.remoteEnabled.checked, port: Math.min(65535, Math.max(1024, +f.remotePort.value || 7777)),
+      hours: Math.min(168, Math.max(0, f.remoteHours.value === '' ? 8 : +f.remoteHours.value)),
       token: cfg.remote?.token || RemoteBridge.newToken(),
     };
-    cfg.summaryWebhook = f.summaryWebhook.value.trim();
+    cfg.summaryEnabled = f.summaryEnabled.checked;
     cfg.summaryTime = f.summaryTime.value || '18:00';
+    this.webhook = f.summaryWebhook.value.trim(); // goes to the vault once Settings is saved
   }
 
-  saved() { this.apply(); }
+  async saved() {
+    this.apply();
+    if (!this.webhook) return;
+    const r = await ab.secretsSet(DailySummary.SECRET, this.webhook);
+    this.webhook = '';
+    if (!r.ok) toast(`Could not save the webhook URL: ${esc(r.error)}`, 7000);
+  }
 
   async apply() {
     const r = await ab.remoteApply();
@@ -41,11 +53,18 @@ class IntegrationSettings {
 
   async renderLinks() {
     const s = await ab.remoteStatus();
+    const until = s.expiresAt ? ` · turns off at ${new Date(s.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : '';
     $('#remoteLinks').innerHTML = s.running
-      ? s.urls.map((u) => `<div class="set-row"><code class="link">${esc(u.replace(/#t=.*/, '#t=…'))}</code>
+      ? (s.urls.map((u) => `<div class="set-row"><code class="link">${esc(u.replace(/#t=.*/, '#t=…'))}</code>
           <button type="button" class="ghost" data-copy="${esc(u)}" title="Copy the link, token included">${icon('copy', 13)} Copy</button></div>`).join('')
-        || '<div class="set-row muted">No network found: connect this computer to Wi-Fi.</div>'
+        || '<div class="set-row muted">No network found: connect this computer to Wi-Fi.</div>')
+        + `<div class="set-row muted small">On${esc(until)}. Certificate SHA-256: <code class="fp">${esc(s.fingerprint || '')}</code></div>`
       : '<div class="set-row muted">Off. Turn it on and save to get the link.</div>';
+  }
+
+  async renderSummary() {
+    const saved = (await ab.secretsList()).some((s) => s.name === DailySummary.SECRET);
+    $('#summaryState').textContent = saved ? 'URL saved in Secrets' : 'No URL saved yet';
   }
 
   async newLink() {
@@ -56,8 +75,7 @@ class IntegrationSettings {
   }
 
   async test() {
-    const url = $('#settingsForm').summaryWebhook.value.trim();
-    const r = await dailySummaryJob.send(url);
+    const r = await dailySummaryJob.send($('#settingsForm').summaryWebhook.value.trim() || null);
     toast(r.ok ? 'Summary sent: check your channel.' : `Could not send it: ${esc(r.error)}`, 5000);
   }
 }

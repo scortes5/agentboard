@@ -14,9 +14,9 @@ const MASK = '••••••';
 
 class SecretVault {
   // crypto: Electron's safeStorage (tests pass a stand-in with the same methods).
-  constructor({ dataDir, crypto }) {
+  constructor({ dataDir, crypto, audit }) {
     this.file = path.join(dataDir, 'secrets.json');
-    this.crypto = crypto;
+    Object.assign(this, { crypto, audit });
   }
 
   // Without a system keyring (some Linux setups) Electron would store them as plain text.
@@ -45,13 +45,16 @@ class SecretVault {
     const all = this.read();
     all[name] = { value: this.crypto.encryptString(String(value)).toString('base64'), updatedAt: Date.now() };
     this.write(all);
+    this.audit?.add('secret-saved', { name });
     return this.list();
   }
 
   remove(name) {
     const all = this.read();
+    if (!all[name]) return this.list();
     delete all[name];
     this.write(all);
+    this.audit?.add('secret-removed', { name });
     return this.list();
   }
 

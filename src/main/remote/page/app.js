@@ -20,8 +20,9 @@ function render(s) {
   const c = s.counts || {};
   $('#counts').textContent = [c.done != null && `${c.done}/${c.total} done`, c.running && `${c.running} working`, c.errors && `${c.errors} with errors`].filter(Boolean).join(' · ');
   $('#approvals').innerHTML = (s.approvals || []).map((a) => `
-    <div class="item ask"><b>${esc(a.title)}</b>${a.context ? `<pre>${esc(a.context)}</pre>` : ''}<div>${esc(a.question)}</div>
-      <div class="row"><button data-card="${esc(a.card)}" data-yes="0">Reject</button><button class="primary" data-card="${esc(a.card)}" data-yes="1">Approve</button></div></div>`).join('');
+    <div class="item ask${a.danger ? ' danger' : ''}"><b>${esc(a.title)}</b>${a.context ? `<pre>${esc(a.context)}</pre>` : ''}<div>${esc(a.question)}</div>
+      ${a.danger ? '<div class="warn">Looks dangerous: approve it at the computer.</div>' : ''}
+      <div class="row"><button data-card="${esc(a.card)}" data-yes="0">Reject</button>${a.danger ? '' : `<button class="primary" data-card="${esc(a.card)}" data-yes="1">Approve</button>`}</div></div>`).join('');
   $('#tasks').innerHTML = (s.tasks || []).map((t) => `
     <div class="item"><span class="st ${esc(t.status)}"></span>${esc(t.text)}
       <div class="line">${esc([t.agent, t.elapsed, t.tokens, t.line || t.summary].filter(Boolean).join(' · '))}</div></div>`).join('') || '<span class="muted">No tasks.</span>';

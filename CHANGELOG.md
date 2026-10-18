@@ -4,6 +4,20 @@ All notable changes to AgentBoard. The format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-10-18
+
+### Added
+- **Settings → Security**:
+  - *Dangerous* rules (a built-in list you can edit: `rm -rf`, `git push --force`, `sudo`, `curl … | sh`, `.env`, `.ssh/`…). Matching permission requests are flagged in red, left out of **Approve All**, ask once more before you approve them, and can't be approved from the phone.
+  - *Approve automatically* rules, empty by default.
+  - The **activity log**: answers (yours, the phone's or a rule's), remote devices, automation commands with the secrets they got, and secrets saved or removed (`audit.log`, readable only by your user).
+- **GitHub issues**: issues from people outside the project are flagged and show their text, and ask before being queued. Every issue's text reaches the agent between markers, with the instruction to treat it only as a description.
+
+### Changed
+- **Phone remote**: served over **HTTPS** with a certificate made on your computer (its SHA-256 fingerprint is shown in Settings). It turns itself off after 8 hours by default, each new device is announced and logged, and repeated wrong links block the address for a few minutes.
+- The daily summary's **webhook URL** is kept encrypted in Secrets; one saved by 1.1–1.3 moves there by itself.
+- The window runs in Chromium's **sandbox**.
+
 ## [1.3.1] - 2026-10-18
 
 ### Fixed

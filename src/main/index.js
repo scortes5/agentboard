@@ -24,6 +24,8 @@ const { WebhookNotifier } = require('./integrations/WebhookNotifier');
 const { GitHubIssues } = require('./integrations/GitHubIssues');
 const { SecretVault } = require('./secrets/SecretVault');
 const { CommandRunner } = require('./flows/CommandRunner');
+const { AuditLog } = require('./security/AuditLog');
+const { TlsIdentity } = require('./remote/TlsIdentity');
 const { App } = require('./app/App');
 const { AppMenu } = require('./app/AppMenu');
 const { TrayIcon } = require('./app/TrayIcon');
@@ -55,7 +57,8 @@ bridge = new AgentBridge({
   requestNewCard: (opts) => requests.ask('bridge:new-card', opts),
 });
 
-const vault = new SecretVault({ dataDir, crypto: safeStorage });
+const audit = new AuditLog({ dataDir });
+const vault = new SecretVault({ dataDir, crypto: safeStorage, audit });
 const runner = new GitRunner();
 const gitService = new GitService({ runner });
 const claudeAccounts = new ClaudeAccounts({ config });
@@ -74,8 +77,8 @@ application = new App({
     new AgentCatalog({ config, shellEnv }), new LocalModels({ shellEnv }), claudeAccounts,
     new GroundRules({ config, claudeAccounts }),
     new SkillLibrary({ config }), new SkillPack({ claudeAccounts }), new UsageService({ dataDir, claudeAccounts }),
-    new TaskPlanner({ shellEnv }), new CommandRunner({ shellEnv, vault }), vault,
-    new RemoteServer({ config, send }), new WebhookNotifier(), new GitHubIssues({ shellEnv }),
+    new TaskPlanner({ shellEnv }), new CommandRunner({ shellEnv, vault, audit }), vault, audit,
+    new RemoteServer({ config, send, audit, tls: new TlsIdentity({ dataDir }) }), new WebhookNotifier({ vault }), new GitHubIssues({ shellEnv }),
   ],
 });
 application.start();

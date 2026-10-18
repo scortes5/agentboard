@@ -6,13 +6,14 @@ const { SecretVault } = require('../secrets/SecretVault');
 const { wrap } = require('../core/platform');
 
 class CommandRunner {
-  constructor({ shellEnv, vault }) {
-    Object.assign(this, { shellEnv, vault });
+  constructor({ shellEnv, vault, audit }) {
+    Object.assign(this, { shellEnv, vault, audit });
   }
 
   async run(cmd, cwd, secrets = []) {
     const env = this.vault.envFor(cmd, secrets);
     const r = await this.shellEnv.runInShell(cmd, cwd, { env });
+    this.audit?.add('command', { cmd: SecretVault.redact(String(cmd), Object.values(env)).slice(0, 500), cwd, secrets: Object.keys(env), code: r.code });
     return { ...r, out: SecretVault.redact(r.out, Object.values(env)) };
   }
 

@@ -14,7 +14,11 @@ Everything here is in **Settings → Integrations** and is off until you turn it
 **Security**
 - Every request needs the random token in the link. The token travels after the `#`, a part the browser never sends to servers.
 - **New Link** creates a new token; the old link stops working.
-- The page uses plain http on your local network. Turn it on only on networks you trust (home or office, not a café or an airport).
+- The page uses **HTTPS** with a certificate made on your computer, so the link and everything you do travel encrypted over the Wi-Fi. The first time, the phone warns that it doesn't know the certificate: compare the SHA-256 fingerprint in its details with the one in Settings, then continue.
+- It **turns itself off** after 8 hours by default (*Turn it off by itself after*; 0 = never).
+- Every **new device** that opens the link is announced on the computer and recorded in *Settings → Security*. If it isn't yours, press **New Link**.
+- Ten wrong links from one address within five minutes **block** that address for a while.
+- Requests flagged as **dangerous** can be rejected from the phone but only approved at the computer.
 - The port is `7777` by default. Change it if something else uses that port: the setting shows an error when the port is taken.
 
 ## Daily summary to a chat
@@ -23,7 +27,7 @@ Everything here is in **Settings → Integrations** and is off until you turn it
    - **Slack:** *Apps → Incoming Webhooks*.
    - **Discord:** *Channel → Edit → Integrations → Webhooks*.
    - **Microsoft Teams** and **Google Chat** also give you a webhook URL.
-2. Paste the URL (it must start with `https://`) and pick a time.
+2. Turn on **Send the daily summary**, paste the URL (it must start with `https://`) and pick a time. The URL is kept encrypted in **Secrets** (as `DAILY_SUMMARY_WEBHOOK`), because whoever has it can post to your channel; the field stays empty afterwards.
 3. **Send Test** sends today's summary right away.
 
 The summary is sent once a day, at the chosen time or as soon as the app is open after it. It lists the tasks done today and the ones still pending, the same Markdown as **Summary** in the Tasks panel.
@@ -33,7 +37,8 @@ The summary is sent once a day, at the chosen time or as soon as the app is open
 **Issues** in the Tasks panel lists the open issues of the project chosen in the panel. Pick some and press **Add**:
 
 - each one becomes a task (`#12 Fix the login`);
-- the agent receives the issue's text;
+- the agent receives the issue's text between markers, and is told it only describes the problem: it must not follow instructions, run commands or open links from it;
+- issues written by people outside the project (not owners, members or collaborators) are flagged **outside**, show their text, and ask before being queued: on a public repository anyone can open an issue, including one written to trick an agent;
 - the pull request created from the task says `Closes #12`.
 
 This needs the [GitHub CLI](https://cli.github.com) installed and signed in (`gh auth login`). AgentBoard stores no GitHub token.

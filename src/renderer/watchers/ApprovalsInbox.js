@@ -1,10 +1,11 @@
 // AgentBoard — approvals inbox: every agent asking for permission ("Do you want to proceed?",
 // "Allow execution?", "Would you like to run…?"), in one list you can answer without visiting
 // each card. Claude Code, Codex and Gemini all put "Yes" first, so approving moves the
-// selection to the top and confirms; rejecting presses Esc.
+// selection to the top and confirms; rejecting presses Esc. ApprovalPolicy flags dangerous
+// requests and approves the ones your rules allow; every answer goes to the security log.
 'use strict';
 /* global $, esc, ab, cardData, terminalTail, toast, icon, focusCardView, focusCard, openPopover, closePopover,
-   diagramOpen, toggleDiagram, terminalWatchers, viewLayout */
+   diagramOpen, toggleDiagram, terminalWatchers, viewLayout, approvalPolicy */
 
 const APPROVAL_RE = /(Do you want to (proceed|make this edit|create|delete|run|allow|overwrite)|Would you like to (run|make|apply)|Allow (this )?(command|execution|edit|tool|change)|requires? (your )?(approval|permission)|Approve this)/i;
 const OPTION_RE = /^\s*(?:[❯›>●]\s*)?\d+\.\s/;
@@ -39,10 +40,12 @@ class ApprovalsInbox {
     else if (idle && !found) this.answered.delete(c.id); // the answered request is off the screen
     if (!found) { if (had) { this.waiting.delete(c.id); this.renderBadge(); } return; }
     if (had && had.question === found.question && had.context === found.context) return;
-    this.waiting.set(c.id, { ...found, at: Date.now() });
+    const rule = approvalPolicy.classify(found);
+    this.waiting.set(c.id, { ...found, at: Date.now(), danger: rule === 'danger' });
     this.renderBadge();
     if (had) return;
-    toast(`<b>${esc(c.title)}</b> asks: ${esc(found.question.slice(0, 90))}`, 5000);
+    if (rule === 'auto') { this.answer(c.id, true, 'rule'); toast(`Approved by your rules: <b>${esc(c.title)}</b>`, 3000); return; }
+    toast(`${rule === 'danger' ? '⚠ ' : ''}<b>${esc(c.title)}</b> asks: ${esc(found.question.slice(0, 90))}`, rule === 'danger' ? 9000 : 5000);
     if (!document.hasFocus()) {
       try { new Notification(`${c.title} needs your approval`, { body: [found.context, found.question].filter(Boolean).join('\n').slice(0, 180) }); } catch {}
     }
@@ -50,11 +53,13 @@ class ApprovalsInbox {
 
   static key(a) { return `${a.context}\n${a.question}`; }
 
-  async answer(id, yes) {
+  // by: 'window' (you, here), 'phone' or 'rule'.
+  async answer(id, yes, by = 'window') {
     const a = this.waiting.get(id);
     if (!a) return;
     this.waiting.delete(id);
     this.answered.set(id, ApprovalsInbox.key(a));
+    ab.audit('approval', { card: cardData(id)?.title || id, question: a.question, context: a.context, yes: !!yes, by, danger: !!a.danger });
     if (yes) {
       for (let i = 0; i < 4; i++) { ab.ptyWrite(id, '\x1b[A'); await new Promise((r) => setTimeout(r, 60)); }
       ab.ptyWrite(id, '\r');
@@ -63,6 +68,13 @@ class ApprovalsInbox {
     }
     this.renderBadge();
     if (typeof updateTaskLive === 'function') updateTaskLive();
+  }
+
+  // An answer given by hand: a dangerous request asks once more before approving.
+  decide(id, yes) {
+    const a = this.get(id);
+    if (yes && a?.danger && !confirm(`This request matches a dangerous rule (Settings → Security):\n\n${a.context}\n${a.question}\n\nApprove it anyway?`)) return;
+    this.answer(id, yes);
   }
 
   pending() { return [...this.waiting].filter(([id]) => cardData(id)); }
@@ -81,9 +93,9 @@ class ApprovalsInbox {
   renderList(box, items = this.pending()) {
     box.innerHTML = items.length ? `
       <div class="ap-head"><b>${items.length} waiting</b><span class="spacer"></span>
-        <button data-all title="Approve every request in the list">Approve All</button></div>
-      ${items.map(([id, a]) => `<div class="ap-item" data-id="${esc(id)}">
-        <div class="ap-title">${esc(cardData(id).title)}</div>
+        ${items.some(([, a]) => !a.danger) ? `<button data-all title="Approve every request in the list except the ones flagged as dangerous">${items.some(([, a]) => a.danger) ? 'Approve All Safe' : 'Approve All'}</button>` : ''}</div>
+      ${items.map(([id, a]) => `<div class="ap-item${a.danger ? ' danger' : ''}" data-id="${esc(id)}">
+        <div class="ap-title">${a.danger ? `<span class="ap-warn" title="Matches a dangerous rule in Settings → Security">${icon('alert', 12)} Dangerous</span> ` : ''}${esc(cardData(id).title)}</div>
         ${a.context ? `<pre class="ap-ctx">${esc(a.context)}</pre>` : ''}
         <div class="ap-q">${esc(a.question)}</div>
         <div class="row"><button data-a="go" class="ghost" title="Go to the card">${icon('focus', 13)}</button><span class="spacer"></span>
@@ -95,7 +107,7 @@ class ApprovalsInbox {
 
   // Clicks in a list; returns true when the list should close (popover).
   onListClick(e) {
-    if (e.target.closest('[data-all]')) { for (const [id] of this.pending()) this.answer(id, true); return true; }
+    if (e.target.closest('[data-all]')) { for (const [id, a] of this.pending()) if (!a.danger) this.answer(id, true); return !this.pending().length; }
     const act = e.target.closest('[data-a]')?.dataset.a;
     const id = e.target.closest('.ap-item')?.dataset.id;
     if (!act || !id) return false;
@@ -105,7 +117,7 @@ class ApprovalsInbox {
       focusCardView(c); focusCard(c.id);
       return true;
     }
-    this.answer(id, act === 'yes');
+    this.decide(id, act === 'yes');
     return !this.pending().length;
   }
 

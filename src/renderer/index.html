@@ -209,6 +209,7 @@
         <button type="button" data-sec="keys" data-icon="keyboard" title="View and change keyboard shortcuts">Shortcuts</button>
         <button type="button" data-sec="projects" data-icon="folder" title="Rename or remove projects">Projects</button>
         <button type="button" data-sec="tasks" data-icon="tasks" title="Queue, parallelism and worktrees for tasks">Tasks</button>
+        <button type="button" data-sec="security" data-icon="alert" title="Rules for what agents ask permission to do, and the log of what was approved, by whom">Security</button>
         <button type="button" data-sec="secrets" data-icon="lock" title="Passwords and keys for automations, encrypted with your system keychain">Secrets</button>
         <button type="button" data-sec="integrations" data-icon="send" title="Control AgentBoard from your phone and send a daily summary to Slack or Discord">Integrations</button>
         <button type="button" data-sec="advanced" data-icon="code" title="Edit every setting as JSON">Advanced</button>
@@ -317,6 +318,21 @@
           </div>
         </section>
 
+        <section data-sec="security" class="hidden">
+          <h2>Security</h2>
+          <p class="set-note">Agents run with your permissions: they can do anything you can on this computer. These rules decide what happens when one asks for permission. One rule per line; plain text matches anywhere (ignoring case), <code>/…/</code> is a regular expression.</p>
+          <h3>Dangerous: always ask, never approve in bulk or from the phone</h3>
+          <textarea name="approvalDanger" class="rules" rows="7" spellcheck="false"></textarea>
+          <div class="row-end"><button type="button" id="dangerDefaults" class="ghost" title="Put back the built-in list">Restore Defaults</button></div>
+          <h3>Approve automatically (unless it is also dangerous)</h3>
+          <textarea name="approvalAuto" class="rules" rows="4" spellcheck="false" placeholder="npm test&#10;git status&#10;/^\s*ls\b/"></textarea>
+          <p class="set-note">Leave it empty to answer every request yourself. Keep it to commands that only read or test.</p>
+          <h3>Activity</h3>
+          <p class="set-note">What was approved or rejected and by whom (you, your phone or a rule), devices that used the remote, automation commands and the secrets they got, and secrets saved or removed.</p>
+          <div id="auditList" class="audit"></div>
+          <div class="row-end"><button type="button" id="auditRefresh" class="ghost">Refresh</button></div>
+        </section>
+
         <section data-sec="secrets" class="hidden">
           <h2>Secrets</h2>
           <p class="set-note">Passwords, API keys and logins your automations need. Each value is encrypted with your system keychain and never shown again. A <b>Command</b> step gets a secret as an environment variable when it mentions it (<code>$APP_PASSWORD</code>) or lists it under <i>Secrets it can use</i>, and the value is hidden in its output. Agents never see them.</p>
@@ -331,21 +347,23 @@
         <section data-sec="integrations" class="hidden">
           <h2>Integrations</h2>
           <h3>Remote control</h3>
-          <p class="set-note">See your tasks, approve what the agents ask and add tasks from your phone's browser, on the same Wi-Fi as this computer.</p>
+          <p class="set-note">See your tasks, approve what the agents ask and add tasks from your phone's browser, on the same Wi-Fi as this computer. Requests flagged as dangerous (Settings → Security) can only be approved here.</p>
           <div class="set-group">
             <label class="set-row check"><span>Let my phone control AgentBoard</span><input name="remoteEnabled" type="checkbox" class="switch-input" /></label>
+            <label class="set-row">Turn it off by itself after, in hours (0 = never) <input name="remoteHours" type="number" min="0" max="168" /></label>
             <label class="set-row">Port <input name="remotePort" type="number" min="1024" max="65535" /></label>
             <div id="remoteLinks"></div>
             <div class="set-row">Anyone with the link can control your agents: share it with no one.
               <button type="button" id="remoteNewLink" class="ghost" title="Create a new link; the old one stops working">New Link</button></div>
           </div>
-          <p class="set-note">The page uses plain http on your local network, so turn it on only on networks you trust (home or office, not a café).</p>
+          <p class="set-note">The page uses HTTPS with a certificate made on this computer, so the link and what you do travel encrypted. The first time, the phone warns that the certificate is not known: check that its SHA-256 fingerprint is the one shown above, then continue. Each new device that connects is announced here and recorded in Settings → Security.</p>
           <h3>Daily summary</h3>
-          <p class="set-note">Once a day, today's done and pending tasks are sent to a channel. Create an incoming webhook in Slack, Discord, Teams or Google Chat and paste its URL.</p>
+          <p class="set-note">Once a day, today's done and pending tasks are sent to a channel. Create an incoming webhook in Slack, Discord, Teams or Google Chat and paste its URL: it is kept encrypted in Secrets, because whoever has it can post to your channel.</p>
           <div class="set-group">
-            <label class="set-row">Webhook URL (empty = off) <input name="summaryWebhook" type="url" placeholder="https://hooks.slack.com/services/…" /></label>
+            <label class="set-row check"><span>Send the daily summary</span><input name="summaryEnabled" type="checkbox" class="switch-input" /></label>
+            <label class="set-row">Webhook URL <input name="summaryWebhook" type="password" autocomplete="off" placeholder="https://hooks.slack.com/services/…" /></label>
             <label class="set-row">Send it at <input name="summaryTime" type="time" /></label>
-            <div class="row-end"><button type="button" id="summaryTest" class="ghost" title="Send today's summary now to the URL above">Send Test</button></div>
+            <div class="row-end"><span id="summaryState" class="muted small"></span><button type="button" id="summaryTest" class="ghost" title="Send today's summary now (to the URL typed above, or the saved one)">Send Test</button></div>
           </div>
         </section>
 
@@ -560,6 +578,7 @@
   <script src="flows/flows.js"></script>
   <script src="usage/usage-panel.js"></script>
   <script src="watchers/ErrorWatch.js"></script>
+  <script src="watchers/ApprovalPolicy.js"></script>
   <script src="watchers/ApprovalsInbox.js"></script>
   <script src="review/UnifiedDiff.js"></script>
   <script src="review/ReviewDialog.js"></script>
@@ -574,6 +593,7 @@
   <script src="integrations/IssueImporter.js"></script>
   <script src="integrations/IntegrationSettings.js"></script>
   <script src="agents/GroundRules.js"></script>
+  <script src="security/SecuritySettings.js"></script>
   <script src="secrets/SecretsSettings.js"></script>
   <script src="onboarding/Onboarding.js"></script>
 </body>

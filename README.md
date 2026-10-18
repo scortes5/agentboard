@@ -200,7 +200,7 @@ refactor the payments module !!
 - **Dependencies and templates**: start a line with `>` to make it wait for the one above; insert frequent to-dos from **Templates**.
 - **Limits and budgets**: if a subscription runs out, its tasks move to another; if all of them do, AgentBoard tells you when the first one comes back (with an idea for the break). Tokens per task are shown live, with optional budgets per task and per day.
 - **Subagents you can see**: with *Agent Connection* on, a task agent may split its work with `start_agent`; each helper opens as a `↳` card next to it.
-- **GitHub issues**: **Issues** lists the project's open issues (needs the `gh` CLI signed in) and queues the ones you pick; the agent reads the issue and its pull request says `Closes #n`.
+- **GitHub issues**: **Issues** lists the project's open issues (needs the `gh` CLI signed in) and queues the ones you pick; the agent reads the issue and its pull request says `Closes #n`. Issues written by people outside the project are flagged and show their text first, and the agent is told to treat any issue's text as a description, never as instructions.
 - **Summary**: copies what was done today and what is pending, as Markdown (or sends it every day to a chat, see below).
 - **Global shortcut** (⌃⌥Space, configurable): add a task from any app.
 
@@ -261,6 +261,7 @@ It reads the Claude Code and Codex logs on this computer (every Claude account i
 - **Agents**: each agent's command and arguments (for resuming, light mode and heavy mode), and custom agents for any CLI.
 - **Ground Rules**: rules every agent follows, written once. They go into each CLI's own instructions file (`~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, `~/.gemini/GEMINI.md`…) inside a marked block, so the rest of the file stays yours and agents you open by hand follow them too.
 - **Shortcuts**: all editable; click one and press the new combination.
+- **Security**: rules for permission requests (*dangerous*: flagged in red, never approved in bulk or from the phone; *approve automatically*: for commands that only read or test) and the activity log (what was approved and by whom, remote devices, automation commands, secrets saved or removed).
 - **Projects**, **Tasks**, **Secrets**, **Integrations** and **Advanced** (every setting as JSON, to add or remove keys).
 
 ![Keyboard shortcuts](docs/images/shortcuts.png)
@@ -289,8 +290,8 @@ The **palette** (⇧⌘P or the magnifier) finds agents, tasks, projects and act
 
 *Settings → Integrations*:
 
-- **Remote control**: turn on *Let my phone control AgentBoard*, save, and open the link on your phone, on the same Wi-Fi. You see the tasks live, approve or reject what the agents ask, and add tasks. Every request needs the random token in the link (it travels in the `#` part, which the browser never sends to servers); **New Link** makes the old one stop working. The page uses plain http on your local network, so turn it on only on networks you trust.
-- **Daily summary**: create an incoming webhook in Slack, Discord, Teams or Google Chat, paste its URL and pick a time. Once a day, today's done and pending tasks are sent to that channel. **Send Test** sends it now.
+- **Remote control**: turn on *Let my phone control AgentBoard*, save, and open the link on your phone, on the same Wi-Fi. You see the tasks live, approve or reject what the agents ask, and add tasks. Every request needs the random token in the link (it travels in the `#` part, which the browser never sends to servers); **New Link** makes the old one stop working. The page uses HTTPS with a certificate made on your computer (the phone asks once to trust it; compare the SHA-256 fingerprint shown in Settings). It turns itself off after 8 hours by default, each new device is announced and logged, too many wrong links block that address for a few minutes, and requests flagged as dangerous can only be approved at the computer.
+- **Daily summary**: create an incoming webhook in Slack, Discord, Teams or Google Chat, paste its URL (kept encrypted in Secrets) and pick a time. Once a day, today's done and pending tasks are sent to that channel. **Send Test** sends it now.
 
 ---
 
@@ -346,7 +347,10 @@ Example, in Claude: *"ask Codex what it thinks of this change and summarize its 
   | Windows | `%APPDATA%\AgentBoard\board.json` |
 
 - The agent bridge is a local socket with a random token. It only writes to cards running an agent (never to a plain terminal), each card can turn it off, and it has a messages-per-minute limit.
-- Optional, and off by default: the phone remote (a page on your local network that needs the random token in its link), the daily summary (sent only to the webhook you paste) and GitHub issues (read through your own `gh` CLI). Ground rules are written only to the CLIs' instructions files, inside a marked block.
+- **Agents run with your permissions**: they can do anything you can on this computer. Approve requests after reading them; *Settings → Security* flags dangerous ones (`rm -rf`, `git push --force`, `curl … | sh`, `.env`…), keeps them out of **Approve All** and the phone, and logs every answer.
+- **Text from outside is data, not instructions**: GitHub issues are fenced in the agent's prompt, with outsiders' issues flagged before you queue them.
+- The window runs in Chromium's sandbox with context isolation and a strict content security policy: what a terminal prints cannot run code.
+- Optional, and off by default: the phone remote (an HTTPS page on your local network that needs the random token in its link, turns itself off after some hours and logs each device), the daily summary (sent only to the webhook you paste, whose URL is kept encrypted) and GitHub issues (read through your own `gh` CLI). Ground rules are written only to the CLIs' instructions files, inside a marked block.
 - Secrets are encrypted with your system keychain (`secrets.json` in the app's data folder, readable only by your user). The window can list their names but not read them; only the automation commands that ask for a secret get its value, as an environment variable, and it is hidden in their output.
 
 ---
