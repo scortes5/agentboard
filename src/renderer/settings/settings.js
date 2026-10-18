@@ -29,6 +29,8 @@ function projectRow(p) {
   row.dataset.path = p.path;
   row.innerHTML = `<input name="name" value="${esc(p.name)}" /><span class="path" title="${esc(p.path)}">${esc(p.path)}</span>
     <input name="verify" value="${esc(p.verify || '')}" placeholder="Check command (e.g. npm test)" title="Runs after each task in this project; if it fails, the agent gets the output and fixes it" />
+    <label class="budget" title="Token budget for this project per week, in thousands (empty = none)">week <input name="budgetWeekK" type="number" min="0" step="100" value="${esc(p.budgetWeekK || '')}" placeholder="—" />k</label>
+    <label class="budget" title="Token budget for this project per month, in thousands (empty = none)">month <input name="budgetMonthK" type="number" min="0" step="100" value="${esc(p.budgetMonthK || '')}" placeholder="—" />k</label>
     <button type="button" class="card-btn" title="Remove the project from the list (keeps the folder)">${icon('close', 13)}</button>`;
   row.querySelector('button').addEventListener('click', () => row.remove());
   return row;
@@ -259,6 +261,9 @@ async function openSettings(section = 'general') {
   f.crossReview.checked = !!cfg.crossReview;
   f.taskBudgetK.value = cfg.taskBudgetK || 0;
   f.dailyBudgetK.value = cfg.dailyBudgetK || 0;
+  f.weeklyBudgetK.value = cfg.weeklyBudgetK || 0;
+  f.monthlyBudgetK.value = cfg.monthlyBudgetK || 0;
+  f.budgetAlertsToChat.checked = !!cfg.budgetAlertsToChat;
   for (const b of $('#budgetSeg').querySelectorAll('[data-v]')) b.classList.toggle('active', b.dataset.v === (cfg.budgetAction || 'warn'));
   f.preferLocalForLight.checked = !!cfg.preferLocalForLight;
   f.limitFallback.checked = cfg.limitFallback !== false;
@@ -310,6 +315,9 @@ $('#settings').addEventListener('close', async () => {
   cfg.crossReview = f.crossReview.checked;
   cfg.taskBudgetK = clamp(+f.taskBudgetK.value || 0, 0, 100000);
   cfg.dailyBudgetK = clamp(+f.dailyBudgetK.value || 0, 0, 1000000);
+  cfg.weeklyBudgetK = clamp(+f.weeklyBudgetK.value || 0, 0, 10000000);
+  cfg.monthlyBudgetK = clamp(+f.monthlyBudgetK.value || 0, 0, 100000000);
+  cfg.budgetAlertsToChat = f.budgetAlertsToChat.checked;
   cfg.budgetAction = $('#budgetSeg .active')?.dataset.v || 'warn';
   cfg.preferLocalForLight = f.preferLocalForLight.checked;
   cfg.limitFallback = f.limitFallback.checked;
@@ -332,10 +340,15 @@ $('#settings').addEventListener('close', async () => {
   if (!agents.shell) agents.shell = { label: 'Terminal', command: '', resumeArgs: '', color: '#8e8e93' };
   cfg.agents = agents;
 
+  const budgetK = (r, n) => clamp(+r.querySelector(`[name=${n}]`).value || 0, 0, 100000000) || undefined;
   const rows = new Map([...document.querySelectorAll('#projectRows .project-row')].map((r) => [r.dataset.path, {
     name: r.querySelector('[name=name]').value.trim(), verify: r.querySelector('[name=verify]').value.trim(),
+    budgetWeekK: budgetK(r, 'budgetWeekK'), budgetMonthK: budgetK(r, 'budgetMonthK'),
   }]));
-  cfg.projects = cfg.projects.filter((p) => rows.has(p.path)).map((p) => ({ ...p, name: rows.get(p.path).name || basename(p.path), verify: rows.get(p.path).verify }));
+  cfg.projects = cfg.projects.filter((p) => rows.has(p.path)).map((p) => {
+    const r = rows.get(p.path);
+    return { ...p, name: r.name || basename(p.path), verify: r.verify, budgetWeekK: r.budgetWeekK, budgetMonthK: r.budgetMonthK };
+  });
   if (!cfg.projects.some((p) => p.path === cfg.selectedProject)) cfg.selectedProject = cfg.projects[0]?.path || null;
   if (cfg.activeSpace && cfg.activeSpace !== '*' && !cfg.projects.some((p) => p.path === cfg.activeSpace)) cfg.activeSpace = '*';
 

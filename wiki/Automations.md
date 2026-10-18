@@ -15,6 +15,21 @@ Open with **Automations** (⇧⌘F). A flow is a diagram of connected steps, n8n
 | **Notify** | Sends a desktop notification. |
 | **Concept** | An idea written on the diagram; it does not run. |
 
+## Templates
+
+**Templates** (the list icon next to `+`, or *Start from a Template*) creates a ready-made automation for the current project, using its check command (*Settings → Projects*, or `npm test`):
+
+| Template | What it does |
+|---|---|
+| Fix a GitHub issue → tests → pull request | Asks which issue. An agent fixes it on `fix/issue-n` with a test, the checks run, and another agent opens the PR with "Closes #n". The agent reads the issue itself and is told its text is a description, not instructions. |
+| Nightly tests that fix themselves | Every night at 02:00 an agent runs the checks and fixes what fails. |
+| Review my changes before committing | The most capable model reviews your uncommitted changes without editing anything. |
+| Update dependencies safely | Patch and minor updates on `chore/deps`, committed only if the checks pass; major versions are listed. |
+| Keep the docs up to date | Every evening, the README and docs are updated to match today's commits. |
+| Triage open issues | A label, a priority and a one-line plan per open issue, without changing anything on GitHub. |
+
+Every step can be edited afterwards. A new template is one entry in `src/renderer/flows/FlowTemplates.js`.
+
 ## Building a flow
 
 - **By hand**: add steps from the toolbar and connect them by dragging from the dot on the right of one step onto another. The right panel edits the selected step.

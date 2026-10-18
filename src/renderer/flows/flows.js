@@ -547,6 +547,14 @@ async function designWithAI() {
   if (!r.ok) return toast(`Could not design it: ${esc(r.error)}`, 6000);
   let spec;
   try { spec = JSON.parse(r.value.match(/\{[\s\S]*\}/)[0]); } catch { return toast('AI did not return a valid diagram; try describing it differently.', 6000); }
+  const done = flowFromSpec(spec, f);
+  if (!done) return toast('AI did not return any nodes.');
+  toast(`Automation designed: ${done.nodes.length} steps. Review it, then use Explain Run or Run.`, 5000);
+}
+
+// A flow from a description { name, nodes: [{ id, type, title, config }], edges: [{ from, to, branch }] }
+// (what AI designs, or a template): new ids, laid out, opened. Into `target` or a new flow.
+function flowFromSpec(spec, target = null) {
   const ids = new Map();
   const nodes = (spec.nodes || []).filter((n) => NODE_TYPES[n.type]).slice(0, 20).map((n) => {
     const id = uid(); ids.set(n.id, id);
@@ -557,14 +565,14 @@ async function designWithAI() {
   });
   const edges = (spec.edges || []).filter((e) => ids.has(e.from) && ids.has(e.to))
     .map((e) => ({ from: ids.get(e.from), to: ids.get(e.to), ...(e.branch === 'no' || e.branch === 'yes' ? { branch: e.branch } : {}) }));
-  if (!nodes.length) return toast('AI did not return any nodes.');
+  if (!nodes.length) return null;
   layoutNodes(nodes, edges);
-  const target = f || newFlow();
+  target = target || newFlow();
   Object.assign(target, { name: spec.name ? String(spec.name).slice(0, 80) : target.name, nodes, edges, lastRun: null });
   flowSel = target.id; nodeSel = null; edgeSel = null;
   delete flowPlan[target.id];
   save(); renderFlow();
-  toast(`Automation designed: ${nodes.length} steps. Review it, then use Explain Run or Run.`, 5000);
+  return target;
 }
 
 async function explainWithAI() {
@@ -608,6 +616,8 @@ function initFlows() {
   $('#flNew').onclick = () => { const f = newFlow(); flowSel = f.id; nodeSel = f.nodes[0].id; renderFlow(); $('#flName').select(); };
   $('#flEmptyNew').onclick = $('#flNew').onclick;
   $('#flEmptyAI').onclick = () => { flowSel = null; designWithAI(); };
+  $('#flTemplates').onclick = (e) => flowTemplates.open(e.currentTarget);
+  $('#flEmptyTemplates').onclick = (e) => flowTemplates.open(e.currentTarget);
   $('#flName').addEventListener('input', (e) => { const f = curFlow(); if (f) { f.name = e.target.value; save(); renderFlowList(); } });
   $('#flAdd').addEventListener('click', (e) => { const t = e.target.closest('[data-type]')?.dataset.type; if (t) addNode(t); });
   $('#flAdd').innerHTML = Object.entries(NODE_TYPES).map(([k, T]) => `<button type="button" data-type="${k}" title="Add a ${T.label} node: ${esc(T.hint)}"><span style="color:${T.color}">${icon(T.icon, 13)}</span> ${T.label}</button>`).join('');

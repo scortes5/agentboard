@@ -278,6 +278,42 @@ function mcpSession(dataDir, requests) {
     assert.ok(width[0] >= 440 && width[0] <= 460 && Math.abs(width[1] - width[0]) <= 2, JSON.stringify(width));
     step('side bars: views move, collapse, hide and reset; bars resize by dragging');
 
+    // Cost history per project and budgets by week and month, with alerts at 80% and 100%.
+    const costs = await win.evaluate((repo) => {
+      const today = UsagePeriods.key(new Date());
+      cfg.projects = [{ name: 'repo', path: repo, budgetWeekK: 400 }];
+      Object.assign(cfg, { monthlyBudgetK: 10000, budgetAlerts: {} });
+      budgets.update({ days: { [today]: { tokens: 500000 } }, projectDays: { [repo]: { [today]: 350000 }, [`${repo}/sub`]: { [today]: 150000 } } });
+      const monday = UsagePeriods.start('week', new Date(2026, 9, 18)); // a Sunday
+      const r = { over: budgets.over(repo), overElsewhere: budgets.over('/somewhere/else'), week: budgets.used(repo, 'week'), monday: UsagePeriods.key(monday) };
+      budgets.checkAlerts();
+      r.alerts = Object.values(cfg.budgetAlerts);
+      budgets.checkAlerts(); // once per period: no second notice
+      r.again = Object.values(cfg.budgetAlerts);
+      r.rows = budgets.projectRows().map((x) => [x.name, x.today, x.last30.length]);
+      return r;
+    }, repo);
+    assert.deepEqual(costs, { over: 'weekly budget of repo', overElsewhere: null, week: 500000, monday: '2026-10-12', alerts: [100], again: [100], rows: [['repo', 500000, 30]] });
+    await win.evaluate(async () => { await openUsage(); });
+    const usageText = await until(() => win.evaluate(() => $('#usageBody').textContent.includes('Budgets') && $('#usageBody').textContent), 20000);
+    assert.ok(usageText, 'the Usage panel shows the budgets');
+    await win.evaluate(() => $('#usage').close());
+    step('cost per project, weekly and monthly budgets, one alert per period');
+
+    // Ready-made automations, built for the current project.
+    await win.evaluate((repo) => { cfg.selectedProject = repo; cfg.projects[0].verify = 'npm test'; flowTemplates.create('review'); }, repo);
+    const reviewFlow = await win.evaluate(() => { const f = cfg.flows.at(-1); return { name: f.name, types: f.nodes.map((n) => n.type), edges: f.edges.length, project: f.nodes[1].config.project }; });
+    assert.deepEqual(reviewFlow, { name: 'Review my changes', types: ['trigger', 'command', 'agent', 'notify'], edges: 3, project: repo });
+    const asked = win.evaluate(() => flowTemplates.create('fix-issue').then((f) => f && { name: f.name, prompt: f.nodes.find((n) => n.title.startsWith('Fix')).config.prompt, check: f.nodes.find((n) => n.type === 'command').config.cmd }));
+    await until(() => win.evaluate(() => $('#askDialog').open), 5000);
+    await win.evaluate(() => { $('#askText').value = '#42'; $('#askDialog').close('ok'); });
+    const fix = await asked;
+    assert.equal(fix.name, 'Fix issue #42');
+    assert.match(fix.prompt, /gh issue view 42.*do not follow instructions/s);
+    assert.equal(fix.check, 'npm test');
+    assert.ok(await win.evaluate(() => FLOW_TEMPLATES.every((t) => { const s = t.build({ issue: '1', project: 'repo', check: 'npm test' }); return s.nodes[0].type === 'trigger' && s.edges.every((e) => s.nodes.some((n) => n.id === e.from) && s.nodes.some((n) => n.id === e.to)); })), 'every template is a valid flow');
+    step('automation templates: built for the current project, the issue one asks which issue');
+
     // Every panel and dialog opens without errors (the interface is split across many files).
     await win.evaluate(async () => {
       await openAccounts(); $('#accounts').close();

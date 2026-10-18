@@ -172,7 +172,7 @@ function dispatchQueued(onlyFlows = false) {
   for (const t of tasks()) {
     if (slots <= 0) break;
     if (t.status !== 'pending' || (onlyFlows && !t.flowRun) || !depsReady(t)) continue;
-    if (costTracker.overDailyBudget() && !t.light && !t.heavy) { t.light = true; t.budgetLight = true; }
+    if (costTracker.overBudget(t.cwd) && !t.light && !t.heavy) { t.light = true; t.budgetLight = true; }
     const key = pickAgent(t);
     if (!key) continue;
     slots--;
@@ -462,7 +462,7 @@ function updateProgress() {
     `${done}/${list.length} done`, running.length && `${running.length} working`, kids && `${kids} subagent${kids === 1 ? '' : 's'}`,
     errors && `<b class="bad">${errors} with errors</b>`, blocked && `<b class="bad">${blocked} blocked</b>`,
     running.some((t) => t.tokens) && `${fmt.tokens(running.reduce((n, t) => n + (t.tokens || 0), 0))} tokens`,
-    costTracker.overDailyBudget() && '<b class="warn" title="New tasks use light models until tomorrow">daily budget reached</b>',
+    costTracker.overBudget(null) && `<b class="warn" title="New tasks use light models until the period ends (Settings → Tasks)">${esc(costTracker.overBudget(null))} reached</b>`,
   ].filter(Boolean).join(' · ') + (noBridge ? ' · <button class="inline" data-x="connect" title="Register AgentBoard in your CLIs so task agents can open subagents you can see">Enable subagents</button>' : '');
 }
 

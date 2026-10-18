@@ -115,6 +115,7 @@ async function scanUsage({ tasks, historyFile, claudeDirs = [], codexDir }) {
   const days = {};          // day → { tokens, sessions, tasks }
   const byAgent = {};       // agent → totals
   const byProject = {};     // cwd → tokens
+  const projectDays = {};   // cwd → day → tokens (cost history per project)
   const sessionTokens = {}; // Claude sessionId → tokens (for tokens per task)
 
   for (const src of sources) {
@@ -129,6 +130,7 @@ async function scanUsage({ tasks, historyFile, claudeDirs = [], codexDir }) {
         fileTokens += t;
         const dd = days[day] || (days[day] = { tokens: 0, sessions: 0, tasks: 0 });
         dd.tokens += t; dd.sessions++;
+        if (s.cwd && t) { const pd = projectDays[s.cwd] || (projectDays[s.cwd] = {}); pd[day] = (pd[day] || 0) + t; }
       }
       if (!fileTokens) continue;
       tot.sessions++;
@@ -153,7 +155,7 @@ async function scanUsage({ tasks, historyFile, claudeDirs = [], codexDir }) {
   }
 
   return {
-    days, byAgent, taskStats,
+    days, byAgent, taskStats, projectDays,
     byProject: Object.entries(byProject).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([cwd, tokens]) => ({ cwd, tokens })),
   };
 }

@@ -1,13 +1,11 @@
 // AgentBoard — what tasks cost while they run: tokens per task (read live from Claude's
-// session logs), a budget per task and per day, and the history the router learns from.
+// session logs), a budget per task, the usage that the day/week/month budgets are measured
+// against (Budgets) and the history the router learns from.
 'use strict';
-/* global cfg, esc, ab, toast, save, cardData, runtime, tasks, updateTaskLive, fmt */
-
-const todayKey = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+/* global cfg, esc, ab, toast, save, cardData, runtime, tasks, updateTaskLive, fmt, viewLayout, budgets */
 
 class CostTracker {
   constructor() {
-    this.today = 0;      // tokens used today
     this.byAgent = {};   // subscription → { done, blocked } on finished tasks
     setInterval(() => this.pollTasks(), 10_000);
     setInterval(() => this.refreshSummary(), 5 * 60_000);
@@ -16,8 +14,9 @@ class CostTracker {
 
   // Budgets are set in thousands of tokens in Settings → Tasks (0 = no budget).
   taskBudget() { return (cfg.taskBudgetK || 0) * 1000; }
-  dailyBudget() { return (cfg.dailyBudgetK || 0) * 1000; }
-  overDailyBudget() { return this.dailyBudget() > 0 && this.today >= this.dailyBudget(); }
+
+  // The day/week/month budget a task in `cwd` is over ("weekly budget of shop-api"), or null.
+  overBudget(cwd) { return budgets.over(cwd); }
 
   // Tokens of the running tasks; once a task reaches its budget, warn or ask it to wrap up.
   async pollTasks() {
@@ -42,11 +41,12 @@ class CostTracker {
     }
   }
 
-  // Today's total (daily budget) and how each subscription did on finished tasks.
+  // Usage for the budgets (and their alerts) and how each subscription did on finished tasks.
   async refreshSummary() {
     const r = await ab.usageScan(tasks().map((t) => ({ ...t })));
     if (!r.ok) return;
-    this.today = r.value.days[todayKey()]?.tokens || 0;
+    budgets.update(r.value);
+    budgets.checkAlerts();
     this.byAgent = r.value.taskStats?.byAgent || {};
   }
 
