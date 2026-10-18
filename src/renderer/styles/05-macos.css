@@ -1,0 +1,75 @@
+/* AgentBoard — The macOS look layered over the base styles (toolbar, sidebar, sheets). */
+/* =====================================================================
+   v0.3 — macOS style: unified toolbar, edge-to-edge sidebar and inspector
+   ===================================================================== */
+html, body { font-size: var(--ui-scale); background: var(--bg); letter-spacing: 0; }
+body { font: var(--ui-scale)/1.4 var(--font-ui); }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: rgba(var(--fg-rgb), .18); border-radius: 10px; border: 3px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-track { background: transparent; }
+
+.eyebrow, .lbl, dialog h3, .side-group, .group-title, .dg-note-title, .popover.edit label, .popover.handoff label {
+  font: 600 11px var(--font-ui) !important; text-transform: none !important; letter-spacing: 0 !important; color: var(--muted);
+}
+.dg-attr i { font: 600 10.5px var(--font-ui); text-transform: none; letter-spacing: 0; }
+
+button { border-radius: 7px; padding: 4px 11px; box-shadow: inset 0 0 0 .5px var(--line-hi), 0 .5px 1px rgba(0,0,0,.08); }
+button.primary { background: var(--accent) !important; color: var(--on-accent) !important; font-weight: 500; box-shadow: 0 1px 2px rgba(0,0,0,.15) !important; }
+button.primary:hover { filter: brightness(1.08); }
+select, input, textarea { border-radius: 7px !important; }
+input:focus, select:focus, textarea:focus { box-shadow: 0 0 0 3px rgba(var(--accent-rgb), .35), inset 0 0 0 .5px var(--accent) !important; }
+.seg { background: var(--fill); padding: 2px; border-radius: 8px; gap: 2px; }
+.seg button, .tabs button { box-shadow: none; border-radius: 6px; }
+.seg button.active, .tabs button.active { background: var(--surface); box-shadow: 0 1px 2px rgba(0,0,0,.18), inset 0 0 0 .5px var(--line-hi); color: var(--text); }
+.tabs { background: var(--fill); border-radius: 9px; box-shadow: none; padding: 2px; }
+
+/* unified toolbar */
+#topbar {
+  top: 0; left: 0; right: 0; height: 52px; border-radius: 0; gap: 14px; padding: 0 12px;
+  background: var(--glass); box-shadow: 0 .5px 0 var(--line-hi);
+}
+body.mac #topbar { padding-left: 84px; }
+.machine { box-shadow: none; background: var(--fill); }
+.brand-name { font-weight: 600; font-size: 13.5px; }
+
+/* sidebar (Finder) and inspector (tasks) attached to the edges */
+#sidebar { top: 52px; left: 0; bottom: 0; width: 248px; border-radius: 0; box-shadow: .5px 0 0 var(--line-hi); background: var(--glass); }
+#tasks { top: 52px; right: 0; bottom: 0; width: 352px; border-radius: 0; box-shadow: -.5px 0 0 var(--line-hi); background: var(--glass); }
+body.tasks-open #minimap { right: 366px; }
+#diagram { top: 64px; }
+body.tasks-open #diagram { right: 364px; }
+.side-item { border-radius: 6px; padding: 5px 9px; }
+.side-item.focused { background: rgba(var(--accent-rgb), .2); box-shadow: none; }
+.side-item::before { display: none; }
+.side-item .status { margin-left: 1px; }
+
+/* board */
+#board { background-color: var(--board); background-image: radial-gradient(rgba(var(--fg-rgb), .09) 1px, transparent 1.2px); }
+.card { border-radius: 10px; box-shadow: 0 0 0 .5px var(--line-hi), 0 18px 50px -20px rgba(0,0,0,.55); }
+.card-head { height: 32px; background: var(--surface); border-bottom: .5px solid var(--line-hi); }
+.title { font-weight: 600; font-size: 12.5px; }
+.proj { font: 500 11px var(--font-ui); text-transform: none; letter-spacing: 0; }
+.card-body { padding: 6px 0 0 10px; }
+.status.idle { background: var(--ok); }
+.frame { border-radius: 16px; }
+.frame-head { border-radius: 9px; height: 30px; }
+.frame-title { font-size: 13px; }
+
+/* dock as a floating bar */
+#dock { border-radius: 14px; padding: 6px; bottom: 12px; }
+.chip { border-radius: 8px; padding: 5px 11px; }
+
+/* dialogs and popovers: macOS sheets */
+dialog { background: var(--surface); border-radius: 14px; box-shadow: 0 0 0 .5px var(--line-hi), 0 30px 90px -20px rgba(0,0,0,.6); }
+dialog h2 { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+.popover { background: var(--surface); border-radius: 10px; box-shadow: 0 0 0 .5px var(--line-hi), var(--shadow); }
+.hub-row, .task { border-radius: 10px; box-shadow: inset 0 0 0 .5px var(--line); background: var(--fill); }
+.toast { background: var(--surface); border-radius: 10px; }
+.toast b { color: var(--accent); }
+.badge-n { background: var(--accent); color: #fff; }
+.tchip { font: 500 10.5px var(--font-ui); }
+.pal { background: var(--surface); border-radius: 14px; }
+.dg-pkg-tab, .dg-sub-tab { font-family: var(--font-ui); }
+#dgCanvas { background-color: var(--board); background-image: radial-gradient(rgba(var(--fg-rgb), .07) 1px, transparent 1.2px); }
+.dg-node { border-radius: 10px; }
+.dg-edge-label { stroke: var(--board); }

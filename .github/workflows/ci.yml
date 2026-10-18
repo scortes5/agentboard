@@ -35,9 +35,11 @@ jobs:
         # node --check compiles files as CommonJS, which allows a top-level return;
         # the renderer loads them as plain <script>s, where that is a syntax error.
         run: |
-          for f in src/renderer/*.js; do
+          for f in $(find src/renderer -name '*.js'); do
             node -e "new (require('vm').Script)(require('fs').readFileSync(process.argv[1], 'utf8'), { filename: process.argv[1] })" "$f" || exit 1
           done
+      - name: Unit and open/closed tests
+        run: npm test
       - name: Validate JSON
         run: |
           for f in package.json; do node -e "JSON.parse(require('fs').readFileSync('$f','utf8'))"; done

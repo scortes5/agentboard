@@ -333,6 +333,7 @@ npm start          # opens the app in development mode
 npm run app        # builds and installs the app
 npm run dist:mac   # builds the .dmg files  ·  npm run dist:win  builds the .exe
 npm run icon       # regenerates the icons from src/assets/logo.svg
+npm test           # unit and open/closed tests
 npm run test:e2e   # opens the real app and drives a task with a fake agent (Linux: xvfb-run -a npm run test:e2e)
 ```
 
@@ -341,37 +342,17 @@ When a new `version` in `package.json` reaches `main`, the `.github/workflows/bu
 To see the update notice from source, pretend to run an older version: `AGENTBOARD_FAKE_VERSION=0.1.0 npm start` (the check runs 10 seconds after opening).
 
 ```
-src/
-  main.js         app lifecycle: window, menus, tray, shortcuts; wires the modules below
-  config.js       this machine's board and defaults
-  shell-env.js    the user's shell and PATH; headless and shell runs
-  pty-host.js     the cards' real terminals
-  git.js          status, branches, worktrees, checkpoints, diffs, merges, pull requests
-  agents.js       installed CLIs, sign-in, local models, Claude accounts, MCP status
-  library.js      skills, subagents, bundled skills and usage
-  ai.js           cheap model calls: routing tasks, automation design, shell steps
-  bridge.js       local bridge between agents (socket + token)
-  skills.js       reads and edits each CLI's skills, commands and subagents
-  usage.js        tokens and sessions from the CLIs' local logs
-  updates.js      update checks: electron-updater on Windows, GitHub releases on Mac
-  preload.js      the only bridge between the interface and the main process
-  renderer/
-    app.js        board, cards, groups, tabs, appearance and settings
-    tasks.js      task queue, spreading across subscriptions, live progress
-    task-checks.js  checks after each task and cross-review
-    approvals.js  inbox of agents asking for permission
-    review.js     diff review, comments, merge, pull request, undo
-    templates.js  task templates
-    flows.js      automations: editor, runs and AI design
-    diagram.js    diagram view
-    palette.js    command palette
-    usage.js      usage and savings panel
-    icons.js      icons and contextual help
-test/             end-to-end test with a fake agent
-skills-pack/      token-saving skills
-scripts/          MCP server, app install and icons
-docs/             guide and screenshots
+src/main/        main process: one folder per area (app, core, shell, terminals, git, agents,
+                 library, ai, bridge, updates); index.js wires the services together
+src/preload/     the only bridge between the interface and the main process
+src/renderer/    the window: core, board, watchers, tasks, review, settings, flows, diagram…
+skills-pack/     token-saving skills
+scripts/         MCP server, app install and icons
+test/            unit, open/closed and end-to-end tests
+docs/            guide and screenshots
 ```
+
+See the wiki's [Architecture](https://github.com/scortes5/agentboard/wiki/Architecture) page for the classes and how to extend the app by adding files.
 
 ---
 

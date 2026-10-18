@@ -7,7 +7,13 @@
   <title>AgentBoard</title>
   <link rel="icon" type="image/svg+xml" href="../assets/logo.svg" />
   <link rel="stylesheet" href="../../node_modules/@xterm/xterm/css/xterm.css" />
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles/01-base.css" />
+  <link rel="stylesheet" href="styles/02-board.css" />
+  <link rel="stylesheet" href="styles/03-dialogs.css" />
+  <link rel="stylesheet" href="styles/04-panels.css" />
+  <link rel="stylesheet" href="styles/05-macos.css" />
+  <link rel="stylesheet" href="styles/06-settings-automations.css" />
+  <link rel="stylesheet" href="styles/07-task-control.css" />
 </head>
 <body>
   <main id="board">
@@ -451,19 +457,42 @@
   <script src="../../node_modules/@xterm/xterm/lib/xterm.js"></script>
   <script src="../../node_modules/@xterm/addon-fit/lib/addon-fit.js"></script>
   <script src="../../node_modules/@xterm/addon-web-links/lib/addon-web-links.js"></script>
-  <script src="icons.js"></script>
-  <script src="app.js"></script>
-  <script src="settings.js"></script>
-  <script src="tasks.js"></script>
-  <script src="diagram.js"></script>
-  <script src="palette.js"></script>
-  <script src="flows.js"></script>
-  <script src="usage.js"></script>
-  <script src="approvals.js"></script>
-  <script src="review.js"></script>
-  <script src="task-checks.js"></script>
-  <script src="templates.js"></script>
-  <script src="costs.js"></script>
-  <script src="limits.js"></script>
+  <script src="core/format.js"></script>
+  <script src="core/icons.js"></script>
+  <script src="core/state.js"></script>
+  <script src="board/viewport.js"></script>
+  <script src="board/cards.js"></script>
+  <script src="board/selection.js"></script>
+  <script src="board/groups.js"></script>
+  <script src="board/status.js"></script>
+  <script src="watchers/TerminalWatchers.js"></script>
+  <script src="board/git.js"></script>
+  <script src="board/pan-zoom.js"></script>
+  <script src="board/card-menu.js"></script>
+  <script src="board/sidebar.js"></script>
+  <script src="board/minimap.js"></script>
+  <script src="agents/accounts.js"></script>
+  <script src="core/notify.js"></script>
+  <script src="agents/handoff.js"></script>
+  <script src="agents/bridge-events.js"></script>
+  <script src="agents/skills-dialog.js"></script>
+  <script src="board/spaces.js"></script>
+  <script src="main.js"></script>
+  <script src="settings/settings.js"></script>
+  <script src="tasks/tasks.js"></script>
+  <script src="diagram/diagram.js"></script>
+  <script src="palette/palette.js"></script>
+  <script src="flows/flows.js"></script>
+  <script src="usage/usage-panel.js"></script>
+  <script src="watchers/ErrorWatch.js"></script>
+  <script src="watchers/ApprovalsInbox.js"></script>
+  <script src="review/UnifiedDiff.js"></script>
+  <script src="review/ReviewDialog.js"></script>
+  <script src="tasks/pipeline/TaskPipeline.js"></script>
+  <script src="tasks/pipeline/ChecksStep.js"></script>
+  <script src="tasks/pipeline/CrossReviewStep.js"></script>
+  <script src="tasks/TemplateLibrary.js"></script>
+  <script src="tasks/CostTracker.js"></script>
+  <script src="tasks/LimitsNotice.js"></script>
 </body>
 </html>

@@ -4,6 +4,13 @@ All notable changes to AgentBoard. The format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-10-18
+
+### Changed
+- **The code is organized by area, with a class for each process.** The main process lives in `src/main/` (app, core, shell, terminals, git, agents, library, ai, bridge, updates) and `src/main/index.js` is the only place that builds and wires the services. The interface lives in `src/renderer/` folders (core, board, watchers, tasks, review, settings…), and its styles in seven files loaded in order.
+- **Extension points instead of edits**: a new CLI is a file in `agents/providers`, a new tool for agents is a file in `bridge/tools` (the MCP server now asks the app for its tools), updates use a strategy per platform, terminal detections are watchers and post-task steps are pipeline steps. Tests check that each one plugs in without changing the code that uses it.
+- Repeated number and time formatting merged into one helper.
+
 ## [1.0.0] - 2026-10-18
 
 ### Added
@@ -164,7 +171,8 @@ Includes the 0.2.0 changes, which were not released separately.
 ### Added
 - First release: a board of terminals for CLI agents on Mac and Windows.
 
-[Unreleased]: https://github.com/scortes5/agentboard/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/scortes5/agentboard/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/scortes5/agentboard/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/scortes5/agentboard/compare/v0.9.0...v1.0.0
 [0.9.0]: https://github.com/scortes5/agentboard/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/scortes5/agentboard/compare/v0.7.0...v0.8.0
