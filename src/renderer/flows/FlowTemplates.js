@@ -18,10 +18,10 @@ const FLOW_TEMPLATES = [
       nodes: [
         { id: 't', type: 'trigger', title: 'Start', config: { mode: 'manual' } },
         { id: 'fix', type: 'agent', title: `Fix #${issue}`, config: { project, agent: 'auto', mode: 'normal', prompt: `Read GitHub issue #${issue} with \`gh issue view ${issue}\`. ${ISSUE_CAUTION} Create the branch fix/issue-${issue}, fix the problem with the smallest change, and add or update a test that covers it. Commit with the git author already configured. Do not push.` } },
-        { id: 'test', type: 'command', title: 'Run the checks', config: { project, cmd: check } },
+        { id: 'test', type: 'command', title: 'Run the checks', config: { project, cmd: check, inTaskFolder: true } },
         { id: 'pr', type: 'agent', title: 'Open the pull request', config: { project, agent: 'auto', mode: 'light', prompt: `Push the branch fix/issue-${issue} and open a pull request with \`gh pr create\`: a short title, and a description that explains the fix and includes "Closes #${issue}".` } },
         { id: 'n', type: 'notify', title: 'Notify', config: { message: `Pull request ready for issue #${issue}` } },
-        { id: 'note', type: 'note', title: 'If the checks fail', config: { text: 'The flow stops at the failed step: open the fix task\'s card and ask the agent to fix the checks, then run it again. The checks run in the project folder, so use it with "Worktree per task" off.' } },
+        { id: 'note', type: 'note', title: 'If the checks fail', config: { text: 'The flow stops at the failed step: open the fix task\'s card and ask the agent to fix the checks, then run it again.' } },
       ],
       edges: [{ from: 't', to: 'fix' }, { from: 'fix', to: 'test' }, { from: 'test', to: 'pr' }, { from: 'pr', to: 'n' }],
     }),

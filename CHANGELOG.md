@@ -4,6 +4,20 @@ All notable changes to AgentBoard. The format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+## [1.5.1] - 2026-10-18
+
+### Added
+- **Usage at API prices**: an estimate in dollars of what the tokens would cost through the API, in total and per project this month. Prices are $ per million tokens, editable in *Settings → Tasks* (Claude Sonnet's by default). With a subscription you don't pay per token.
+- **Activity log**: search it, and *Export CSV* saves it whole. Cells are written so a spreadsheet never runs them as formulas.
+- **Command steps** can run in the folder of the previous agent's task, its worktree if it has one. The *Fix a GitHub issue* template now uses this, so its checks test the agent's changes with *Worktree per task* on as well.
+
+### Changed
+- The dangerous-request rule for `.env` now flags `.env`, `.env.local`, `.env.production`… but no longer `.env.example` or `process.env` in code. Lists saved by earlier versions are updated when read.
+- New README and wiki screenshots of the current interface, taken from the app by `scripts/demo/screenshots.js`.
+
+### Fixed
+- The demo agent read model arguments (`-m …`) as its task.
+
 ## [1.5.0] - 2026-10-18
 
 ### Added

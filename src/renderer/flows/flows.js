@@ -184,6 +184,7 @@ function renderInspector() {
   } else if (n.type === 'command') {
     body += field('cmd', 'Command', `<textarea data-c="cmd" rows="3" class="mono" placeholder="npm test">${esc(c.cmd || '')}</textarea>`);
     body += field('project', 'Folder', `<select data-c="project">${projectOptions(c.project)}</select>`);
+    body += `<label class="fl-field check"><input type="checkbox" data-c="inTaskFolder" ${c.inTaskFolder ? 'checked' : ''}/> <span>Run in the folder of the previous agent's task (its worktree, if it has one)</span></label>`;
     body += field('secrets', 'Secrets it can use (optional)', `<input data-c="secrets" class="mono" value="${esc(c.secrets || '')}" placeholder="APP_USER, APP_PASSWORD"/>`);
     body += `<p class="set-note">If it exits with an error, the following steps do not run. Secrets (Settings → Secrets) arrive as environment variables, and their values are hidden in the output.</p>`;
   } else if (n.type === 'condition') {
@@ -296,7 +297,7 @@ function wireFlowCanvas() {
     if (e.target.dataset.f === 'enabled') { f.enabled = e.target.checked; save(); renderFlowList(); return; }
     if (!n) return;
     if (e.target.dataset.k) n[e.target.dataset.k] = e.target.value;
-    if (e.target.dataset.c) n.config[e.target.dataset.c] = e.target.type === 'number' ? +e.target.value : e.target.value;
+    if (e.target.dataset.c) n.config[e.target.dataset.c] = e.target.type === 'number' ? +e.target.value : e.target.type === 'checkbox' ? e.target.checked : e.target.value;
     save();
     const el = $(`#flNodes [data-node="${CSS.escape(n.id)}"]`);
     if (el) { $('.fl-node-title', el).textContent = n.title || NODE_TYPES[n.type].label; $('.fl-node-sum', el).textContent = nodeSummary(n); }
@@ -354,6 +355,13 @@ function waitForTask(id, run) {
   });
 }
 
+// The folder of the last agent task this run finished: its own worktree when "Worktree per
+// task" is on, so a check or a git command right after it sees what the agent changed.
+function lastTaskFolder(run) {
+  const done = Object.keys(run.taskNode).map(taskById).filter((t) => t && t.status === 'done').sort((a, b) => (b.finishedAt || 0) - (a.finishedAt || 0));
+  return done[0] ? done[0].workdir || done[0].cwd : null;
+}
+
 async function execNode(f, run, n) {
   const c = n.config || {};
   const ctx = contextFor(f, run, n.id);
@@ -366,7 +374,8 @@ async function execNode(f, run, n) {
   }
   if (n.type === 'command') {
     if (!c.cmd) return { ok: false, text: 'No command.' };
-    const r = await ab.flowExec(c.cmd, c.project || cfg.selectedProject, SecretsSettings.parse(c.secrets));
+    const folder = (c.inTaskFolder && lastTaskFolder(run)) || c.project || cfg.selectedProject;
+    const r = await ab.flowExec(c.cmd, folder, SecretsSettings.parse(c.secrets));
     if (!r.ok) return { ok: false, text: r.error };
     const tail = r.value.out.split('\n').slice(-6).join('\n');
     return { ok: r.value.code === 0, text: `${r.value.code === 0 ? 'OK' : `exit code ${r.value.code}`}\n${tail}` };

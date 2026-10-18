@@ -6,10 +6,13 @@
 'use strict';
 /* global cfg */
 
+// A .env file (.env, .env.local, .env.production…), but not .env.example and not process.env in code.
+const ENV_FILE_RULE = '/(?<![\\w$])\\.env(?![\\w.-]*(example|sample|template))/';
+
 const DEFAULT_DANGER = [
   'rm -rf', 'rm -fr', 'git push --force', 'git push -f', 'git reset --hard', 'git clean -fd',
   'sudo ', 'chmod -R 777', 'mkfs', 'dd if=', '/curl[^|]*\\|\\s*(ba|z)?sh/', '/wget[^|]*\\|\\s*(ba|z)?sh/',
-  'DROP TABLE', 'DROP DATABASE', '.env', 'id_rsa', '.ssh/', 'npm publish', 'kubectl delete', 'terraform destroy',
+  'DROP TABLE', 'DROP DATABASE', ENV_FILE_RULE, 'id_rsa', '.ssh/', 'npm publish', 'kubectl delete', 'terraform destroy',
 ];
 
 class ApprovalPolicy {
@@ -22,7 +25,11 @@ class ApprovalPolicy {
     }).filter(Boolean);
   }
 
-  danger() { return ApprovalPolicy.rules(cfg.approvalDanger ?? DEFAULT_DANGER.join('\n')); }
+  // Lists saved before 1.5.1 have a plain ".env" line, which also flagged .env.example and process.env.
+  danger() {
+    const text = cfg.approvalDanger ?? DEFAULT_DANGER.join('\n');
+    return ApprovalPolicy.rules(text.split('\n').map((l) => (l.trim() === '.env' ? ENV_FILE_RULE : l)).join('\n'));
+  }
   auto() { return ApprovalPolicy.rules(cfg.approvalAuto || ''); }
 
   // 'danger' | 'auto' | 'ask' for a request { question, context }.

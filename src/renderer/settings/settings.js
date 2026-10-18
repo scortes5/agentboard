@@ -264,6 +264,8 @@ async function openSettings(section = 'general') {
   f.weeklyBudgetK.value = cfg.weeklyBudgetK || 0;
   f.monthlyBudgetK.value = cfg.monthlyBudgetK || 0;
   f.budgetAlertsToChat.checked = !!cfg.budgetAlertsToChat;
+  const prices = CostEstimate.prices();
+  f.priceInput.value = prices.input; f.priceOutput.value = prices.output; f.priceCacheRead.value = prices.cacheRead; f.priceCacheWrite.value = prices.cacheWrite;
   for (const b of $('#budgetSeg').querySelectorAll('[data-v]')) b.classList.toggle('active', b.dataset.v === (cfg.budgetAction || 'warn'));
   f.preferLocalForLight.checked = !!cfg.preferLocalForLight;
   f.limitFallback.checked = cfg.limitFallback !== false;
@@ -318,6 +320,9 @@ $('#settings').addEventListener('close', async () => {
   cfg.weeklyBudgetK = clamp(+f.weeklyBudgetK.value || 0, 0, 10000000);
   cfg.monthlyBudgetK = clamp(+f.monthlyBudgetK.value || 0, 0, 100000000);
   cfg.budgetAlertsToChat = f.budgetAlertsToChat.checked;
+  const price = (v, d) => (v === '' || !(+v >= 0) ? d : +v);
+  cfg.apiPrices = { input: price(f.priceInput.value, DEFAULT_API_PRICES.input), output: price(f.priceOutput.value, DEFAULT_API_PRICES.output),
+    cacheRead: price(f.priceCacheRead.value, DEFAULT_API_PRICES.cacheRead), cacheWrite: price(f.priceCacheWrite.value, DEFAULT_API_PRICES.cacheWrite) };
   cfg.budgetAction = $('#budgetSeg .active')?.dataset.v || 'warn';
   cfg.preferLocalForLight = f.preferLocalForLight.checked;
   cfg.limitFallback = f.limitFallback.checked;

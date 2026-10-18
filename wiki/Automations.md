@@ -10,7 +10,7 @@ Open with **Automations** (⇧⌘F). A flow is a diagram of connected steps, n8n
 |---|---|
 | **Trigger** | When it starts: by hand, every N minutes, or every day at a set time. |
 | **Agent** | An agent does a piece of work. It becomes a queued task with its subscription and model. |
-| **Command** | Runs a command in the project (tests, build, git). If it fails, what follows does not run. It can use secrets (see below). |
+| **Command** | Runs a command in the project (tests, build, git), or in the folder of the previous agent's task (its worktree, if it has one). If it fails, what follows does not run. It can use secrets (see below). |
 | **Decision** | Claude reads the previous result and answers yes or no; the flow continues down that branch. |
 | **Notify** | Sends a desktop notification. |
 | **Concept** | An idea written on the diagram; it does not run. |
@@ -21,7 +21,7 @@ Open with **Automations** (⇧⌘F). A flow is a diagram of connected steps, n8n
 
 | Template | What it does |
 |---|---|
-| Fix a GitHub issue → tests → pull request | Asks which issue. An agent fixes it on `fix/issue-n` with a test, the checks run, and another agent opens the PR with "Closes #n". The agent reads the issue itself and is told its text is a description, not instructions. |
+| Fix a GitHub issue → tests → pull request | Asks which issue. An agent fixes it on `fix/issue-n` with a test, the checks run in that task's folder (its worktree, if any), and another agent opens the PR with "Closes #n". The agent reads the issue itself and is told its text is a description, not instructions. |
 | Nightly tests that fix themselves | Every night at 02:00 an agent runs the checks and fixes what fails. |
 | Review my changes before committing | The most capable model reviews your uncommitted changes without editing anything. |
 | Update dependencies safely | Patch and minor updates on `chore/deps`, committed only if the checks pass; major versions are listed. |

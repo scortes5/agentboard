@@ -222,3 +222,14 @@ test('usage is kept per project and per day, for the cost history and the budget
   const r = await usage.scanUsage({ tasks: [], historyFile: path.join(dir, 'h.json'), claudeDirs: [dir] });
   assert.deepEqual(r.projectDays, { '/work/shop': { '2026-10-12': 150, '2026-10-13': 150 }, '/work/blog': { '2026-10-13': 150 } });
 });
+
+test('the security log exports as CSV that a spreadsheet will not run as formulas', () => {
+  const { AuditLog } = require('../src/main/security/AuditLog');
+  const csv = AuditLog.toCsv([
+    { at: '2026-10-18T03:00:00Z', kind: 'command', cmd: 'echo "hi", there', code: -1, secrets: ['A', 'B'] },
+    { at: '2026-10-18T03:01:00Z', kind: 'approval', card: '=HYPERLINK("x")', yes: true },
+  ]);
+  assert.equal(csv, 'at,kind,cmd,code,secrets,card,yes\n'
+    + '2026-10-18T03:00:00Z,command,"echo ""hi"", there",-1,A B,,\n'
+    + `2026-10-18T03:01:00Z,approval,,,,"'=HYPERLINK(""x"")",true\n`);
+});

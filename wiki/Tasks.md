@@ -91,4 +91,5 @@ Each task works on its own branch `agentboard/<task>` in a separate git worktree
 - **Budgets** in thousands of tokens: per task (*Settings → Tasks*: warn, or ask the agent to wrap up), per day, per week and per month for all projects (*Settings → Tasks*), and per week and month for each project (*Settings → Projects*).
 - At **80%** and **100%** of a budget you get a notice once per period; turn on *Also send budget alerts to the daily summary's chat* to get them in Slack or Discord too.
 - Past a budget, new tasks in its scope use **light models** until the period ends (weeks start on Monday).
+- **Usage** also estimates what the tokens would cost at API prices (editable in *Settings → Tasks*; with a subscription you don't pay per token).
 - **Usage → Cost by Project** shows each project's tokens today, this week, this month and over the last 30 days, and **Usage → Budgets** how far along each budget is.
