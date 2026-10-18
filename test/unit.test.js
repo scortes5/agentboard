@@ -212,3 +212,13 @@ test('a command gets its secrets as variables and its output hides them', async 
   assert.equal(seenEnv.APP_PASSWORD, 'hunter2-very-secret');
   assert.equal(r.out, 'logged in with ••••••');
 });
+
+test('usage is kept per project and per day, for the cost history and the budgets', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'claude-'));
+  fs.mkdirSync(path.join(dir, 'projects', '-shop'), { recursive: true });
+  const msg = (id, cwd, day) => JSON.stringify({ type: 'assistant', cwd, timestamp: `${day}T12:00:00Z`, message: { id, usage: { input_tokens: 100, output_tokens: 50 } } });
+  fs.writeFileSync(path.join(dir, 'projects', '-shop', 'a.jsonl'), [msg('m1', '/work/shop', '2026-10-12'), msg('m2', '/work/shop', '2026-10-13')].join('\n'));
+  fs.writeFileSync(path.join(dir, 'projects', '-shop', 'b.jsonl'), msg('m3', '/work/blog', '2026-10-13'));
+  const r = await usage.scanUsage({ tasks: [], historyFile: path.join(dir, 'h.json'), claudeDirs: [dir] });
+  assert.deepEqual(r.projectDays, { '/work/shop': { '2026-10-12': 150, '2026-10-13': 150 }, '/work/blog': { '2026-10-13': 150 } });
+});

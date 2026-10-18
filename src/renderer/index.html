@@ -143,7 +143,7 @@
 
   <section id="flows" class="hidden">
     <aside class="fl-side">
-      <div class="side-head"><span class="eyebrow">Automations</span><button type="button" id="flNew" class="card-btn" data-icon="plus" title="New blank automation"></button></div>
+      <div class="side-head"><span class="eyebrow">Automations</span><span class="spacer"></span><button type="button" id="flTemplates" class="card-btn" data-icon="list" title="New automation from a template (fix an issue, nightly tests, review…)"></button><button type="button" id="flNew" class="card-btn" data-icon="plus" title="New blank automation"></button></div>
       <div id="flList"></div>
       <button type="button" id="flClose" class="fl-back" data-icon="back" title="Back to the board (Esc)">Back to Board</button>
     </aside>
@@ -152,7 +152,7 @@
         <h2>Automate with your agents.</h2>
         <p>Draw a flow like in n8n — trigger, agents, commands, decisions — and AgentBoard runs it with your subscriptions.
           Or describe it and AI designs it for you.</p>
-        <p><button type="button" id="flEmptyAI" class="primary" title="Describe what you want and AI builds the diagram">Design with AI</button> <button type="button" id="flEmptyNew" title="Start with a trigger and add steps by hand">Start Blank</button></p>
+        <p><button type="button" id="flEmptyAI" class="primary" title="Describe what you want and AI builds the diagram">Design with AI</button> <button type="button" id="flEmptyTemplates" title="Fix an issue, nightly tests, review before committing, update dependencies…">Start from a Template</button> <button type="button" id="flEmptyNew" title="Start with a trigger and add steps by hand">Start Blank</button></p>
       </div>
       <div id="flMain" class="hidden">
         <div class="fl-bar">
@@ -286,7 +286,7 @@
 
         <section data-sec="projects" class="hidden">
           <h2>Projects</h2>
-          <p class="set-note">Each project is a tab at the top; its agents work at the same time as everyone else's.</p>
+          <p class="set-note">Each project is a tab at the top; its agents work at the same time as everyone else's. Set a weekly or monthly token budget per project to get a notice at 80% and 100%; past it, new tasks in that project use light models.</p>
           <div id="projectRows"></div>
         </section>
 
@@ -312,6 +312,9 @@
             <div class="set-row">When a task reaches it
               <div class="seg" id="budgetSeg"><button type="button" data-v="warn" title="Only tell me">Warn me</button><button type="button" data-v="wrap" title="Ask the agent to finish the smallest working change now">Ask it to wrap up</button></div></div>
             <label class="set-row">Daily token budget, in thousands (0 = none; past it, new tasks use light models) <input name="dailyBudgetK" type="number" min="0" max="1000000" step="100" /></label>
+            <label class="set-row">Weekly token budget, in thousands (0 = none; weeks start on Monday) <input name="weeklyBudgetK" type="number" min="0" max="10000000" step="1000" /></label>
+            <label class="set-row">Monthly token budget, in thousands (0 = none) <input name="monthlyBudgetK" type="number" min="0" max="100000000" step="1000" /></label>
+            <label class="set-row check" title="At 80% and 100% of a budget you get a notice; this also posts it to the channel of the daily summary (Settings → Integrations)"><span>Also send budget alerts to the daily summary's chat</span><input name="budgetAlertsToChat" type="checkbox" class="switch-input" /></label>
             <label class="set-row check"><span>Send light tasks to local models first (agents marked "local")</span><input name="preferLocalForLight" type="checkbox" class="switch-input" /></label>
             <label class="set-row check"><span>When a subscription hits its limit, move even tasks pinned to it (<code>@name</code>) to another one</span><input name="limitFallback" type="checkbox" class="switch-input" /></label>
             <div class="set-row">Subscriptions out of usage <span id="exhaustedList" class="muted">None</span></div>
@@ -576,6 +579,7 @@
   <script src="diagram/diagram.js"></script>
   <script src="palette/palette.js"></script>
   <script src="flows/flows.js"></script>
+  <script src="flows/FlowTemplates.js"></script>
   <script src="usage/usage-panel.js"></script>
   <script src="watchers/ErrorWatch.js"></script>
   <script src="watchers/ApprovalPolicy.js"></script>
@@ -586,6 +590,7 @@
   <script src="tasks/pipeline/ChecksStep.js"></script>
   <script src="tasks/pipeline/CrossReviewStep.js"></script>
   <script src="tasks/TemplateLibrary.js"></script>
+  <script src="tasks/Budgets.js"></script>
   <script src="tasks/CostTracker.js"></script>
   <script src="tasks/LimitsNotice.js"></script>
   <script src="integrations/RemoteBridge.js"></script>

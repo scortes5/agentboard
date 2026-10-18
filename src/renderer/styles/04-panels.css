@@ -148,3 +148,13 @@ body.diagram-open #dock, body.diagram-open #minimap, body.diagram-open #sidebar,
 .pal-label { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pal-sub { color: var(--muted); font: 11px var(--font-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 45%; }
 .pal-empty { color: var(--muted); padding: 14px; font-size: 12.5px; }
+
+/* Usage → Cost by Project and Budgets */
+.u-cost { width: 100%; border-collapse: collapse; font-size: 12px; }
+.u-cost th { text-align: left; font-weight: 500; color: var(--muted); padding: 4px 6px; border-bottom: .5px solid var(--line); }
+.u-cost td { padding: 5px 6px; border-bottom: .5px solid var(--line); font-variant-numeric: tabular-nums; }
+.u-cost td:first-child { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.spark { display: flex; align-items: flex-end; gap: 1px; height: 22px; width: 150px; }
+.spark i { flex: 1; background: var(--accent); opacity: .75; border-radius: 1px 1px 0 0; min-width: 2px; }
+.u-track span.warn { background: var(--warn); }
+.u-track span.bad { background: var(--bad); }

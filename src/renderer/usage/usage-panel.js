@@ -43,8 +43,25 @@ function heatmap(days, metric) {
     <span class="hm-legend">less <i class="l0"></i><i class="l1"></i><i class="l2"></i><i class="l3"></i><i class="l4"></i> more</span></div>`;
 }
 
+// Each project's tokens today, this week and this month, with its last 30 days as small bars.
+function costByProject(rows) {
+  if (!rows.length) return '';
+  const max = Math.max(1, ...rows.flatMap((r) => r.last30.map((d) => d.tokens)));
+  return `<table class="u-cost"><thead><tr><th>Project</th><th>Today</th><th>This week</th><th>This month</th><th>Last 30 days</th></tr></thead><tbody>
+    ${rows.map((r) => `<tr><td title="${esc(r.path)}">${esc(r.name)}</td><td>${fmt.count(r.today)}</td><td>${fmt.count(r.week)}</td><td>${fmt.count(r.month)}</td>
+      <td><span class="spark">${r.last30.map((d) => `<i style="height:${Math.max(d.tokens ? 8 : 0, Math.round((d.tokens / max) * 100))}%" title="${esc(d.day)}: ${fmt.count(d.tokens)}"></i>`).join('')}</span></td></tr>`).join('')}
+  </tbody></table>`;
+}
+
+// Progress of every budget set in Settings (all projects and per project).
+function budgetStatus(list) {
+  return list.map((b) => `<div class="u-bar"><span class="u-name">${esc(b.name)} · ${{ day: 'today', week: 'this week', month: 'this month' }[b.period]}</span>
+    <span class="u-track"><span class="${b.ratio >= 1 ? 'bad' : b.ratio >= 0.8 ? 'warn' : ''}" style="width:${Math.min(100, b.ratio * 100)}%"></span></span>
+    <span class="u-val">${fmt.count(b.used)} of ${fmt.count(b.limit)} (${Math.round(b.ratio * 100)}%)</span></div>`).join('');
+}
+
 function renderUsage() {
-  const { days, byAgent, byProject, taskStats: ts } = usageData;
+  const { days, byAgent, taskStats: ts } = usageData;
   const sum = (k) => Object.values(byAgent).reduce((s, a) => s + (a[k] || 0), 0);
   const input = sum('input'), output = sum('output'), cacheRead = sum('cacheRead'), cacheWrite = sum('cacheWrite');
   const total = input + output + cacheRead + cacheWrite;
@@ -63,9 +80,9 @@ function renderUsage() {
       <span class="u-track"><span style="width:${total ? (t / total) * 100 : 0}%;background:${esc(color)}"></span></span>
       <span class="u-val">${fmt.count(t)} · ${a.sessions} sessions${done ? ` · ${done.done} done, ${done.blocked} blocked` : ''}</span></div>`;
   }).join('') || '<p class="muted small">No Claude Code or Codex logs on this computer.</p>';
-  const maxP = byProject[0]?.tokens || 1;
-  const projRows = byProject.map((p) => `<div class="u-bar"><span class="u-name" title="${esc(p.cwd)}">${esc(basename(p.cwd))}</span>
-    <span class="u-track"><span style="width:${(p.tokens / maxP) * 100}%"></span></span><span class="u-val">${fmt.count(p.tokens)}</span></div>`).join('');
+  budgets.update(usageData);
+  const projRows = costByProject(budgets.projectRows());
+  const budgetRows = budgetStatus(budgets.status());
 
   $('#usageBody').innerHTML = `
     <div class="u-head"><div id="usageMetric" class="seg">
@@ -88,7 +105,8 @@ function renderUsage() {
       ${tile('Tokens per task', ts.tokensPerTask.length ? fmt.count(median(ts.tokensPerTask)) : '—', 'median (Claude tasks)')}
     </div>
     <h3>By Subscription</h3><div class="rows">${agentRows}</div>
-    ${projRows ? `<h3>By Project</h3><div class="rows">${projRows}</div>` : ''}
+    ${budgetRows ? `<h3>Budgets</h3><div class="rows">${budgetRows}</div>` : ''}
+    ${projRows ? `<h3>Cost by Project</h3>${projRows}` : ''}
     <p class="muted small">Read from the Claude Code and Codex logs on this computer; nothing leaves it.
       Savings are an estimate: a cache read costs about 10% of normal input.</p>`;
   $('#usageMetric').onclick = (e) => { const k = e.target.closest('button')?.dataset.k; if (k) { usageMetric = k; renderUsage(); } };

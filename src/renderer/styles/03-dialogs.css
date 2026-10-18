@@ -18,7 +18,9 @@ dialog small { color: var(--muted); }
 .agent-row > *, .project-row > * { min-width: 0; width: 100%; }
 .agent-row button, .project-row button { width: auto; }
 .agent-row input[type=color] { width: 34px; height: 30px; padding: 0; border: none; background: none; }
-.project-row { grid-template-columns: 1fr 1.6fr 1.4fr 28px; font-size: 12px; }
+.project-row { grid-template-columns: 1fr 1.4fr 1.2fr auto auto 28px; font-size: 12px; }
+.project-row .budget { display: flex; align-items: center; gap: 3px; color: var(--muted); font-size: 11px; white-space: nowrap; width: auto; }
+.project-row .budget input { width: 64px; }
 .project-row .path { color: var(--muted); font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
 

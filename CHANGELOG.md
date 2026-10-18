@@ -4,6 +4,22 @@ All notable changes to AgentBoard. The format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-10-18
+
+### Added
+- **Cost by project** (*Usage*): tokens per project today, this week and this month, with the last 30 days as small bars, read from the agents' logs (sessions in a subfolder or a worktree count for their project).
+- **Weekly and monthly budgets**, for all projects (*Settings → Tasks*, besides the daily one) and per project (*Settings → Projects*). You get a notice at 80% and at 100% of each, once per period (and, if you turn it on, a message in the daily summary's chat). Past a budget, new tasks there use light models until the period ends. *Usage → Budgets* shows how far along each one is.
+- **Automation templates** (*Automations → Templates*, or *New Automation from a Template* in the palette), built for the current project with its check command:
+  - fix a GitHub issue → checks → pull request with "Closes #n";
+  - nightly tests that fix themselves;
+  - review my changes before committing;
+  - update dependencies safely;
+  - keep the docs up to date;
+  - triage open issues.
+
+### Changed
+- "Design with AI" and the templates build the flow with the same code (`flowFromSpec`).
+
 ## [1.4.0] - 2026-10-18
 
 ### Added

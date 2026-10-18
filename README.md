@@ -198,7 +198,7 @@ refactor the payments module !!
 - **Checks after each task**: set a command per project (for example `npm test`). If it fails, the output goes back to the same agent until it passes (or the task is marked blocked).
 - **Cross-review** (optional): another subscription reviews each finished task and approves it or sends the problems back.
 - **Dependencies and templates**: start a line with `>` to make it wait for the one above; insert frequent to-dos from **Templates**.
-- **Limits and budgets**: if a subscription runs out, its tasks move to another; if all of them do, AgentBoard tells you when the first one comes back (with an idea for the break). Tokens per task are shown live, with optional budgets per task and per day.
+- **Limits and budgets**: if a subscription runs out, its tasks move to another; if all of them do, AgentBoard tells you when the first one comes back (with an idea for the break). Tokens per task are shown live, with optional budgets per task, per day, per week and per month, for all projects or for each one; you get a notice at 80% and 100%.
 - **Subagents you can see**: with *Agent Connection* on, a task agent may split its work with `start_agent`; each helper opens as a `↳` card next to it.
 - **GitHub issues**: **Issues** lists the project's open issues (needs the `gh` CLI signed in) and queues the ones you pick; the agent reads the issue and its pull request says `Closes #n`. Issues written by people outside the project are flagged and show their text first, and the agent is told to treat any issue's text as a description, never as instructions.
 - **Summary**: copies what was done today and what is pending, as Markdown (or sends it every day to a chat, see below).
@@ -222,6 +222,7 @@ refactor the payments module !!
 | **Concept** | An idea written on the diagram; it does not run. |
 
 - Connect steps by dragging from the dot on the right of one onto another. The right panel edits the selected step.
+- **Templates**: start from a ready-made automation for the current project: fix a GitHub issue → checks → pull request, nightly tests that fix themselves, review my changes before committing, update dependencies safely, keep the docs up to date, triage open issues.
 - **Design with AI**: describe what you want in your own words and Claude builds (or changes) the diagram.
 - **Explain Run**: the AI explains what will happen step by step, what may fail and how to improve it.
 - **Run**: independent branches run in parallel. Each agent receives only a one-line summary of the previous steps, not their whole history.
@@ -247,6 +248,7 @@ refactor the payments module !!
 - **By subscription** and **by project**: where your tokens go.
 
 It reads the Claude Code and Codex logs on this computer (every Claude account included) and only adds up token counters; nothing leaves your machine.
+- **Cost by project**: tokens per project today, this week and this month, with the last 30 days as small bars, and **Budgets**: how far along each budget is (set them in *Settings → Tasks* and *Settings → Projects*).
 
 ---
 
