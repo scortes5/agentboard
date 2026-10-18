@@ -13,6 +13,7 @@ function palCommands() {
     { icon: 'tasks', label: 'Tasks', hint: '⇧⌘T', run: () => openTasks() },
     { icon: 'diagram', label: 'Diagram', hint: '⇧⌘D', run: () => toggleDiagram(true) },
     { icon: 'flows', label: 'Automations', hint: '⇧⌘F', run: () => toggleFlows(true) },
+    { icon: 'chart', label: 'Usage and Savings', hint: '⇧⌘U', run: () => openUsage() },
     { icon: 'keyboard', label: 'Keyboard Shortcuts', hint: '⌘/', run: () => openSettings('keys') },
     { icon: 'sun', label: 'Appearance', run: () => openSettings('appearance') },
     { icon: 'group', label: 'New Group', hint: '⇧⌘G', run: () => newGroup() },

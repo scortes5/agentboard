@@ -1781,6 +1781,7 @@ ab.onMenu((action) => {
   else if (action === 'sidebar') toggleSidebar();
   else if (action === 'accounts') openAccounts();
   else if (action === 'skills') openSkills();
+  else if (action === 'usage') openUsage();
   else if (action === 'tasks') toggleTasks();
   else if (action === 'diagram') toggleDiagram();
   else if (action === 'palette') openPalette();

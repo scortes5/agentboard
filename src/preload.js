@@ -54,6 +54,7 @@ contextBridge.exposeInMainWorld('ab', {
   applyQuickKey: () => ipcRenderer.invoke('app:quickKey'),
   packStatus: () => ipcRenderer.invoke('pack:status'),
   packInstall: (providers) => ipcRenderer.invoke('pack:install', providers),
+  usageScan: (tasks) => ipcRenderer.invoke('usage:scan', tasks),
   localModels: () => ipcRenderer.invoke('local:models'),
   pickFolder: () => ipcRenderer.invoke('dialog:pickFolder'),
   openPath: (p) => ipcRenderer.invoke('shell:openPath', p),

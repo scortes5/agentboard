@@ -9,6 +9,7 @@ const { execFile, spawn } = require('child_process');
 const http = require('http');
 const pty = require('node-pty');
 const skills = require('./skills');
+const usage = require('./usage');
 const { createBridge } = require('./bridge');
 
 const IS_WIN = process.platform === 'win32';
@@ -341,6 +342,10 @@ ipcMain.handle('clip:read', () => clipboard.readText());
 const projectsOf = () => loadConfig().projects || [];
 const wrap = (fn) => async (...args) => { try { return { ok: true, value: await fn(...args) }; } catch (err) { return { ok: false, error: err.message }; } };
 
+ipcMain.handle('usage:scan', wrap((_e, tasks) => usage.scanUsage({
+  tasks, historyFile: path.join(app.getPath('userData'), 'task-history.json'),
+  claudeDirs: [skills.claudeDir(), ...claudeAccountDirs()], codexDir: skills.codexDir(),
+})));
 ipcMain.handle('skills:scan', () => skills.scanSkills(projectsOf()));
 ipcMain.handle('skills:copy', wrap((_e, src, target) => skills.copySkill(src, target, projectsOf())));
 ipcMain.handle('agents:list', () => skills.listAgents(projectsOf()));
@@ -663,6 +668,7 @@ const SHORTCUTS = [
   { id: 'tasks', label: 'Tasks', key: 'CmdOrCtrl+Shift+T', section: 'Panels' },
   { id: 'diagram', label: 'Diagram', key: 'CmdOrCtrl+Shift+D', section: 'Panels' },
   { id: 'flows', label: 'Automations', key: 'CmdOrCtrl+Shift+F', section: 'Panels' },
+  { id: 'usage', label: 'Usage and Savings', key: 'CmdOrCtrl+Shift+U', section: 'Panels' },
   { id: 'palette', label: 'Search or Run…', key: 'CmdOrCtrl+Shift+P', section: 'Panels' },
   { id: 'sidebar', label: 'Agent List', key: 'CmdOrCtrl+Shift+A', section: 'Panels' },
   { id: 'space:next', label: 'Next Project', key: 'CmdOrCtrl+Alt+Right', section: 'Projects' },
@@ -693,7 +699,7 @@ function buildMenu() {
       label: 'Board',
       submenu: [
         item('new:claude'), item('new:codex'), item('new:gemini'), item('new:shell'), item('new:note'), item('new:group'), sep,
-        item('tasks'), item('diagram'), item('flows'), item('palette'), sep,
+        item('tasks'), item('diagram'), item('flows'), item('usage'), item('palette'), sep,
         item('sidebar'),
         { label: 'Skills and Agents…', click: cmd('skills') },
         { label: 'Subscriptions and Accounts…', click: cmd('accounts') }, sep,

@@ -699,3 +699,26 @@ button[data-icon] { display: inline-flex; align-items: center; white-space: nowr
 .composer-row select { flex: 1 1 120px; max-width: none !important; }
 .composer-row .spacer { flex-basis: 100%; height: 0; }
 .composer-row #taskPlan { margin-left: auto; }
+
+/* ---------- Usage and savings ---------- */
+.u-head { display: flex; justify-content: flex-end; }
+.hm { overflow-x: auto; padding-bottom: 2px; }
+.hm-months, .hm-grid { display: grid; grid-auto-flow: column; grid-auto-columns: 11px; gap: 3px; }
+.hm-months span { font: 10px var(--font-mono); color: var(--muted); height: 14px; white-space: nowrap; }
+.hm-col { display: grid; grid-template-rows: repeat(7, 11px); gap: 3px; }
+.hm i, .hm-legend i { display: block; width: 11px; height: 11px; border-radius: 3px; background: var(--fill); }
+.hm .l1, .hm-legend .l1 { background: color-mix(in srgb, var(--accent) 28%, transparent); }
+.hm .l2, .hm-legend .l2 { background: color-mix(in srgb, var(--accent) 50%, transparent); }
+.hm .l3, .hm-legend .l3 { background: color-mix(in srgb, var(--accent) 75%, transparent); }
+.hm .l4, .hm-legend .l4 { background: var(--accent); }
+.hm-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.hm-legend { display: inline-flex; align-items: center; gap: 3px; }
+.u-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.u-tile { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border-radius: 10px; background: var(--fill); box-shadow: inset 0 0 0 1px var(--line); }
+.u-tile b { font-size: 20px; font-weight: 600; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.u-bar { display: grid; grid-template-columns: 160px 1fr auto; align-items: center; gap: 10px; }
+.u-name { display: flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.u-name i { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.u-track { height: 6px; border-radius: 3px; background: var(--fill); overflow: hidden; }
+.u-track span { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
+.u-val { font: 11.5px var(--font-mono); color: var(--text-2); }

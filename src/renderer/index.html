@@ -42,6 +42,7 @@
     </div>
 
     <div class="group right">
+      <button id="usageBtn" title="Usage and savings: activity per day, tokens and effectiveness (⇧⌘U)">Usage</button>
       <button id="skillsBtn" title="Skills, your agents and the connection between agents">Skills and Agents</button>
       <button id="accountsBtn" title="Subscriptions, CLIs and local models">Subscriptions</button>
       <button id="settingsBtn" class="icon" data-icon="gear" title="Settings: appearance, shortcuts, agents and more (⌘,)"></button>
@@ -287,6 +288,18 @@
   </dialog>
 
   <!-- Skills and agents -->
+  <dialog id="usage" class="wide">
+    <form method="dialog">
+      <span class="eyebrow">Your activity with agents, on this computer</span>
+      <h2>Usage and Savings</h2>
+      <div id="usageBody"></div>
+      <div class="actions">
+        <button type="button" id="usageRefresh" class="ghost" data-icon="refresh" title="Read the logs again">Refresh</button>
+        <button value="ok" class="primary">Done</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog id="skills" class="wide">
     <form method="dialog" id="skillsForm">
       <span class="eyebrow">Everything your agents know</span>
@@ -374,5 +387,6 @@
   <script src="diagram.js"></script>
   <script src="palette.js"></script>
   <script src="flows.js"></script>
+  <script src="usage.js"></script>
 </body>
 </html>
