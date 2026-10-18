@@ -1,7 +1,7 @@
 // AgentBoard — what tasks cost while they run: tokens per task (read live from Claude's
 // session logs), a budget per task and per day, and the history the router learns from.
 'use strict';
-/* global cfg, $, esc, ab, toast, save, cardData, runtime, tasks, renderTasks, updateTaskLive */
+/* global cfg, esc, ab, toast, save, cardData, runtime, tasks, updateTaskLive */
 
 const fmtTokens = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}k` : String(n || 0));
 const usageCache = { today: 0, byAgent: {}, at: 0 };
