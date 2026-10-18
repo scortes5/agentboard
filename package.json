@@ -2,9 +2,34 @@
   "name": "agentboard",
   "productName": "AgentBoard",
   "version": "0.4.0",
-  "description": "Tablero infinito con terminales reales para Claude Code, Codex y Gemini CLI. Mac y Windows.",
+  "description": "A desktop board of real terminals to run Claude Code, Codex, Gemini CLI and other coding agents side by side, on your own subscriptions. macOS and Windows.",
+  "keywords": [
+    "claude-code",
+    "codex",
+    "gemini-cli",
+    "ai-agents",
+    "coding-agents",
+    "agent-orchestration",
+    "multi-agent",
+    "mcp",
+    "electron",
+    "terminal",
+    "xterm",
+    "worktree",
+    "developer-tools",
+    "llm",
+    "productivity"
+  ],
   "author": "Sergio Cortés",
   "license": "MIT",
+  "homepage": "https://github.com/scortes5/agentboard#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scortes5/agentboard.git"
+  },
+  "bugs": {
+    "url": "https://github.com/scortes5/agentboard/issues"
+  },
   "private": true,
   "main": "src/main.js",
   "scripts": {

@@ -10,10 +10,21 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/scortes5/agentboard/releases/latest">Download</a> ·
+  <a href="https://github.com/scortes5/agentboard/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/scortes5/agentboard?label=release&color=f97316"></a>
+  <a href="https://github.com/scortes5/agentboard/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/scortes5/agentboard/total?color=22c55e"></a>
+  <a href="https://github.com/scortes5/agentboard/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/scortes5/agentboard/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://github.com/scortes5/agentboard/actions/workflows/codeql.yml"><img alt="CodeQL" src="https://github.com/scortes5/agentboard/actions/workflows/codeql.yml/badge.svg"></a>
+  <img alt="Platforms" src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey">
+  <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/github/license/scortes5/agentboard?color=blue"></a>
+  <a href="https://github.com/scortes5/agentboard/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/scortes5/agentboard?style=social"></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/scortes5/agentboard/releases/latest"><b>Download</b></a> ·
   <a href="docs/GUIDE.md">Getting started</a> ·
+  <a href="https://github.com/scortes5/agentboard/wiki">Wiki</a> ·
   <a href="CHANGELOG.md">Changelog</a> ·
-  <a href="LICENSE">MIT License</a>
+  <a href="https://github.com/scortes5/agentboard/discussions">Discussions</a>
 </p>
 
 ![AgentBoard board](docs/images/board.png)
@@ -23,6 +34,8 @@ AgentBoard is a desktop app that puts your AI agents on one board. Each card is 
 It uses no API keys and sends nothing to servers of its own: it runs the programs you already have installed (`claude`, `codex`, `gemini`…) with the session you already signed in to.
 
 > **First time?** The [Getting started guide](docs/GUIDE.md) explains everything step by step, with no prior knowledge assumed.
+
+> **Like it?** A ⭐ on the repo helps other people find AgentBoard.
 
 ---
 
@@ -41,6 +54,7 @@ It uses no API keys and sends nothing to servers of its own: it runs the program
 - [Privacy and security](#privacy-and-security)
 - [Development](#development)
 - [Known limitations](#known-limitations)
+- [Contributing](#contributing)
 
 ---
 
@@ -57,6 +71,18 @@ It uses no API keys and sends nothing to servers of its own: it runs the program
 | **Token saving** | A fresh session per task, light mode, compact-context skills and load spreading across accounts. |
 
 ![Dark mode](docs/images/board-dark.png)
+
+### Why not just tmux or a few terminal tabs?
+
+| | Terminal tabs / tmux | AgentBoard |
+|---|---|---|
+| Several agents at once | Yes | Yes, on one visual board |
+| See who is working, waiting or stuck | Check each tab | Status on every card, notifications, Diagram view |
+| Spread a to-do list across agents and plans | By hand | Task queue with parallelism limits |
+| Plan runs out of usage | You notice and switch | The task moves to another subscription |
+| Agents editing the same repo | Conflicts | Worktree per task, then review, merge or discard |
+| Agents talking to each other | No | Built-in MCP bridge |
+| Repeatable workflows | Shell scripts | Visual automations the AI can design and explain |
 
 ---
 
@@ -276,7 +302,7 @@ npm run dist:mac   # builds the .dmg files  ·  npm run dist:win  builds the .ex
 npm run icon       # regenerates the icons from src/assets/logo.svg
 ```
 
-Pushing a `v*` tag makes the `.github/workflows/build.yml` workflow build the Mac and Windows installers and attach them to the Release.
+Pushing a `v*` tag makes the `.github/workflows/build.yml` workflow build the Mac and Windows installers and attach them to the Release. Every push and pull request runs the `ci` and `codeql` workflows; Dependabot keeps npm packages and GitHub Actions up to date.
 
 ```
 src/
@@ -304,6 +330,21 @@ docs/             guide and screenshots
 - Scheduled automations only run while AgentBoard is open (it can be in the background).
 - The board does not sync between computers, on purpose: each machine has its own projects. To copy it, copy `board.json`.
 - The app is not signed with an Apple or Microsoft certificate.
+
+---
+
+## Contributing
+
+Bug reports, ideas and pull requests are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md), browse the [wiki](https://github.com/scortes5/agentboard/wiki) for how the code fits together, and ask anything in [Discussions](https://github.com/scortes5/agentboard/discussions). Security problems: see [SECURITY.md](SECURITY.md).
+
+If AgentBoard saves you time, **[star it on GitHub](https://github.com/scortes5/agentboard/stargazers)** and share it with someone who juggles more than one coding agent.
+
+<a href="https://star-history.com/#scortes5/agentboard&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=scortes5/agentboard&type=Date&theme=dark" />
+    <img alt="Star history" src="https://api.star-history.com/svg?repos=scortes5/agentboard&type=Date" width="600" />
+  </picture>
+</a>
 
 ---
 
