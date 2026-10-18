@@ -1,10 +1,13 @@
-# Builds the installers on GitHub (Mac .dmg and Windows .exe).
-# Runs when a v* tag is pushed (e.g. git tag v0.1.0 && git push --tags) or by hand from Actions.
+# Builds the installers on GitHub (Mac .dmg and Windows .exe) and publishes the release.
+# Runs on every push to main: when package.json has a version with no v<version> tag yet,
+# it builds and creates that release (and its tag). Pushing a v* tag or running it by hand
+# from Actions also works; a manual run on a released version only builds the artifacts.
 # latest.yml and the .blockmap go with the .exe: the Windows app reads them to update itself.
 name: build
 
 on:
   push:
+    branches: [main]
     tags: ['v*']
   workflow_dispatch:
 
@@ -16,7 +19,34 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.check.outputs.tag }}
+      release: ${{ steps.check.outputs.release }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: check
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            tag="$GITHUB_REF_NAME"
+          else
+            tag="v$(node -p "require('./package.json').version")"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          if [[ "$GITHUB_REF" != refs/tags/v* ]] && git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            echo "$tag is already released."
+          else
+            echo "release=true" >> "$GITHUB_OUTPUT"
+            echo "Will release $tag."
+          fi
+
   build:
+    needs: version
+    if: needs.version.outputs.release == 'true' || github.event_name == 'workflow_dispatch'
     strategy:
       fail-fast: false
       matrix:
@@ -40,10 +70,22 @@ jobs:
             dist/*.exe
             dist/*.blockmap
             dist/latest.yml
-      - name: Attach to the tag's Release
-        if: startsWith(github.ref, 'refs/tags/v')
+
+  release:
+    needs: [version, build]
+    if: needs.version.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Publish the release
         uses: softprops/action-gh-release@v3
         with:
+          tag_name: ${{ needs.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: AgentBoard ${{ needs.version.outputs.tag }}
           generate_release_notes: true
           files: |
             dist/*.dmg

@@ -41,7 +41,7 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 
 ## Releases
 
-Maintainers bump `version` in `package.json`, move the *Unreleased* changelog entries under the new version and push a `v*` tag. The `build` workflow builds the macOS and Windows installers and attaches them to the GitHub Release.
+Maintainers bump `version` in `package.json` (and `VERSION` in `scripts/agentboard-mcp.js`) and move the *Unreleased* changelog entries under the new version. When that change reaches `main`, the `build` workflow sees a version without a tag, builds the macOS and Windows installers and publishes the GitHub Release with its `v<version>` tag.
 
 ## Code of conduct
 
