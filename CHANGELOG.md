@@ -4,6 +4,17 @@ All notable changes to AgentBoard. The format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-10-18
+
+### Added
+- **Remote control from your phone**: turn it on in *Settings → Integrations* and open the link on your phone (same Wi-Fi). The page shows your tasks live (status, agent, time, tokens, last line), lets you **approve or reject** what agents ask, and **adds tasks**. Every request needs the random token in the link; **New Link** makes the old one stop working. Off by default.
+- **Daily summary to Slack, Discord, Teams or Google Chat**: paste an incoming-webhook URL and pick a time; today's done and pending tasks are sent once a day. **Send Test** sends it now.
+- **GitHub issues as tasks**: **Issues** in the Tasks panel lists the open issues of the chosen project (through the `gh` CLI) and queues the ones you pick. The agent gets the issue's text and the pull request says `Closes #n`.
+- **Ground rules** (*Settings → Ground Rules*): rules every agent follows, written once (commit as you, explain before deleting files…). They go into each CLI's own instructions file (`~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, `~/.gemini/GEMINI.md`, Qwen and OpenCode) in a marked block that leaves the rest of the file alone, so they also apply to agents you open by hand; agents without such a file get them in each task. **Add Suggested Rules** fills in a starting set.
+
+### Changed
+- Extension points: provider files can declare `instructions` (their global instructions file), main-process services can have `onReady()` and `onQuit()`, and new Settings sections plug in through `settingsSections` without changing the dialog's code.
+
 ## [1.0.1] - 2026-10-18
 
 ### Changed

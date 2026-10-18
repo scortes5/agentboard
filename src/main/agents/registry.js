@@ -11,6 +11,7 @@ function validateProvider(p, file) {
   const missing = REQUIRED.filter((k) => typeof p[k] !== 'string' || !p[k]);
   if (missing.length) throw new Error(`${path.basename(file)}: missing ${missing.join(', ')}`);
   if (p.isSignedIn && typeof p.isSignedIn !== 'function') throw new Error(`${path.basename(file)}: isSignedIn must be a function`);
+  if (p.instructions && typeof p.instructions !== 'function') throw new Error(`${path.basename(file)}: instructions must be a function`);
   if (p.mcp && (typeof p.mcp.add !== 'function' || typeof p.mcp.isRegistered !== 'function')) {
     throw new Error(`${path.basename(file)}: mcp needs add(script) and isRegistered(probe)`);
   }

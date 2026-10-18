@@ -44,12 +44,15 @@ function mcpSession(dataDir, requests) {
 (async () => {
   const data = fs.mkdtempSync(path.join(os.tmpdir(), 'agentboard-data-'));
   const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'agentboard-repo-'));
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'agentboard-home-')); // ground rules are written here, not in your HOME
+  fs.mkdirSync(path.join(home, '.claude'));
+  fs.writeFileSync(path.join(home, '.claude', 'CLAUDE.md'), '# Mine\n\nKeep this.\n');
   execSync('git init -q && git config user.email test@example.com && git config user.name test && echo a > a.txt && git add . && git commit -qm init', { cwd: repo });
 
   const app = await _electron.launch({
     executablePath: require('electron'),
     args: ['--no-sandbox', `--user-data-dir=${data}`, ROOT],
-    env: { ...process.env, AGENTBOARD_DATA: data },
+    env: { ...process.env, AGENTBOARD_DATA: data, HOME: home },
   });
   const win = await app.firstWindow();
   const errors = [];
@@ -161,6 +164,42 @@ function mcpSession(dataDir, requests) {
     const ideas = await win.evaluate(() => { cfg.breakDeck = []; return Array.from({ length: 20 }, () => limitsNotice.nextIdea()); });
     assert.equal(new Set(ideas).size, 20, 'twenty different ideas before any repeats');
     step('all subscriptions out: "come back in" with the soonest reset and a fresh idea');
+
+    // Remote control: turned on in Settings, the phone page sees the tasks and adds one.
+    const port = 40000 + Math.floor(Math.random() * 9000);
+    await win.evaluate(() => openSettings('integrations'));
+    await win.evaluate((port) => { const f = $('#settingsForm'); f.remoteEnabled.checked = true; f.remotePort.value = port; }, port);
+    await win.evaluate(() => $('#saveSettings').click());
+    const links = await until(async () => (await win.evaluate(() => ab.remoteStatus())).running && win.evaluate(() => $('#remoteLinks').textContent), 10000);
+    assert.ok(links, 'the remote server starts from Settings');
+    const token = await win.evaluate(() => cfg.remote.token);
+    const phone = (p, body, auth = token) => fetch(`http://127.0.0.1:${port}/api/${p}`, {
+      method: body ? 'POST' : 'GET', headers: { Authorization: `Bearer ${auth}` }, body: body && JSON.stringify(body),
+    });
+    assert.equal((await phone('state', null, 'wrong')).status, 401);
+    const state = await until(async () => { const s = await (await phone('state')).json(); return s.tasks.length && s; }, 10000);
+    assert.ok(state.tasks.some((t) => t.text === 'waiting for a subscription'), JSON.stringify(state));
+    assert.equal((await phone('task', { text: 'sent from my phone' })).status, 202);
+    assert.ok(await until(() => win.evaluate(() => cfg.tasks.some((t) => t.text === 'sent from my phone')), 5000), 'the phone adds a task');
+    step('remote control: the phone needs the token, sees the tasks and adds one');
+
+    // Ground rules: into each CLI's instructions file, and into the prompt of agents without one.
+    await win.evaluate(() => openSettings('rules'));
+    await win.evaluate(() => { $('#settingsForm').groundRules.value = '- Commit as me.'; $('#saveSettings').click(); });
+    const claudeMd = path.join(home, '.claude', 'CLAUDE.md');
+    assert.ok(await until(() => /Commit as me\./.test(fs.readFileSync(claudeMd, 'utf8')), 5000), 'the rules reach CLAUDE.md');
+    assert.match(fs.readFileSync(claudeMd, 'utf8'), /^# Mine\n\nKeep this\.\n\n<!-- agentboard:ground-rules:start/);
+    assert.match(await win.evaluate(() => groundRules.forTask({ assigned: 'fake' })), /Commit as me/);
+    assert.equal(await win.evaluate(() => groundRules.forTask({ assigned: 'claude' })), '');
+    step('ground rules: written once, read by every agent');
+
+    // Daily summary time and GitHub issues (no gh remote here: the popover explains why).
+    assert.deepEqual(await win.evaluate(() => [DailySummary.minutes('07:30'), DailySummary.minutes('')]), [450, 1080]);
+    await win.evaluate((repo) => { cfg.selectedProject = repo; cfg.projects = [{ name: 'repo', path: repo }]; renderTaskOptions(); toggleTasks(true); $('#taskProject').value = repo; $('#taskIssues').click(); }, repo);
+    const hint = await until(() => win.evaluate(() => { const h = $('.popover.issues .hint'); return h && !/Loading/.test(h.textContent) && h.textContent; }), 20000);
+    assert.ok(hint, 'the issues popover answers');
+    await win.evaluate(() => closePopover());
+    step('daily summary schedule and the GitHub issues popover');
 
     // Every panel and dialog opens without errors (the interface is split across many files).
     await win.evaluate(async () => {

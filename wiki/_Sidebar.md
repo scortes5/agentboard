@@ -10,6 +10,7 @@
 - [[Automations]]
 - [[Diagram]]
 - [[Settings and Shortcuts]]
+- [[Remote Control and Integrations]]
 
 **Agents**
 - [[Subscriptions and Accounts]]

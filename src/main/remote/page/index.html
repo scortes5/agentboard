@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="light dark" />
+  <title>AgentBoard</title>
+  <link rel="stylesheet" href="app.css" />
+</head>
+<body>
+  <header><b>AgentBoard</b> <span id="counts" class="muted"></span></header>
+  <p id="error" class="error" hidden></p>
+  <section id="approvals"></section>
+  <section>
+    <h2>Tasks</h2>
+    <div id="tasks" class="muted">Loading…</div>
+  </section>
+  <form id="add">
+    <textarea id="text" rows="3" placeholder="New task (Route and the queue on your computer decide who does it)"></textarea>
+    <button type="submit">Add Task</button>
+  </form>
+  <script src="app.js"></script>
+</body>
+</html>

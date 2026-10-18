@@ -12,12 +12,16 @@ const { WorktreeService } = require('./git/WorktreeService');
 const { AgentCatalog } = require('./agents/AgentCatalog');
 const { LocalModels } = require('./agents/LocalModels');
 const { ClaudeAccounts } = require('./agents/ClaudeAccounts');
+const { GroundRules } = require('./agents/GroundRules');
 const { SkillLibrary } = require('./library/SkillLibrary');
 const { SkillPack } = require('./library/SkillPack');
 const { UsageService } = require('./library/UsageService');
 const { TaskPlanner } = require('./ai/TaskPlanner');
 const { AgentBridge } = require('./bridge/AgentBridge');
 const { Updater } = require('./updates/Updater');
+const { RemoteServer } = require('./remote/RemoteServer');
+const { WebhookNotifier } = require('./integrations/WebhookNotifier');
+const { GitHubIssues } = require('./integrations/GitHubIssues');
 const { App } = require('./app/App');
 const { AppMenu } = require('./app/AppMenu');
 const { TrayIcon } = require('./app/TrayIcon');
@@ -65,8 +69,10 @@ application = new App({
     new SystemIpc({ config, getWindow: () => application.win }), requests, ptyHost, menu, quickKey, updater,
     gitService, new WorktreeService({ runner, gitService, shellEnv }),
     new AgentCatalog({ config, shellEnv }), new LocalModels({ shellEnv }), claudeAccounts,
+    new GroundRules({ config, claudeAccounts }),
     new SkillLibrary({ config }), new SkillPack({ claudeAccounts }), new UsageService({ dataDir, claudeAccounts }),
     new TaskPlanner({ shellEnv }),
+    new RemoteServer({ config, send }), new WebhookNotifier(), new GitHubIssues({ shellEnv }),
   ],
 });
 application.start();
