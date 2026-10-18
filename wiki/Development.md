@@ -27,7 +27,7 @@ CodeQL code scanning (GitHub default setup) analyzes JavaScript and workflows on
 
 ## Releasing
 
-1. Bump `version` in `package.json` (and `VERSION` in `scripts/agentboard-mcp.js`).
+1. Bump `version` in `package.json` (and `VERSION` in `scripts/agentboard-mcp.js`): **new features raise the first number** (`1.4.2` → `2.0.0`), **fixes and small changes raise the last one** (`1.4.2` → `1.4.3`).
 2. Move *Unreleased* entries in `CHANGELOG.md` under the new version.
 3. Merge to `main`. The `build` workflow notices that `vX.Y.Z` has no tag yet, builds the macOS and Windows installers and publishes the Release (creating the tag) with generated notes.
 
