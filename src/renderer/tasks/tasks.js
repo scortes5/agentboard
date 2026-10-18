@@ -249,7 +249,7 @@ function startTaskAgain(t) {
 
 function tickTasks() {
   if (!cfg) return;
-  if (cfg.tasksOpen) updateTaskLive();
+  if (viewLayout.visible('tasks')) updateTaskLive();
   let changed = false;
   const now = Date.now();
   for (const t of tasks()) {
@@ -612,10 +612,10 @@ async function planWithAI() {
 }
 
 function toggleTasks(force) {
-  cfg.tasksOpen = force ?? !cfg.tasksOpen;
-  document.body.classList.toggle('tasks-open', !!cfg.tasksOpen);
-  if (cfg.tasksOpen) { renderTaskOptions(); renderTasks(); setTimeout(() => $('#taskInput').focus(), 50); }
-  drawMinimap(); save();
+  const open = force ?? !viewLayout.visible('tasks');
+  if (!open) return viewLayout.setOpen(viewLayout.sideOf('tasks'), false);
+  viewLayout.reveal('tasks');
+  setTimeout(() => $('#taskInput').focus(), 50);
 }
 
 function openTasks(prefill = '') {
@@ -657,19 +657,21 @@ ab.onBridgeAsk(({ reqId, kind, payload }) => {
   ab.bridgeAnswer(reqId, value);
 });
 
+// ---------- Views ----------
+viewLayout.register({ id: 'tasks', title: 'Tasks', side: 'right', order: 0, badge: '#taskCounts', onShow: () => { renderTaskOptions(); renderTasks(); } });
+viewLayout.register({ id: 'queue', title: 'Queue Options', side: 'right', order: 2, grow: false, collapsed: true, onShow: () => renderTaskOptions() });
+
 // ---------- Startup ----------
 function initTasks() {
   if (cfg.taskAuto == null) cfg.taskAuto = true;
   // tasks left "running" at quit: their card resumes; if the card is gone, send them to review
   for (const t of tasks()) if (t.status === 'running' && (!t.cardId || !cardData(t.cardId))) t.status = 'review';
-  document.body.classList.toggle('tasks-open', !!cfg.tasksOpen);
   renderTaskOptions();
   renderTasks();
   refreshBridgeStatus().then(updateProgress);
   setInterval(tickTasks, 1000);
   $('#taskProgress').addEventListener('click', (e) => { if (e.target.closest('[data-x="connect"]')) openSkills('connect'); });
 
-  $('#tasksClose').onclick = () => toggleTasks(false);
   $('#taskAdd').onclick = addFromComposer;
   $('#taskPlan').onclick = planWithAI;
   $('#taskInput').addEventListener('keydown', (e) => {

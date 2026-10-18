@@ -35,7 +35,7 @@ function migrateLegacy(c) {
   applyAppearance();
   renderSpaces();
   document.title = cfg.activeSpace && cfg.activeSpace !== '*' ? `${spaceName(cfg.activeSpace)} — AgentBoard` : 'AgentBoard';
-  document.body.classList.toggle('sidebar-open', !!cfg.sidebarOpen);
+  viewLayout.mount();
   // groups first, so they sit behind the cards
   for (const c of [...cfg.cards].sort((a, b) => (b.type === 'group') - (a.type === 'group'))) {
     mountCard(c, { resume: true });

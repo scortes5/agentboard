@@ -33,11 +33,11 @@ body.mac #topbar { padding-left: 84px; }
 .brand-name { font-weight: 600; font-size: 13.5px; }
 
 /* sidebar (Finder) and inspector (tasks) attached to the edges */
-#sidebar { top: 52px; left: 0; bottom: 0; width: 248px; border-radius: 0; box-shadow: .5px 0 0 var(--line-hi); background: var(--glass); }
-#tasks { top: 52px; right: 0; bottom: 0; width: 352px; border-radius: 0; box-shadow: -.5px 0 0 var(--line-hi); background: var(--glass); }
-body.tasks-open #minimap { right: 366px; }
+#sidebar { top: 52px; left: 0; bottom: 0; width: var(--left-w); border-radius: 0; box-shadow: .5px 0 0 var(--line-hi); background: var(--glass); }
+#tasks { top: 52px; right: 0; bottom: 0; width: var(--right-w); border-radius: 0; box-shadow: -.5px 0 0 var(--line-hi); background: var(--glass); }
+body.tasks-open #minimap { right: calc(var(--right-w) + 14px); }
 #diagram { top: 64px; }
-body.tasks-open #diagram { right: 364px; }
+body.tasks-open #diagram { right: calc(var(--right-w) + 12px); }
 .side-item { border-radius: 6px; padding: 5px 9px; }
 .side-item.focused { background: rgba(var(--accent-rgb), .2); box-shadow: none; }
 .side-item::before { display: none; }

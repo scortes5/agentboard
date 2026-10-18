@@ -28,6 +28,22 @@ Frames that gather a team of agents (*Backend*, *Frontend*…). Moving the frame
 
 Sticky notes live on the same board; the **minimap** (bottom right) and the **agent list** (⇧⌘A, left) help you move around.
 
+## Side bars and views
+
+The left and right bars work like VS Code's. Each holds views: **Agents**, **Tasks**, **Approvals** and **Queue Options**.
+
+| To… | Do this |
+|---|---|
+| Collapse or expand a view | Click its title. |
+| Reorder a view, or move it to the other side | Drag its title. |
+| Hide a view | Its **⋯** → *Hide*, or uncheck it in the bar's **⋯**. |
+| Show a hidden view, or bring one from the other side | The bar's **⋯** → pick it. |
+| Resize a bar | Drag its inner edge; double-click the edge for the default width. |
+| Share the height between two views | Drag the line between them. |
+| Start over | The bar's **⋯** → *Reset Layout* (or *Reset Side Bar Layout* in the palette). |
+
+The **Tasks** button and ⇧⌘A open the bar where Tasks or Agents live, wherever you moved them. The layout is saved with your board.
+
 ## Background mode and sessions
 
 Closing the window keeps AgentBoard running in the background (menu-bar / tray icon). Quitting with ⌘Q asks for confirmation. When you reopen, each Claude card resumes **its own** conversation (`--resume <id>`), even with several in the same project.

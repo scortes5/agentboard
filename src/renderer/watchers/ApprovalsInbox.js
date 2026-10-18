@@ -4,7 +4,7 @@
 // selection to the top and confirms; rejecting presses Esc.
 'use strict';
 /* global $, esc, ab, cardData, terminalTail, toast, icon, focusCardView, focusCard, openPopover, closePopover,
-   diagramOpen, toggleDiagram, terminalWatchers */
+   diagramOpen, toggleDiagram, terminalWatchers, viewLayout */
 
 const APPROVAL_RE = /(Do you want to (proceed|make this edit|create|delete|run|allow|overwrite)|Would you like to (run|make|apply)|Allow (this )?(command|execution|edit|tool|change)|requires? (your )?(approval|permission)|Approve this)/i;
 const OPTION_RE = /^\s*(?:[❯›>●]\s*)?\d+\.\s/;
@@ -72,14 +72,14 @@ class ApprovalsInbox {
     $('#approvalsBadge').textContent = String(n);
     $('#approvalsBadge').classList.toggle('hidden', !n);
     $('#approvalsBtn').classList.toggle('attn', n > 0);
+    $('#approvalsCount').textContent = String(n);
+    $('#approvalsCount').classList.toggle('hidden', !n);
+    this.renderList($('#approvalsList'));
   }
 
-  open(anchor) {
-    closePopover();
-    const items = this.pending();
-    const pop = document.createElement('div');
-    pop.className = 'popover approvals';
-    pop.innerHTML = items.length ? `
+  // The list of requests, in the Approvals view and in the toolbar popover.
+  renderList(box, items = this.pending()) {
+    box.innerHTML = items.length ? `
       <div class="ap-head"><b>${items.length} waiting</b><span class="spacer"></span>
         <button data-all title="Approve every request in the list">Approve All</button></div>
       ${items.map(([id, a]) => `<div class="ap-item" data-id="${esc(id)}">
@@ -91,23 +91,34 @@ class ApprovalsInbox {
           <button data-a="yes" class="primary" title="Allow this once">Approve</button></div>
       </div>`).join('')}`
       : '<div class="hint">No agent is waiting for permission.</div>';
+  }
+
+  // Clicks in a list; returns true when the list should close (popover).
+  onListClick(e) {
+    if (e.target.closest('[data-all]')) { for (const [id] of this.pending()) this.answer(id, true); return true; }
+    const act = e.target.closest('[data-a]')?.dataset.a;
+    const id = e.target.closest('.ap-item')?.dataset.id;
+    if (!act || !id) return false;
+    if (act === 'go') {
+      const c = cardData(id);
+      if (diagramOpen()) toggleDiagram(false);
+      focusCardView(c); focusCard(c.id);
+      return true;
+    }
+    this.answer(id, act === 'yes');
+    return !this.pending().length;
+  }
+
+  open(anchor) {
+    closePopover();
+    const pop = document.createElement('div');
+    pop.className = 'popover approvals';
+    this.renderList(pop);
     openPopover(pop, anchor, 360);
-    pop.addEventListener('click', (e) => {
-      if (e.target.closest('[data-all]')) { for (const [id] of items) this.answer(id, true); closePopover(); return; }
-      const act = e.target.closest('[data-a]')?.dataset.a;
-      const id = e.target.closest('.ap-item')?.dataset.id;
-      if (!act || !id) return;
-      if (act === 'go') {
-        const c = cardData(id);
-        if (diagramOpen()) toggleDiagram(false);
-        closePopover(); focusCardView(c); focusCard(c.id);
-        return;
-      }
-      this.answer(id, act === 'yes');
-      e.target.closest('.ap-item').remove();
-      if (!pop.querySelector('.ap-item')) closePopover();
-    });
+    pop.addEventListener('click', (e) => { if (this.onListClick(e)) closePopover(); else this.renderList(pop); });
   }
 }
 
 const approvalsInbox = terminalWatchers.add(new ApprovalsInbox());
+$('#approvalsList').addEventListener('click', (e) => approvalsInbox.onListClick(e));
+viewLayout.register({ id: 'approvals', title: 'Approvals', side: 'right', order: 1, grow: false, badge: '#approvalsCount', onShow: () => approvalsInbox.renderBadge() });

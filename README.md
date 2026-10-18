@@ -150,6 +150,12 @@ Copilot CLI, Cursor CLI, Qwen Code, OpenCode, Aider, Amp and local models throug
 - **Project tabs**: the toolbar shows *All* and each project, with how many agents it has and whether any is working. `+` opens another folder as a project. Each tab remembers its view.
 - **Groups**: frames that gather a team of agents (for example *Backend* or *Frontend*). Moving the frame moves its cards. **Arrange** lays everything out while keeping the groups.
 - **Notes** on the same board, a **minimap** at the bottom right and the **agent list** on the left.
+- **Side bars like VS Code**: the left and right bars hold views (**Agents**, **Tasks**, **Approvals**, **Queue Options**).
+  - Click a view's title to collapse it.
+  - Drag its title to reorder it or to move it to the other side.
+  - Hide it from its **⋯** menu; the bar's **⋯** shows it again or resets the layout.
+  - Drag a bar's inner edge to resize it (double-click the edge for the default width), and the line between two views to share the height.
+  - The layout is saved with your board.
 - **Close several at once**: ⌘/Ctrl or Shift + click title bars to select cards, then **Close**. The palette also closes finished-task cards, stopped cards or the whole view, and a group's menu closes its cards.
 - **Options menu** on each card (three dots): rename it, change its agent, project or arguments (for example `--model opus`), duplicate it, or **Send to…** another agent a piece of the conversation.
 - **Help on every button**: hold the pointer over a button for 2 seconds to see what it does.
