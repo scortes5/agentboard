@@ -1,10 +1,10 @@
 # Changelog
 
-All notable changes to AgentBoard. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org).
+All notable changes to AgentBoard. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: a release with new features raises the first number (`2.0.0`); fixes and small changes raise the last one (`1.0.1`).
 
 ## [Unreleased]
 
-## [0.9.0] - 2026-10-18
+## [1.0.0] - 2026-10-18
 
 ### Added
 - **Approvals inbox**: when Claude Code, Codex or Gemini asks for permission ("Do you want to proceed?", "Allow execution?"), the request appears under **Approvals** in the toolbar and under its task, with the command or file it is about. Approve or reject from there (or everything at once) without going to each card; you also get a notice and a notification.
@@ -148,8 +148,8 @@ Includes the 0.2.0 changes, which were not released separately.
 ### Added
 - First release: a board of terminals for CLI agents on Mac and Windows.
 
-[Unreleased]: https://github.com/scortes5/agentboard/compare/v0.9.0...HEAD
-[0.9.0]: https://github.com/scortes5/agentboard/compare/v0.8.0...v0.9.0
+[Unreleased]: https://github.com/scortes5/agentboard/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/scortes5/agentboard/compare/v0.8.0...v1.0.0
 [0.8.0]: https://github.com/scortes5/agentboard/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/scortes5/agentboard/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/scortes5/agentboard/compare/v0.5.0...v0.6.0

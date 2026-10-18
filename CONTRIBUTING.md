@@ -42,7 +42,14 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 
 ## Releases
 
-Maintainers bump `version` in `package.json` (and `VERSION` in `scripts/agentboard-mcp.js`) and move the *Unreleased* changelog entries under the new version. When that change reaches `main`, the `build` workflow sees a version without a tag, builds the macOS and Windows installers and publishes the GitHub Release with its `v<version>` tag.
+Versions are `MAJOR.MINOR.PATCH`:
+
+| Change | Bump | Example |
+|---|---|---|
+| New features | **MAJOR** | `1.4.2` → `2.0.0` |
+| Fixes and small changes (docs, tweaks, dependencies) | **PATCH** | `1.4.2` → `1.4.3` |
+
+MINOR is kept for changes that are neither (rare). Maintainers bump `version` in `package.json` (and `VERSION` in `scripts/agentboard-mcp.js`) and move the *Unreleased* changelog entries under the new version. When that change reaches `main`, the `build` workflow sees a version without a tag, builds the macOS and Windows installers and publishes the GitHub Release with its `v<version>` tag.
 
 ## Code of conduct
 
