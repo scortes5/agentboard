@@ -1,8 +1,24 @@
 # Changelog
 
-All notable changes to AgentBoard. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org).
+All notable changes to AgentBoard. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: a release with new features raises the first number (`2.0.0`); fixes and small changes raise the last one (`1.0.1`).
 
 ## [Unreleased]
+
+## [1.0.0] - 2026-10-18
+
+### Added
+- **All subscriptions out**: when every subscription in the queue has hit its usage limit, a screen says *"You have reached your limits. Come back in …"* with the time of the soonest reset, plus one of 20 ideas for the break (a walk, a coffee, the news…). The ideas come from a shuffled deck, so none repeats until all have been shown. Queued tasks start by themselves when a subscription is back.
+- A task pinned to a subscription (`@claude`) also moves to another one when that subscription hits its limit (can be turned off). *Settings → Tasks* lists the subscriptions that are out, with **Use Again**.
+- **Live cost**: tokens per running task, read from Claude's session logs, under each task and in total in the progress bar; finished tasks keep their count.
+- **Budgets**: a token budget per task (warn, or ask the agent to wrap up with the smallest change that works) and a daily budget (past it, new tasks use light models).
+- **Smarter routing**: haiku also sees how each subscription did on past tasks, and which agents run free local models.
+- **Local models first for light tasks**: mark an agent as *local* in *Settings → Agents* and light tasks go to it first.
+- **Appearance**: the terminal's font, cursor shape and blinking, and how many lines each terminal keeps, in the panel instead of the JSON.
+- `npm test` runs unit tests for the main-process modules.
+
+### Changed
+- Versions: new features now raise the first number (this release is 1.0.0); fixes and small changes raise the last one.
+- Settings moved to its own file (`renderer/settings.js`); terminals get their options from one function.
 
 ## [0.9.0] - 2026-10-18
 
@@ -148,7 +164,8 @@ Includes the 0.2.0 changes, which were not released separately.
 ### Added
 - First release: a board of terminals for CLI agents on Mac and Windows.
 
-[Unreleased]: https://github.com/scortes5/agentboard/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/scortes5/agentboard/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/scortes5/agentboard/compare/v0.9.0...v1.0.0
 [0.9.0]: https://github.com/scortes5/agentboard/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/scortes5/agentboard/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/scortes5/agentboard/compare/v0.6.0...v0.7.0

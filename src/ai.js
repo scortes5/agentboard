@@ -18,6 +18,8 @@ function register(ipcMain) {
       'Split a large request into tasks that touch different files or areas, so agents do not step on each other; keep small requests as one task.',
       'light=true for simple work (docs, renames, a small test, a question); heavy=true only for hard work (architecture, tricky bugs, large refactors); never both.',
       'Use "auto" unless the text asks for a specific agent.',
+      ...(opts.local?.length ? [`These agents run local models for free: ${opts.local.join(', ')}. Send them trivial tasks (renames, docs, small questions) with light=true.`] : []),
+      ...(opts.history ? [`How each agent did on past tasks: ${opts.history}. When a task is clearly the kind one agent is better at, pick it; otherwise use "auto".`] : []),
       'Markers in a line are the user\'s choice and win: @name = agent, #name = group, +name = project, ! = light, !! = heavy. Do not copy markers into "text".',
       'Write each task in the same language as the to-do list.',
       'Available projects: ' + projects + '. Do not invent projects.',

@@ -186,6 +186,7 @@ refactor the payments module !!
 - **Checks after each task**: set a command per project (for example `npm test`). If it fails, the output goes back to the same agent until it passes (or the task is marked blocked).
 - **Cross-review** (optional): another subscription reviews each finished task and approves it or sends the problems back.
 - **Dependencies and templates**: start a line with `>` to make it wait for the one above; insert frequent to-dos from **Templates**.
+- **Limits and budgets**: if a subscription runs out, its tasks move to another; if all of them do, AgentBoard tells you when the first one comes back (with an idea for the break). Tokens per task are shown live, with optional budgets per task and per day.
 - **Subagents you can see**: with *Agent Connection* on, a task agent may split its work with `start_agent`; each helper opens as a `↳` card next to it.
 - **Summary**: copies what was done today and what is pending, as Markdown.
 - **Global shortcut** (⌃⌥Space, configurable): add a task from any app.

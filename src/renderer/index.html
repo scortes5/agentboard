@@ -212,13 +212,18 @@
             <div class="set-row">Terminal theme
               <div class="seg" id="termSeg"><button type="button" data-v="auto" title="Terminals use the same theme as the app">Same as App</button><button type="button" data-v="light" title="Always light terminals">Light</button><button type="button" data-v="dark" title="Always dark terminals">Dark</button></div></div>
             <label class="set-row">Terminal line height <span class="range"><input name="lineHeight" type="range" min="1" max="1.6" step="0.05" /><output id="lineHeightOut"></output></span></label>
+            <label class="set-row">Terminal font <select name="termFont" title="Fonts you do not have installed fall back to the app's monospace font"></select></label>
+            <div class="set-row">Cursor
+              <div class="seg" id="cursorSeg"><button type="button" data-v="block" title="A filled block">Block</button><button type="button" data-v="bar" title="A thin vertical bar">Bar</button><button type="button" data-v="underline" title="A line under the character">Underline</button></div></div>
+            <label class="set-row check"><span>Blinking cursor</span><input name="cursorBlink" type="checkbox" class="switch-input" /></label>
+            <label class="set-row">Lines kept in each terminal's history <input name="scrollback" type="number" min="1000" max="100000" step="1000" /></label>
           </div>
           <p class="set-note">Changes preview instantly; they are kept when you click Save.</p>
         </section>
 
         <section data-sec="agents" class="hidden">
           <h2>Agents</h2>
-          <p class="set-note">Color · name · command · resume args · light args (<code>!</code>) · heavy args (<code>!!</code>)</p>
+          <p class="set-note">Color · name · command · resume args · light args (<code>!</code>) · heavy args (<code>!!</code>) · local (a free local model)</p>
           <div id="agentRows"></div>
           <button type="button" id="addAgent" class="ghost" data-icon="plus" title="Add any CLI as an agent (aider, opencode, ollama…)">Custom Agent</button>
         </section>
@@ -259,6 +264,16 @@
             <label class="set-row">Check command after each task (empty = none; a project's own command wins) <input name="verifyCmd" placeholder="npm test" /></label>
             <label class="set-row">Send failed checks back to the agent, at most <input name="verifyRetries" type="number" min="0" max="5" /></label>
             <label class="set-row check"><span>Cross-review: another subscription reviews each finished task</span><input name="crossReview" type="checkbox" class="switch-input" /></label>
+          </div>
+          <h3>Costs and limits</h3>
+          <div class="set-group">
+            <label class="set-row">Token budget per task, in thousands (0 = none) <input name="taskBudgetK" type="number" min="0" max="100000" step="10" /></label>
+            <div class="set-row">When a task reaches it
+              <div class="seg" id="budgetSeg"><button type="button" data-v="warn" title="Only tell me">Warn me</button><button type="button" data-v="wrap" title="Ask the agent to finish the smallest working change now">Ask it to wrap up</button></div></div>
+            <label class="set-row">Daily token budget, in thousands (0 = none; past it, new tasks use light models) <input name="dailyBudgetK" type="number" min="0" max="1000000" step="100" /></label>
+            <label class="set-row check"><span>Send light tasks to local models first (agents marked "local")</span><input name="preferLocalForLight" type="checkbox" class="switch-input" /></label>
+            <label class="set-row check"><span>When a subscription hits its limit, move even tasks pinned to it (<code>@name</code>) to another one</span><input name="limitFallback" type="checkbox" class="switch-input" /></label>
+            <div class="set-row">Subscriptions out of usage <span id="exhaustedList" class="muted">None</span></div>
           </div>
         </section>
 
@@ -314,6 +329,17 @@
   </dialog>
 
   <!-- Skills and agents -->
+  <dialog id="limits" class="limits">
+    <form method="dialog">
+      <div class="limits-emoji" aria-hidden="true">☕</div>
+      <h2>You have reached your limits</h2>
+      <p id="limitsWhen" class="limits-when"></p>
+      <p id="limitsIdea" class="limits-idea"></p>
+      <p class="muted small">Every subscription in the queue hit its usage limit. Queued tasks start by themselves as soon as one is back.</p>
+      <div class="actions"><button type="button" id="limitsAnother" class="ghost" title="Another idea">Another Idea</button><span class="spacer"></span><button value="ok" class="primary">OK</button></div>
+    </form>
+  </dialog>
+
   <dialog id="review" class="wide review">
     <form method="dialog">
       <h2 id="reviewTitle">Review</h2>
@@ -427,6 +453,7 @@
   <script src="../../node_modules/@xterm/addon-web-links/lib/addon-web-links.js"></script>
   <script src="icons.js"></script>
   <script src="app.js"></script>
+  <script src="settings.js"></script>
   <script src="tasks.js"></script>
   <script src="diagram.js"></script>
   <script src="palette.js"></script>
@@ -436,5 +463,7 @@
   <script src="review.js"></script>
   <script src="task-checks.js"></script>
   <script src="templates.js"></script>
+  <script src="costs.js"></script>
+  <script src="limits.js"></script>
 </body>
 </html>

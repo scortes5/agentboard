@@ -60,6 +60,13 @@ When an agent asks for permission (run a command, edit a file), the request show
 - **Review**: the diff button opens the full diff file by file. Click a line to quote it, write what to change and **Send to Agent**. With a worktree you can also **Merge**, **Create Pull Request** or **Discard**.
 - **Undo**: without a worktree, each task starts from a checkpoint of the project. **Undo** puts the project back exactly as it was (new files removed, changed ones restored).
 
+## Costs and limits
+
+- **Tokens per task**: running tasks show how many tokens they have used (read from Claude's session logs); the progress bar shows the total.
+- **Budgets** (*Settings → Tasks → Costs and limits*): a budget per task, in thousands of tokens, that either warns you or asks the agent to wrap up; and a daily budget, past which new tasks use light models.
+- **Limits**: when a subscription hits its usage limit, its tasks move to another (also tasks pinned with `@name`, unless you turn that off). When **all** of them are out, AgentBoard shows when the first one comes back and suggests something to do meanwhile; queued tasks restart by themselves.
+- **Local models**: mark an agent as *local* in *Settings → Agents* (an Ollama or LM Studio setup). With *Send light tasks to local models first*, light tasks go there at no cost, and the router knows they are free.
+
 ## Dependencies and templates
 
 - Start a line with `>` to make it wait for the task on the line above (`write the API` / `> write tests for the API`). With **Route**, haiku may also mark a task that needs another one's result.

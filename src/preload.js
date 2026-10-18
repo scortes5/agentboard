@@ -60,6 +60,7 @@ contextBridge.exposeInMainWorld('ab', {
   packStatus: () => ipcRenderer.invoke('pack:status'),
   packInstall: (providers) => ipcRenderer.invoke('pack:install', providers),
   usageScan: (tasks) => ipcRenderer.invoke('usage:scan', tasks),
+  usageSessions: (ids) => ipcRenderer.invoke('usage:sessions', ids),
   localModels: () => ipcRenderer.invoke('local:models'),
   pickFolder: () => ipcRenderer.invoke('dialog:pickFolder'),
   openPath: (p) => ipcRenderer.invoke('shell:openPath', p),
