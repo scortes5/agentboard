@@ -1,5 +1,5 @@
-// AgentBoard — proceso principal (Electron)
-// Maneja ventanas, PTYs reales, estado git y la config de esta máquina.
+// AgentBoard — main process (Electron)
+// Owns the window, real PTYs, git status and this machine's config.
 
 const { app, BrowserWindow, ipcMain, dialog, shell, Menu, Tray, nativeImage, globalShortcut, clipboard } = require('electron');
 const path = require('path');
@@ -12,22 +12,22 @@ const skills = require('./skills');
 const { createBridge } = require('./bridge');
 
 const IS_WIN = process.platform === 'win32';
-// Si AgentBoard se abrió desde una sesión de Claude Code (ej. `npm start` en su terminal),
-// estas variables harían que los Claude de las tarjetas se nieguen a arrancar.
-// Los shells de las tarjetas son de login: vuelven a cargar lo que tengas en tu perfil.
+// If AgentBoard was launched from inside a Claude Code session (e.g. `npm start` in its
+// terminal), these variables would make the Claude instances in cards refuse to start.
+// Card shells are login shells, so anything set in the user's profile is loaded again.
 for (const k of Object.keys(process.env)) {
   if (/^(CLAUDECODE|CLAUDE_CODE_.+|CLAUDE_AGENT_SDK_.+|CLAUDE_PID|CLAUDE_EFFORT|CLAUDE_PREVIEW_.+|ANTHROPIC_BASE_URL)$/.test(k)) delete process.env[k];
 }
 const IS_MAC = process.platform === 'darwin';
 
-// ---------- Config por máquina ----------
-// Vive en la carpeta de datos de la app (NO en el repo), así cada
-// computador tiene su propio tablero, proyectos y comandos.
+// ---------- Per-machine config ----------
+// Lives in the app's data folder (NOT in the repo), so each computer
+// keeps its own board, projects and commands.
 //   Mac:     ~/Library/Application Support/AgentBoard/board.json
 //   Windows: %APPDATA%\AgentBoard\board.json
 const CONFIG_PATH = () => path.join(app.getPath('userData'), 'board.json');
 
-// lightArgs: argumentos del "modo ahorro" (modelo más barato / menos razonamiento) para tareas simples.
+// lightArgs / heavyArgs: arguments for light tasks (cheaper model, less reasoning) and heavy ones.
 const DEFAULT_AGENTS = {
   claude: { label: 'Claude', command: 'claude', resumeArgs: '--continue', lightArgs: '--model haiku', heavyArgs: '--model opus', color: '#e8875f' },
   codex:  { label: 'Codex',  command: 'codex',  resumeArgs: 'resume --last', lightArgs: '-c model_reasoning_effort=low', heavyArgs: '-c model_reasoning_effort=high', color: '#3fbf8f' },
@@ -35,35 +35,35 @@ const DEFAULT_AGENTS = {
   shell:  { label: 'Terminal', command: '', resumeArgs: '', color: '#a89d8f' },
 };
 
-// Catálogo de CLIs de agentes. Cada uno inicia sesión con su propia cuenta
-// (suscripción, cuenta gratis o API key) la primera vez que lo abres.
-// Si un comando cambia, se edita en Ajustes → Agentes.
+// Catalog of agent CLIs. Each one signs in with its own account
+// (subscription, free account or API key) the first time it runs.
+// If a command changes, edit it in Settings → Agents.
 const CATALOG = [
   { key: 'claude',   label: 'Claude Code',  command: 'claude',       resumeArgs: '--continue',    color: '#e8875f', plan: 'Claude Pro / Max',          install: 'npm i -g @anthropic-ai/claude-code' },
   { key: 'codex',    label: 'Codex',        command: 'codex',        resumeArgs: 'resume --last', color: '#3fbf8f', plan: 'ChatGPT Plus / Pro',         install: 'npm i -g @openai/codex' },
-  { key: 'gemini',   label: 'Gemini CLI',   command: 'gemini',       resumeArgs: '',              color: '#6c9cf5', plan: 'Cuenta Google (gratis)',     install: 'npm i -g @google/gemini-cli' },
+  { key: 'gemini',   label: 'Gemini CLI',   command: 'gemini',       resumeArgs: '',              color: '#6c9cf5', plan: 'Google account (free)',      install: 'npm i -g @google/gemini-cli' },
   { key: 'copilot',  label: 'Copilot CLI',  command: 'copilot',      resumeArgs: '',              color: '#b08cf0', plan: 'GitHub Copilot',             install: 'npm i -g @github/copilot' },
   { key: 'cursor',   label: 'Cursor CLI',   command: 'cursor-agent', resumeArgs: '',              color: '#d8d0c4', plan: 'Cursor Pro',                 install: 'curl https://cursor.com/install -fsS | bash' },
-  { key: 'qwen',     label: 'Qwen Code',    command: 'qwen',         resumeArgs: '',              color: '#8f7cf7', plan: 'Cuenta Qwen (gratis)',       install: 'npm i -g @qwen-code/qwen-code' },
-  { key: 'opencode', label: 'OpenCode',     command: 'opencode',     resumeArgs: '',              color: '#f0b45a', plan: 'Cualquier proveedor o local', install: 'npm i -g opencode-ai' },
-  { key: 'aider',    label: 'Aider',        command: 'aider',        resumeArgs: '',              color: '#5fd0c8', plan: 'API key o modelo local',     install: 'python -m pip install aider-install && aider-install' },
-  { key: 'amp',      label: 'Amp',          command: 'amp',          resumeArgs: '',              color: '#f06a8a', plan: 'Cuenta Amp',                 install: 'npm i -g @sourcegraph/amp' },
-  { key: 'ollama',   label: 'Ollama',       command: 'ollama',       resumeArgs: '',              color: '#f1e9dd', plan: 'Modelos locales, sin cuenta', install: 'https://ollama.com/download' },
+  { key: 'qwen',     label: 'Qwen Code',    command: 'qwen',         resumeArgs: '',              color: '#8f7cf7', plan: 'Qwen account (free)',        install: 'npm i -g @qwen-code/qwen-code' },
+  { key: 'opencode', label: 'OpenCode',     command: 'opencode',     resumeArgs: '',              color: '#f0b45a', plan: 'Any provider or local',       install: 'npm i -g opencode-ai' },
+  { key: 'aider',    label: 'Aider',        command: 'aider',        resumeArgs: '',              color: '#5fd0c8', plan: 'API key or local model',     install: 'python -m pip install aider-install && aider-install' },
+  { key: 'amp',      label: 'Amp',          command: 'amp',          resumeArgs: '',              color: '#f06a8a', plan: 'Amp account',                install: 'npm i -g @sourcegraph/amp' },
+  { key: 'ollama',   label: 'Ollama',       command: 'ollama',       resumeArgs: '',              color: '#f1e9dd', plan: 'Local models, no account',    install: 'https://ollama.com/download' },
 ];
 
 function defaultConfig() {
   return {
     version: 1,
     machineName: os.hostname().replace(/\.local$/, ''),
-    shell: '',               // vacío = automático (zsh/bash en Mac, PowerShell en Windows)
+    shell: '',               // empty = automatic (zsh/bash on Mac, PowerShell on Windows)
     fontSize: 13,
-    resumeOnOpen: true,      // al reabrir la app, relanzar agentes con sus args de "reanudar"
-    keepRunning: true,       // cerrar la ventana la oculta: los agentes siguen trabajando (salir con ⌘Q / bandeja)
-    maxParallel: 3,          // tareas corriendo a la vez (todas las suscripciones)
-    perAgentParallel: 2,     // tareas a la vez por suscripción
-    taskWorktrees: false,    // cada tarea en su propio git worktree (no se pisan entre agentes)
-    quickKey: 'Control+Alt+Space', // atajo global: anotar una tarea desde cualquier app
-    tasks: [],               // lista de ToDos: [{ id, text, status, agent, cwd, group, light, cardId, ... }]
+    resumeOnOpen: true,      // when the app reopens, relaunch agents with their "resume" args
+    keepRunning: true,       // closing the window hides it; agents keep working (quit with ⌘Q / tray)
+    maxParallel: 3,          // tasks running at once, across all subscriptions
+    perAgentParallel: 2,     // tasks running at once per subscription
+    taskWorktrees: false,    // each task in its own git worktree, so agents don't step on each other
+    quickKey: 'Control+Alt+Space', // global shortcut: add a task from any app
+    tasks: [],               // to-do list: [{ id, text, status, agent, cwd, group, light, cardId, ... }]
     agents: DEFAULT_AGENTS,
     projects: [],            // [{ path, name }]
     selectedProject: null,
@@ -87,7 +87,7 @@ function loadConfig() {
   }
 }
 
-// Solo tu usuario puede leer el tablero (rutas de proyectos, notas).
+// Only the current user can read the board (project paths, notes).
 function saveConfig(cfg) {
   const file = CONFIG_PATH();
   const dir = path.dirname(file);
@@ -95,7 +95,7 @@ function saveConfig(cfg) {
   if (!IS_WIN) { try { fs.chmodSync(dir, 0o700); } catch {} }
   const tmp = file + '.tmp';
   fs.writeFileSync(tmp, JSON.stringify(cfg, null, 2), { mode: 0o600 });
-  fs.renameSync(tmp, file); // escritura atómica
+  fs.renameSync(tmp, file); // atomic write
 }
 
 // ---------- Shell ----------
@@ -105,12 +105,12 @@ function resolveShell(cfg) {
     return { file, args };
   }
   if (IS_WIN) return { file: 'powershell.exe', args: ['-NoLogo'] };
-  // -l: login shell, para que el PATH incluya npm/brew aunque la app se abra desde el Finder
+  // -l: login shell, so PATH includes npm/brew even when the app is opened from Finder
   return { file: process.env.SHELL || (IS_MAC ? '/bin/zsh' : '/bin/bash'), args: ['-l'] };
 }
 
 // ---------- PTYs ----------
-// node-pty 1.1.0 trae spawn-helper sin permiso de ejecución ("posix_spawnp failed").
+// node-pty 1.1.0 ships spawn-helper without the execute bit ("posix_spawnp failed").
 function ensureSpawnHelper() {
   if (IS_WIN) return;
   try {
@@ -128,7 +128,7 @@ function send(channel, ...args) {
   if (win && !win.isDestroyed()) win.webContents.send(channel, ...args);
 }
 
-// Variables extra por tarjeta (ej. OLLAMA_API_BASE para Aider). Solo nombres válidos y valores de texto.
+// Extra variables per card (e.g. OLLAMA_API_BASE for Aider). Only valid names and string values.
 function safeEnv(extra) {
   const out = {};
   for (const [k, v] of Object.entries(extra || {})) {
@@ -155,21 +155,21 @@ ipcMain.handle('pty:create', (_e, { id, cwd, command, cols, rows, env }) => {
       env: { ...process.env, ...safeEnv(env), TERM: 'xterm-256color', COLORTERM: 'truecolor', AGENTBOARD: '1', AGENTBOARD_CARD: String(id) },
     });
   } catch (err) {
-    return { ok: false, error: `No pude abrir el shell "${file}": ${err.message}` };
+    return { ok: false, error: `Could not start the shell "${file}": ${err.message}` };
   }
 
   ptys.set(id, p);
   p.onData((data) => { send('pty:data', id, data); bridge?.record(id, data); });
   p.onExit(({ exitCode }) => {
-    // si lo matamos nosotros (cerrar/reiniciar) ya no está en el mapa: no avisar,
-    // o el aviso taparía a la sesión nueva de la misma tarjeta
+    // if we killed it ourselves (close/restart) it is no longer in the map: stay quiet,
+    // or the notice would cover the new session in the same card
     if (ptys.get(id) !== p) return;
     ptys.delete(id);
     send('pty:exit', id, exitCode);
   });
 
-  // Escribimos el comando dentro del shell: si el agente termina,
-  // la tarjeta queda en un shell usable en vez de cerrarse.
+  // Type the command into the shell: when the agent exits,
+  // the card is left with a usable shell instead of closing.
   if (command && command.trim()) {
     setTimeout(() => { try { p.write(command.trim() + '\r'); } catch {} }, IS_WIN ? 400 : 150);
   }
@@ -186,7 +186,7 @@ ipcMain.on('pty:kill', (_e, id) => {
   if (p) { try { p.kill(); } catch {} ptys.delete(id); }
   bridge?.forget(id);
 });
-// "Pasar a…": pega un bloque de texto en otro agente y lo envía.
+// "Send to…": paste a block of text into another agent and submit it.
 ipcMain.handle('pty:paste', (_e, id, text) => bridge?.paste(id, text) ?? false);
 
 function killAll() {
@@ -206,7 +206,7 @@ function git(cwd, args) {
 ipcMain.handle('git:status', async (_e, cwd) => {
   if (!cwd || !fs.existsSync(cwd)) return null;
   const out = await git(cwd, ['status', '--porcelain=v2', '--branch']);
-  if (out == null) return null; // no es repo, o git no está instalado
+  if (out == null) return null; // not a repo, or git is not installed
   const res = { branch: '', ahead: 0, behind: 0, changes: 0 };
   for (const line of out.split('\n')) {
     if (line.startsWith('# branch.head ')) res.branch = line.slice(14).trim();
@@ -228,7 +228,7 @@ ipcMain.handle('git:checkout', async (_e, cwd, branch, create) => {
   return out != null;
 });
 
-// ---------- Detectar agentes instalados ----------
+// ---------- Detect installed agents ----------
 function which(cmd, cfg) {
   return new Promise((resolve) => {
     if (!cmd) return resolve(true);
@@ -251,15 +251,15 @@ ipcMain.handle('agents:check', async () => {
   return result;
 });
 
-// ---------- Cuentas ----------
-// Cada CLI guarda su propia sesión en este computador. AgentBoard solo
-// comprueba que exista; nunca lee, copia ni envía los tokens.
+// ---------- Accounts ----------
+// Each CLI stores its own session on this computer. AgentBoard only checks
+// that it exists; it never reads, copies or sends the tokens.
 const exists = (...p) => { try { return fs.existsSync(path.join(...p)); } catch { return false; } };
 
 function macKeychainHas(service) {
   return new Promise((resolve) => {
     if (!IS_MAC) return resolve(false);
-    // Sin -w/-g: no devuelve el secreto, solo si la entrada existe.
+    // Without -w/-g: does not return the secret, only whether the entry exists.
     execFile('security', ['find-generic-password', '-s', service], { timeout: 4000 }, (err) => resolve(!err));
   });
 }
@@ -267,7 +267,7 @@ function macKeychainHas(service) {
 const PROVIDERS = {
   claude: {
     login: 'claude',
-    where: IS_MAC ? 'Llavero de macOS' : '~/.claude',
+    where: IS_MAC ? 'macOS Keychain' : '~/.claude',
     async detect() {
       if (await macKeychainHas('Claude Code-credentials')) return true;
       return exists(process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude'), '.credentials.json');
@@ -285,7 +285,7 @@ const PROVIDERS = {
   },
 };
 
-// Catálogo + si cada CLI está instalado y, para los que sabemos revisar, si hay sesión.
+// Catalog + whether each CLI is installed and, where we can tell, whether it is signed in.
 ipcMain.handle('catalog:status', async () => {
   const cfg = loadConfig();
   return Promise.all(CATALOG.map(async (item) => {
@@ -295,8 +295,8 @@ ipcMain.handle('catalog:status', async () => {
   }));
 });
 
-// ---------- Modelos locales ----------
-// Solo consulta servidores en esta máquina (127.0.0.1); nada sale a internet.
+// ---------- Local models ----------
+// Only queries servers on this machine (127.0.0.1); nothing leaves the computer.
 function localJson(port, pathname) {
   return new Promise((resolve) => {
     const req = http.get({ host: '127.0.0.1', port, path: pathname, timeout: 1500 }, (res) => {
@@ -323,7 +323,7 @@ ipcMain.handle('local:models', async () => {
   };
 });
 
-// ---------- Config / diálogos ----------
+// ---------- Config / dialogs ----------
 ipcMain.handle('config:load', () => ({ config: loadConfig(), platform: process.platform, configPath: CONFIG_PATH() }));
 ipcMain.handle('config:save', (_e, cfg) => { saveConfig(cfg); return true; });
 ipcMain.handle('config:reveal', () => shell.showItemInFolder(CONFIG_PATH()));
@@ -337,7 +337,7 @@ ipcMain.handle('shell:openPath', (_e, p) => shell.openPath(p));
 ipcMain.on('clip:write', (_e, text) => clipboard.writeText(String(text ?? '')));
 ipcMain.handle('clip:read', () => clipboard.readText());
 
-// ---------- Skills y agentes ----------
+// ---------- Skills and agents ----------
 const projectsOf = () => loadConfig().projects || [];
 const wrap = (fn) => async (...args) => { try { return { ok: true, value: await fn(...args) }; } catch (err) { return { ok: false, error: err.message }; } };
 
@@ -350,8 +350,8 @@ ipcMain.handle('agents:save', wrap(async (_e, a) => {
   return r.file;
 }));
 ipcMain.handle('agents:delete', wrap(async (_e, file) => {
-  if (!skills.isAgentFile(file, projectsOf())) throw new Error('Archivo de agente inválido.');
-  await shell.trashItem(file); // a la papelera: se puede recuperar
+  if (!skills.isAgentFile(file, projectsOf())) throw new Error('Invalid agent file.');
+  await shell.trashItem(file); // to the Trash: recoverable
   return true;
 }));
 ipcMain.handle('skills:reveal', (_e, p) => {
@@ -360,12 +360,15 @@ ipcMain.handle('skills:reveal', (_e, p) => {
   if (known) shell.showItemInFolder(p);
 });
 
-// ---------- Skills de ahorro (incluidas con AgentBoard) ----------
-// Carpeta skills-pack/<nombre>/SKILL.md. Se copian a la carpeta de skills de
-// cada CLI; el formato SKILL.md es el mismo en Claude Code, Codex y Gemini.
+// ---------- Token-saving skills (bundled with AgentBoard) ----------
+// skills-pack/<name>/SKILL.md, copied into each CLI's skills folder; the
+// SKILL.md format is the same in Claude Code, Codex and Gemini.
 const PACK_DIR = path.join(__dirname, '..', 'skills-pack');
+// Names the same skills had up to v0.3.0; removed on install so they are not duplicated
+const LEGACY_PACK = ['ahorro-contexto', 'tarea-agentboard', 'traspaso-compacto'];
+const removeLegacyPack = (root) => { for (const n of LEGACY_PACK) fs.rmSync(path.join(root, n), { recursive: true, force: true }); };
 const PACK_ROOTS = { claude: () => path.join(skills.claudeDir(), 'skills'), codex: () => path.join(skills.codexDir(), 'skills'), gemini: () => path.join(skills.geminiDir(), 'skills') };
-// Carpetas de las cuentas extra de Claude (agentes con CLAUDE_CONFIG_DIR propio)
+// Folders of the extra Claude accounts (agents with their own CLAUDE_CONFIG_DIR)
 const claudeAccountDirs = () => Object.values(loadConfig().agents || {}).map((a) => a.env?.CLAUDE_CONFIG_DIR).filter((d) => d && fs.existsSync(d));
 
 function packSkills() {
@@ -383,20 +386,22 @@ function packSkills() {
 }
 
 ipcMain.handle('pack:status', () => packSkills());
-// Instala (o actualiza) las skills de ahorro en las suscripciones indicadas.
+// Install (or update) the token-saving skills for the given subscriptions.
 ipcMain.handle('pack:install', wrap((_e, providers) => {
   const done = [];
   for (const k of providers || []) {
     if (!PACK_ROOTS[k]) continue;
+    removeLegacyPack(PACK_ROOTS[k]());
     for (const { name } of packSkills()) {
       const dest = path.join(PACK_ROOTS[k](), name);
       fs.mkdirSync(dest, { recursive: true });
-      // readFileSync funciona dentro de app.asar (cpSync no)
+      // readFileSync works inside app.asar (cpSync does not)
       fs.writeFileSync(path.join(dest, 'SKILL.md'), fs.readFileSync(path.join(PACK_DIR, name, 'SKILL.md')));
       done.push(`${k}/${name}`);
     }
     if (k === 'claude') {
       for (const dir of claudeAccountDirs()) {
+        removeLegacyPack(path.join(dir, 'skills'));
         for (const { name } of packSkills()) {
           const dest = path.join(dir, 'skills', name);
           fs.mkdirSync(dest, { recursive: true });
@@ -409,8 +414,8 @@ ipcMain.handle('pack:install', wrap((_e, providers) => {
   return done;
 }));
 
-// ---------- Tareas (ToDo) ----------
-// Corre un CLI sin terminal (ej. `claude -p`) con el texto por stdin.
+// ---------- Tasks ----------
+// Run a CLI without a terminal (e.g. `claude -p`), passing the text on stdin.
 function runHeadless(cmdline, input, timeoutMs = 90_000) {
   return new Promise((resolve, reject) => {
     const cfg = loadConfig();
@@ -418,78 +423,79 @@ function runHeadless(cmdline, input, timeoutMs = 90_000) {
       ? spawn(cmdline, { shell: true, windowsHide: true })
       : spawn(resolveShell(cfg).file, ['-lc', cmdline]);
     let out = '', err = '';
-    const timer = setTimeout(() => { child.kill(); reject(new Error('Tardó demasiado.')); }, timeoutMs);
+    const timer = setTimeout(() => { child.kill(); reject(new Error('Timed out.')); }, timeoutMs);
     child.stdout.on('data', (d) => { out += d; });
     child.stderr.on('data', (d) => { err += d; });
     child.on('error', (e) => { clearTimeout(timer); reject(e); });
     child.on('close', (code) => {
       clearTimeout(timer);
-      if (code === 0) resolve(out); else reject(new Error((err || out).trim().split('\n').slice(-3).join(' ') || `código ${code}`));
+      if (code === 0) resolve(out); else reject(new Error((err || out).trim().split('\n').slice(-3).join(' ') || `exit code ${code}`));
     });
     child.stdin.end(input);
   });
 }
 
-// Divide un texto libre en tareas con Claude en modo no interactivo y el modelo
-// más barato (haiku): una sola llamada corta, sin abrir terminal ni leer el repo.
+// Split free text into tasks with Claude in non-interactive mode and the cheapest
+// model (haiku): one short call, no terminal, no repository access.
 ipcMain.handle('tasks:plan', wrap(async (_e, text, opts = {}) => {
   const agents = (opts.agents || []).join(', ') || 'claude, codex, gemini';
-  const projects = (opts.projects || []).join(', ') || '(ninguno)';
+  const projects = (opts.projects || []).join(', ') || '(none)';
   const prompt = [
-    'Convierte esta lista de pendientes en tareas concretas e independientes para agentes de código.',
-    'Responde SOLO con un arreglo JSON, sin texto extra:',
-    '[{"text":"instrucción clara y autocontenida","agent":"auto|' + agents.replace(/, /g, '|') + '","light":true|false,"project":"nombre o vacío","group":"etiqueta corta o vacío"}]',
-    'light=true si es simple (docs, renombrar, test chico, pregunta). Usa "auto" salvo que el texto pida un agente.',
-    'Proyectos disponibles: ' + projects + '. No inventes proyectos.',
-    'Pendientes:',
+    'Turn this to-do list into concrete, independent tasks for coding agents.',
+    'Reply ONLY with a JSON array, no extra text:',
+    '[{"text":"clear, self-contained instruction","agent":"auto|' + agents.replace(/, /g, '|') + '","light":true|false,"project":"name or empty","group":"short label or empty"}]',
+    'light=true for simple work (docs, renames, a small test, a question). Use "auto" unless the text asks for a specific agent.',
+    'Write each task in the same language as the to-do list.',
+    'Available projects: ' + projects + '. Do not invent projects.',
+    'To-do list:',
     String(text).slice(0, 8000),
   ].join('\n');
   const out = await runHeadless('claude -p --model haiku --tools "" --no-session-persistence', prompt);
   const m = out.match(/\[[\s\S]*\]/);
-  if (!m) throw new Error('Claude no devolvió una lista.');
+  if (!m) throw new Error('Claude did not return a list.');
   const list = JSON.parse(m[0]);
-  if (!Array.isArray(list)) throw new Error('Respuesta inválida.');
+  if (!Array.isArray(list)) throw new Error('Invalid response.');
   return list.filter((t) => t && typeof t.text === 'string' && t.text.trim()).slice(0, 40);
 }));
 
-// ---------- Automatizaciones ----------
-// Pregunta corta a Claude sin terminal ni herramientas (diseñar un flujo, explicarlo, decidir SÍ/NO).
+// ---------- Automations ----------
+// Short question to Claude with no terminal and no tools (design a flow, explain it, decide YES/NO).
 ipcMain.handle('ai:ask', wrap(async (_e, prompt, model = 'haiku') => {
-  if (!['haiku', 'sonnet'].includes(model)) throw new Error('Modelo inválido.');
+  if (!['haiku', 'sonnet'].includes(model)) throw new Error('Invalid model.');
   const out = await runHeadless(`claude -p --model ${model} --tools "" --no-session-persistence`, String(prompt).slice(0, 30000), 180_000);
   return out.trim();
 }));
 
-// Paso "Comando" de una automatización: corre en el shell del usuario, dentro del proyecto.
+// "Command" step of an automation: runs in the user's shell, inside the project.
 ipcMain.handle('flow:exec', wrap((_e, cmd, cwd) => new Promise((resolve) => {
   const dir = cwd && fs.existsSync(cwd) ? cwd : os.homedir();
   const child = IS_WIN ? spawn(String(cmd), { shell: true, cwd: dir, windowsHide: true }) : spawn(resolveShell(loadConfig()).file, ['-lc', String(cmd)], { cwd: dir });
   let out = '';
   const keep = (d) => { out = (out + d).slice(-8000); };
   child.stdout.on('data', keep); child.stderr.on('data', keep);
-  const timer = setTimeout(() => { child.kill(); keep('\n[AgentBoard: se detuvo tras 10 minutos]'); }, 10 * 60_000);
+  const timer = setTimeout(() => { child.kill(); keep('\n[AgentBoard: stopped after 10 minutes]'); }, 10 * 60_000);
   child.on('error', (err) => { clearTimeout(timer); resolve({ code: -1, out: err.message }); });
   child.on('close', (code) => { clearTimeout(timer); resolve({ code, out: out.trim() }); });
 })));
 
-// Worktree aislado para una tarea: <repo>/.agentboard/worktrees/<slug> en la rama agentboard/<slug>.
+// Isolated worktree for a task: <repo>/.agentboard/worktrees/<slug> on branch agentboard/<slug>.
 function gitLong(cwd, args) {
   return new Promise((resolve) => {
     execFile('git', args, { cwd, timeout: 60_000, windowsHide: true }, (err, stdout, stderr) => resolve({ ok: !err, out: String(stdout), err: String(stderr || err?.message || '') }));
   });
 }
 ipcMain.handle('git:worktree', wrap(async (_e, cwd, slug) => {
-  if (!cwd || !fs.existsSync(cwd)) throw new Error('Proyecto inválido.');
+  if (!cwd || !fs.existsSync(cwd)) throw new Error('Invalid project.');
   const top = (await gitLong(cwd, ['rev-parse', '--show-toplevel'])).out.trim();
-  if (!top) throw new Error('El proyecto no es un repositorio git.');
-  const safe = String(slug || 'tarea').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'tarea';
+  if (!top) throw new Error('The project is not a git repository.');
+  const safe = String(slug || 'task').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'task';
   let name = safe;
   for (let i = 2; fs.existsSync(path.join(top, '.agentboard', 'worktrees', name)); i++) name = `${safe}-${i}`;
   const dir = path.join(top, '.agentboard', 'worktrees', name);
   const branch = `agentboard/${name}`;
   const r = await gitLong(top, ['worktree', 'add', '-b', branch, dir]);
-  if (!r.ok) throw new Error(r.err.trim() || 'git worktree falló.');
-  // que los worktrees no aparezcan como cambios del repo principal
+  if (!r.ok) throw new Error(r.err.trim() || 'git worktree failed.');
+  // keep worktrees from showing up as changes in the main repo
   try {
     const gitDir = (await gitLong(top, ['rev-parse', '--git-common-dir'])).out.trim();
     const exclude = path.resolve(top, gitDir, 'info', 'exclude');
@@ -499,30 +505,30 @@ ipcMain.handle('git:worktree', wrap(async (_e, cwd, slug) => {
   return { dir, branch };
 }));
 
-// ---------- Cuentas extra de Claude ----------
-// Cada cuenta vive en su propia carpeta de configuración (CLAUDE_CONFIG_DIR),
-// con su login, historial y skills. Así una suscripción personal y una del
-// trabajo (o dos planes) se usan lado a lado y la cola reparte entre ellas.
+// ---------- Extra Claude accounts ----------
+// Each account lives in its own config folder (CLAUDE_CONFIG_DIR) with its
+// own login, history and skills, so a personal and a work subscription (or two
+// plans) can be used side by side and the queue spreads tasks across them.
 ipcMain.handle('accounts:claudeDir', wrap((_e, name) => {
   const slug = String(name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30);
-  if (!slug) throw new Error('Nombre inválido.');
+  if (!slug) throw new Error('Invalid name.');
   const dir = path.join(os.homedir(), `.claude-${slug}`);
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
   return { dir, slug };
 }));
-// ¿Esa carpeta ya tiene una sesión? (solo existencia de archivos; nunca se leen tokens)
+// Does that folder already have a session? (file existence only; tokens are never read)
 ipcMain.handle('accounts:claudeStatus', (_e, dirs) => Object.fromEntries((dirs || []).map((d) => [d,
   exists(d, '.credentials.json') || exists(d, 'projects')])));
 
-// ---------- Revisar y fusionar el trabajo de una tarea en worktree ----------
+// ---------- Review and merge a task's worktree ----------
 async function worktreeTop(dir) {
   const common = (await gitLong(dir, ['rev-parse', '--git-common-dir'])).out.trim();
-  if (!common) throw new Error('No es un worktree de git.');
+  if (!common) throw new Error('Not a git worktree.');
   return path.dirname(path.resolve(dir, common));
 }
 
 ipcMain.handle('git:worktreeInfo', wrap(async (_e, dir, branch) => {
-  if (!dir || !fs.existsSync(dir)) throw new Error('El worktree ya no existe.');
+  if (!dir || !fs.existsSync(dir)) throw new Error('The worktree no longer exists.');
   const top = await worktreeTop(dir);
   const base = (await gitLong(top, ['rev-parse', '--abbrev-ref', 'HEAD'])).out.trim();
   const [dirty, ahead, stat] = await Promise.all([
@@ -535,31 +541,31 @@ ipcMain.handle('git:worktreeInfo', wrap(async (_e, dir, branch) => {
     base, top, branch,
     uncommitted: dirty.out.split('\n').filter(Boolean).length,
     commits: parseInt(ahead.out, 10) || 0,
-    stat: [stat.out.trim(), dirty.out.trim() ? `Sin commit:\n${dirty.out.trimEnd()}${wip ? `\n\n${wip}` : ''}` : ''].filter(Boolean).join('\n\n').split('\n').slice(-40).join('\n'),
+    stat: [stat.out.trim(), dirty.out.trim() ? `Uncommitted:\n${dirty.out.trimEnd()}${wip ? `\n\n${wip}` : ''}` : ''].filter(Boolean).join('\n\n').split('\n').slice(-40).join('\n'),
   };
 }));
 
-// Fusiona la rama de la tarea en la rama actual del repo principal y borra el worktree.
+// Merge the task's branch into the main repo's current branch and remove the worktree.
 ipcMain.handle('git:worktreeMerge', wrap(async (_e, dir, branch, message) => {
   const top = await worktreeTop(dir);
   const mainDirty = (await gitLong(top, ['status', '--porcelain', '--untracked-files=no'])).out.trim();
-  if (mainDirty) throw new Error('El repo principal tiene cambios sin commit; haz commit o guárdalos antes de fusionar.');
+  if (mainDirty) throw new Error('The main repo has uncommitted changes; commit or stash them before merging.');
   if ((await gitLong(dir, ['status', '--porcelain'])).out.trim()) {
     await gitLong(dir, ['add', '-A']);
     const c = await gitLong(dir, ['commit', '-m', String(message || `AgentBoard: ${branch}`).slice(0, 200)]);
-    if (!c.ok) throw new Error('No pude hacer commit en el worktree: ' + c.err.trim());
+    if (!c.ok) throw new Error('Could not commit in the worktree: ' + c.err.trim());
   }
   const m = await gitLong(top, ['merge', '--no-ff', '--no-edit', branch]);
   if (!m.ok) {
     await gitLong(top, ['merge', '--abort']);
-    throw new Error('Hay conflictos; no fusioné nada. Resuélvelo en la tarjeta del agente. ' + m.err.trim().split('\n').slice(-2).join(' '));
+    throw new Error('There are conflicts; nothing was merged. Resolve them in the agent card. ' + m.err.trim().split('\n').slice(-2).join(' '));
   }
   await gitLong(top, ['worktree', 'remove', '--force', dir]);
   await gitLong(top, ['branch', '-d', branch]);
   return { base: (await gitLong(top, ['rev-parse', '--abbrev-ref', 'HEAD'])).out.trim() };
 }));
 
-// Descarta el trabajo: borra el worktree y su rama.
+// Discard the work: remove the worktree and its branch.
 ipcMain.handle('git:worktreeDiscard', wrap(async (_e, dir, branch) => {
   const top = await worktreeTop(dir);
   await gitLong(top, ['worktree', 'remove', '--force', dir]);
@@ -567,10 +573,10 @@ ipcMain.handle('git:worktreeDiscard', wrap(async (_e, dir, branch) => {
   return true;
 }));
 
-// Insignia del Dock: tareas que esperan tu revisión.
+// Dock badge: tasks waiting for your review.
 ipcMain.on('app:badge', (_e, n) => { if (IS_MAC) app.dock?.setBadge(n > 0 ? String(n) : ''); });
 
-// ---------- Atajo global: anotar una tarea desde cualquier app ----------
+// ---------- Global shortcut: add a task from any app ----------
 let quickKey = null;
 function registerQuickKey() {
   const want = loadConfig().quickKey || '';
@@ -581,11 +587,11 @@ function registerQuickKey() {
   let ok = false;
   try { ok = globalShortcut.register(want, () => { showWindow(); send('menu', 'quick-task'); }); } catch {}
   if (ok) quickKey = want;
-  return ok ? { ok: true } : { ok: false, error: `No pude registrar ${want} (¿lo usa otra app?).` };
+  return ok ? { ok: true } : { ok: false, error: `Could not register ${want} (is another app using it?).` };
 }
 ipcMain.handle('app:quickKey', () => registerQuickKey());
 
-// ---------- Puente entre agentes (MCP) ----------
+// ---------- Bridge between agents (MCP) ----------
 let bridge = null;
 const pendingCards = new Map();
 const MCP_SCRIPT = path.join(__dirname, '..', 'scripts', 'agentboard-mcp.js').replace(`app.asar${path.sep}`, `app.asar.unpacked${path.sep}`);
@@ -601,7 +607,7 @@ function mcpCommands() {
 
 function readJson(file) { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; } }
 
-// Solo revisa si existe la entrada "agentboard"; no lee nada más de esos archivos.
+// Only checks whether the "agentboard" entry exists; reads nothing else from those files.
 function mcpConnected() {
   const toml = (() => { try { return fs.readFileSync(path.join(skills.codexDir(), 'config.toml'), 'utf8'); } catch { return ''; } })();
   return {
@@ -614,7 +620,7 @@ function mcpConnected() {
 ipcMain.handle('bridge:status', () => ({ connected: mcpConnected(), commands: mcpCommands(), script: MCP_SCRIPT }));
 ipcMain.on('bridge:card-created', (_e, reqId, id) => { pendingCards.get(reqId)?.(id); pendingCards.delete(reqId); });
 
-// Preguntas del puente que solo la UI puede responder (ej. agregar una tarea a la lista).
+// Bridge requests only the UI can answer (e.g. adding a task to the list).
 const pendingAsks = new Map();
 function askRenderer(kind, payload, ms = 5000) {
   return new Promise((resolve) => {
@@ -644,30 +650,30 @@ function startBridge() {
   bridge.start();
 }
 
-// ---------- Ventana + menú ----------
-// Atajos: cada acción tiene uno por defecto; en Configuración → Atajos se cambian
-// (cfg.shortcuts = { acción: "CmdOrCtrl+Shift+X" }, vacío = sin atajo).
+// ---------- Window + menu ----------
+// Shortcuts: every action has a default; Settings → Shortcuts overrides them
+// (cfg.shortcuts = { action: "CmdOrCtrl+Shift+X" }, empty = no shortcut).
 const SHORTCUTS = [
-  { id: 'new:claude', label: 'Nuevo Claude', key: 'CmdOrCtrl+Shift+1', section: 'Agentes' },
-  { id: 'new:codex', label: 'Nuevo Codex', key: 'CmdOrCtrl+Shift+2', section: 'Agentes' },
-  { id: 'new:gemini', label: 'Nuevo Gemini', key: 'CmdOrCtrl+Shift+3', section: 'Agentes' },
-  { id: 'new:shell', label: 'Nueva terminal', key: 'CmdOrCtrl+Shift+4', section: 'Agentes' },
-  { id: 'new:note', label: 'Nueva nota', key: 'CmdOrCtrl+Shift+N', section: 'Tablero' },
-  { id: 'new:group', label: 'Nuevo grupo', key: 'CmdOrCtrl+Shift+G', section: 'Tablero' },
-  { id: 'tasks', label: 'Tareas', key: 'CmdOrCtrl+Shift+T', section: 'Paneles' },
-  { id: 'diagram', label: 'Diagrama', key: 'CmdOrCtrl+Shift+D', section: 'Paneles' },
-  { id: 'flows', label: 'Automatizaciones', key: 'CmdOrCtrl+Shift+F', section: 'Paneles' },
-  { id: 'palette', label: 'Buscar o ejecutar…', key: 'CmdOrCtrl+Shift+P', section: 'Paneles' },
-  { id: 'sidebar', label: 'Panel de agentes', key: 'CmdOrCtrl+Shift+A', section: 'Paneles' },
-  { id: 'space:next', label: 'Proyecto siguiente', key: 'CmdOrCtrl+Alt+Right', section: 'Proyectos' },
-  { id: 'space:prev', label: 'Proyecto anterior', key: 'CmdOrCtrl+Alt+Left', section: 'Proyectos' },
-  { id: 'space:all', label: 'Todos los proyectos', key: 'CmdOrCtrl+Alt+0', section: 'Proyectos' },
-  { id: 'arrange', label: 'Ordenar tarjetas', key: 'CmdOrCtrl+Shift+O', section: 'Tablero' },
-  { id: 'fit', label: 'Ver todo', key: 'CmdOrCtrl+0', section: 'Tablero' },
-  { id: 'zoom:in', label: 'Acercar', key: 'CmdOrCtrl+=', section: 'Tablero' },
-  { id: 'zoom:out', label: 'Alejar', key: 'CmdOrCtrl+-', section: 'Tablero' },
-  { id: 'shortcuts', label: 'Atajos de teclado…', key: 'CmdOrCtrl+/', section: 'Paneles' },
-  { id: 'settings', label: 'Configuración…', key: 'CmdOrCtrl+,', section: 'Paneles' },
+  { id: 'new:claude', label: 'New Claude', key: 'CmdOrCtrl+Shift+1', section: 'Agents' },
+  { id: 'new:codex', label: 'New Codex', key: 'CmdOrCtrl+Shift+2', section: 'Agents' },
+  { id: 'new:gemini', label: 'New Gemini', key: 'CmdOrCtrl+Shift+3', section: 'Agents' },
+  { id: 'new:shell', label: 'New Terminal', key: 'CmdOrCtrl+Shift+4', section: 'Agents' },
+  { id: 'new:note', label: 'New Note', key: 'CmdOrCtrl+Shift+N', section: 'Board' },
+  { id: 'new:group', label: 'New Group', key: 'CmdOrCtrl+Shift+G', section: 'Board' },
+  { id: 'tasks', label: 'Tasks', key: 'CmdOrCtrl+Shift+T', section: 'Panels' },
+  { id: 'diagram', label: 'Diagram', key: 'CmdOrCtrl+Shift+D', section: 'Panels' },
+  { id: 'flows', label: 'Automations', key: 'CmdOrCtrl+Shift+F', section: 'Panels' },
+  { id: 'palette', label: 'Search or Run…', key: 'CmdOrCtrl+Shift+P', section: 'Panels' },
+  { id: 'sidebar', label: 'Agent List', key: 'CmdOrCtrl+Shift+A', section: 'Panels' },
+  { id: 'space:next', label: 'Next Project', key: 'CmdOrCtrl+Alt+Right', section: 'Projects' },
+  { id: 'space:prev', label: 'Previous Project', key: 'CmdOrCtrl+Alt+Left', section: 'Projects' },
+  { id: 'space:all', label: 'All Projects', key: 'CmdOrCtrl+Alt+0', section: 'Projects' },
+  { id: 'arrange', label: 'Arrange Cards', key: 'CmdOrCtrl+Shift+O', section: 'Board' },
+  { id: 'fit', label: 'Fit All', key: 'CmdOrCtrl+0', section: 'Board' },
+  { id: 'zoom:in', label: 'Zoom In', key: 'CmdOrCtrl+=', section: 'Board' },
+  { id: 'zoom:out', label: 'Zoom Out', key: 'CmdOrCtrl+-', section: 'Board' },
+  { id: 'shortcuts', label: 'Keyboard Shortcuts…', key: 'CmdOrCtrl+/', section: 'Panels' },
+  { id: 'settings', label: 'Settings…', key: 'CmdOrCtrl+,', section: 'Panels' },
 ];
 ipcMain.handle('shortcuts:list', () => SHORTCUTS);
 ipcMain.on('menu:rebuild', () => { buildMenu(); registerQuickKey(); });
@@ -684,30 +690,30 @@ function buildMenu() {
   const template = [
     ...(IS_MAC ? [{ role: 'appMenu' }] : []),
     {
-      label: 'Tablero',
+      label: 'Board',
       submenu: [
         item('new:claude'), item('new:codex'), item('new:gemini'), item('new:shell'), item('new:note'), item('new:group'), sep,
         item('tasks'), item('diagram'), item('flows'), item('palette'), sep,
         item('sidebar'),
-        { label: 'Skills y agentes…', click: cmd('skills') },
-        { label: 'Suscripciones y cuentas…', click: cmd('accounts') }, sep,
+        { label: 'Skills and Agents…', click: cmd('skills') },
+        { label: 'Subscriptions and Accounts…', click: cmd('accounts') }, sep,
         item('arrange'), item('fit'), item('zoom:in'), item('zoom:out'), sep,
         item('shortcuts'), item('settings'),
-        ...(IS_MAC ? [] : [sep, { role: 'quit', label: 'Salir' }]),
+        ...(IS_MAC ? [] : [sep, { role: 'quit', label: 'Quit' }]),
       ],
     },
-    { label: 'Proyectos', submenu: [item('space:next'), item('space:prev'), item('space:all')] },
-    // En Windows NO registramos el menú Editar: sus atajos Ctrl+C/Ctrl+V
-    // le robarían el Ctrl+C (interrumpir) a las terminales. Ahí el
-    // portapapeles lo maneja la UI.
+    { label: 'Projects', submenu: [item('space:next'), item('space:prev'), item('space:all')] },
+    // On Windows we do NOT register the Edit menu: its Ctrl+C/Ctrl+V shortcuts
+    // would steal Ctrl+C (interrupt) from the terminals. The UI handles the
+    // clipboard there.
     ...(IS_MAC ? [{ role: 'editMenu' }] : []),
-    // ⌘W cierra la ventana (los agentes siguen en segundo plano), ⌘M minimiza
+    // ⌘W closes the window (agents keep running in the background), ⌘M minimizes
     ...(IS_MAC ? [{ role: 'windowMenu' }] : []),
     {
-      label: 'Ver',
-      // Recargar sin Ctrl+R en Windows (es la búsqueda del historial del shell)
+      label: 'View',
+      // Reload without Ctrl+R on Windows (that is the shell's history search)
       submenu: [
-        IS_MAC ? { role: 'reload' } : { label: 'Recargar', click: () => win && win.reload() },
+        IS_MAC ? { role: 'reload' } : { label: 'Reload', click: () => win && win.reload() },
         { role: 'toggleDevTools' }, sep, { role: 'togglefullscreen' },
       ],
     },
@@ -715,13 +721,13 @@ function buildMenu() {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
-// El tema de la ventana (semáforos, menús, diálogos) sigue al de la app.
+// The window theme (traffic lights, menus, dialogs) follows the app's theme.
 const { nativeTheme } = require('electron');
 ipcMain.on('app:theme', (_e, mode) => { nativeTheme.themeSource = ['light', 'dark'].includes(mode) ? mode : 'system'; });
 
-// ---------- Ícono, bandeja y segundo plano ----------
-// Cerrar la ventana solo la oculta (si hay agentes corriendo): siguen trabajando
-// y las tareas en cola se siguen despachando. Para salir de verdad: ⌘Q o la bandeja.
+// ---------- Icon, tray and background mode ----------
+// Closing the window only hides it (while agents are running): they keep working
+// and queued tasks keep being dispatched. To really quit: ⌘Q or the tray.
 let tray = null;
 let quitting = false;
 let trayHintShown = false;
@@ -737,12 +743,12 @@ function busyCount() { return bridge ? bridge.busyIds().length : 0; }
 function refreshTray() {
   if (!tray) return;
   const n = ptys.size, busy = busyCount();
-  tray.setToolTip(`AgentBoard — ${n} agente${n === 1 ? '' : 's'} abierto${n === 1 ? '' : 's'}, ${busy} trabajando`);
+  tray.setToolTip(`AgentBoard — ${n} agent${n === 1 ? '' : 's'} open, ${busy} working`);
   tray.setContextMenu(Menu.buildFromTemplate([
-    { label: 'Mostrar AgentBoard', click: showWindow },
-    { label: `${n} abiertos · ${busy} trabajando`, enabled: false },
+    { label: 'Show AgentBoard', click: showWindow },
+    { label: `${n} open · ${busy} working`, enabled: false },
     { type: 'separator' },
-    { label: 'Salir (detiene los agentes)', click: () => { quitting = true; app.quit(); } },
+    { label: 'Quit (stops the agents)', click: () => { quitting = true; app.quit(); } },
   ]));
 }
 
@@ -760,10 +766,10 @@ function confirmQuit() {
   const busy = busyCount();
   const r = dialog.showMessageBoxSync(win && win.isVisible() ? win : null, {
     type: 'question',
-    buttons: ['Salir', 'Seguir en segundo plano', 'Cancelar'],
+    buttons: ['Quit', 'Keep Running in Background', 'Cancel'],
     defaultId: busy ? 1 : 0, cancelId: 2,
-    message: `Hay ${ptys.size} agente${ptys.size === 1 ? '' : 's'} abierto${ptys.size === 1 ? '' : 's'}${busy ? ` (${busy} trabajando)` : ''}.`,
-    detail: 'Si sales se detienen; al volver a abrir AgentBoard se reanudan sus sesiones. Tus suscripciones siguen con la sesión iniciada en cualquier caso.',
+    message: `${ptys.size} agent${ptys.size === 1 ? ' is' : 's are'} open${busy ? ` (${busy} working)` : ''}.`,
+    detail: 'Quitting stops them; their sessions resume the next time you open AgentBoard. Your subscriptions stay signed in either way.',
   });
   if (r === 1 && win) win.hide();
   return r === 0;
@@ -784,12 +790,12 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
-      backgroundThrottling: false, // con la ventana oculta, los estados y la cola de tareas siguen al día
+      backgroundThrottling: false, // keep statuses and the task queue up to date while hidden
     },
   });
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 
-  // Links (http/https) se abren en el navegador, nunca dentro de la app
+  // Links (http/https) open in the browser, never inside the app
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//.test(url)) shell.openExternal(url);
     return { action: 'deny' };
@@ -802,7 +808,7 @@ function createWindow() {
       win.hide();
       if (!IS_MAC && tray && !trayHintShown) {
         trayHintShown = true;
-        tray.displayBalloon?.({ title: 'AgentBoard sigue corriendo', content: 'Tus agentes siguen trabajando. Ábrelo o sal desde este ícono.' });
+        tray.displayBalloon?.({ title: 'AgentBoard is still running', content: 'Your agents keep working. Open or quit it from this icon.' });
       }
     } else if (!confirmQuit()) e.preventDefault();
     else quitting = true;
@@ -810,7 +816,7 @@ function createWindow() {
   win.on('closed', () => { killAll(); win = null; });
 }
 
-// Una sola instancia: abrir el ícono de nuevo muestra la ventana existente.
+// Single instance: opening the app again shows the existing window.
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {

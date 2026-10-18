@@ -2,3 +2,7 @@ node_modules/
 dist/
 .DS_Store
 *.log
+
+# Local agent instructions and review rules (not shared)
+CLAUDE.md
+.rules/

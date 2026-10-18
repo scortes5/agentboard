@@ -1,6 +1,6 @@
-// Puente local entre agentes: el servidor MCP (scripts/agentboard-mcp.js) que corre
-// dentro de cada CLI habla con AgentBoard por un socket local protegido con token.
-// Así Claude puede pedirle algo a Codex, leer su respuesta o abrir otro agente.
+// Local bridge between agents: the MCP server (scripts/agentboard-mcp.js) running
+// inside each CLI talks to AgentBoard over a token-protected local socket.
+// That lets Claude ask Codex something, read its answer or open another agent.
 'use strict';
 const fs = require('fs');
 const net = require('net');
@@ -10,7 +10,7 @@ const crypto = require('crypto');
 const { execFile } = require('child_process');
 
 const IS_WIN = process.platform === 'win32';
-const MAX_BUF = 120 * 1024;   // salida reciente que guardamos por terminal
+const MAX_BUF = 120 * 1024;   // recent output kept per terminal
 const RATE = { max: 12, perMs: 60_000 };
 
 function stripAnsi(s) {
@@ -22,7 +22,7 @@ function stripAnsi(s) {
     .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, '');
 }
 
-// Texto legible de lo último que mostró una terminal (las TUIs redibujan mucho).
+// Readable text of what a terminal showed last (TUIs redraw a lot).
 function readableTail(raw, lines) {
   const out = [];
   for (const line of stripAnsi(raw).split('\n')) {
@@ -46,7 +46,7 @@ function parentPid(pid) {
  * deps: {
  *   dataDir, ptys: Map<id, IPty>, loadConfig(), notify(event),
  *   requestNewCard({ agent, cwd, title }) -> Promise<id|null>
- *   askRenderer(kind, payload) -> Promise<any>   (tareas: las guarda la UI)
+ *   askRenderer(kind, payload) -> Promise<any>   (tasks: the UI stores them)
  * }
  */
 function createBridge(deps) {
@@ -58,7 +58,7 @@ function createBridge(deps) {
   let socketPath = IS_WIN
     ? `\\\\.\\pipe\\agentboard-${os.userInfo().username}-${process.pid}`
     : path.join(deps.dataDir, 'bridge.sock');
-  // macOS/Linux limitan la ruta de un socket a ~104 bytes; os.tmpdir() es privado por usuario en macOS.
+  // macOS/Linux limit a socket path to ~104 bytes; os.tmpdir() is per-user on macOS.
   if (!IS_WIN && Buffer.byteLength(socketPath) > 100) socketPath = path.join(os.tmpdir(), `agentboard-${process.getuid()}.sock`);
   let server = null;
 
@@ -71,7 +71,7 @@ function createBridge(deps) {
   function forget(id) { out.delete(id); lastData.delete(id); }
   const busyIds = () => [...deps.ptys.keys()].filter((id) => Date.now() - (lastData.get(id) || 0) < 1500);
 
-  // Pegado "bracketed": la TUI lo recibe como un bloque y no lo envía línea por línea.
+  // Bracketed paste: the TUI receives one block instead of submitting line by line.
   function paste(id, text) {
     const p = deps.ptys.get(id);
     if (!p) return false;
@@ -88,14 +88,14 @@ function createBridge(deps) {
     return {
       id: c.id, name: c.title, agent: agent.label || c.agent,
       project: proj ? proj.name : (c.cwd ? path.basename(c.cwd) : '~'),
-      status: !alive ? 'terminado' : busy ? 'trabajando' : 'esperando',
+      status: !alive ? 'stopped' : busy ? 'working' : 'waiting',
       group: cfg.cards.find((g) => g.type === 'group' && g.id === c.groupId)?.title || '',
-      task: (cfg.tasks || []).find((t) => t.cardId === c.id && t.status !== 'hecho')?.text || '',
+      task: (cfg.tasks || []).find((t) => t.cardId === c.id && t.status !== 'done')?.text || '',
       accepts_messages: canReceive(cfg, c),
     };
   }
 
-  // Nunca escribimos en terminales "normales": solo en tarjetas que corren un agente.
+  // Never write into plain terminals: only into cards running an agent.
   function canReceive(cfg, c) {
     return c.type === 'term' && !c.startCmd && !!cfg.agents[c.agent]?.command && c.bridge !== false && deps.ptys.has(c.id);
   }
@@ -103,12 +103,12 @@ function createBridge(deps) {
   function resolveCard(cfg, ref) {
     const cards = cfg.cards.filter((c) => c.type === 'term');
     const q = String(ref || '').trim().toLowerCase();
-    if (!q) throw new Error('Falta el nombre del agente.');
+    if (!q) throw new Error('Missing agent name.');
     const exact = cards.filter((c) => c.id === ref || c.title.toLowerCase() === q);
     const list = exact.length ? exact : cards.filter((c) => (cfg.agents[c.agent]?.label || c.agent).toLowerCase() === q || c.agent === q);
     if (list.length === 1) return list[0];
-    if (!list.length) throw new Error(`No hay un agente "${ref}" en el tablero. Usa list_agents.`);
-    throw new Error(`Hay varios agentes que coinciden con "${ref}": ${list.map((c) => `${c.title} (id ${c.id})`).join(', ')}. Usa el id.`);
+    if (!list.length) throw new Error(`There is no agent "${ref}" on the board. Use list_agents.`);
+    throw new Error(`Several agents match "${ref}": ${list.map((c) => `${c.title} (id ${c.id})`).join(', ')}. Use the id.`);
   }
 
   async function callerCard(req) {
@@ -134,23 +134,23 @@ function createBridge(deps) {
     async list_agents(_args, ctx) {
       const cfg = deps.loadConfig();
       const agents = cfg.cards.filter((c) => c.type === 'term').map((c) => ({ ...describe(cfg, c), you: c.id === ctx.from }));
-      return agents.length ? JSON.stringify(agents, null, 2) : 'No hay agentes abiertos en el tablero.';
+      return agents.length ? JSON.stringify(agents, null, 2) : 'No agents are open on the board.';
     },
 
     async send_to_agent(args, ctx) {
       const cfg = deps.loadConfig();
       const target = resolveCard(cfg, args.agent);
       const message = String(args.message || '').trim();
-      if (!message) throw new Error('El mensaje está vacío.');
-      if (message.length > 20000) throw new Error('Mensaje demasiado largo (máx. 20.000 caracteres).');
-      if (target.id === ctx.from) throw new Error('No puedes enviarte mensajes a ti mismo.');
-      if (!canReceive(cfg, target)) throw new Error(`"${target.title}" no acepta mensajes (es una terminal, está cerrado o el usuario lo desactivó).`);
+      if (!message) throw new Error('The message is empty.');
+      if (message.length > 20000) throw new Error('Message too long (max 20,000 characters).');
+      if (target.id === ctx.from) throw new Error('You cannot send messages to yourself.');
+      if (!canReceive(cfg, target)) throw new Error(`"${target.title}" does not accept messages (it is a terminal, it is closed, or the user disabled it).`);
       if (!rateOk(ctx.from || 'desconocido')) throw new Error('Demasiados mensajes seguidos; espera un minuto.');
       const from = cfg.cards.find((c) => c.id === ctx.from);
-      const header = `[Mensaje de ${from ? from.title : 'otro agente'} vía AgentBoard]\n`;
+      const header = `[Message from ${from ? from.title : 'another agent'} via AgentBoard]\n`;
       paste(target.id, header + message);
       deps.notify({ kind: 'send', from: ctx.from, to: target.id });
-      return `Enviado a "${target.title}". Lee su respuesta con read_agent_output en un rato (si está "trabajando", espera a que pase a "esperando").`;
+      return `Sent to "${target.title}". Read its answer with read_agent_output in a while (if it is "working", wait until it is "waiting").`;
     },
 
     async read_agent_output(args, ctx) {
@@ -159,36 +159,36 @@ function createBridge(deps) {
       const lines = Math.min(Math.max(parseInt(args.lines, 10) || 80, 1), 400);
       deps.notify({ kind: 'read', from: ctx.from, to: target.id });
       const d = describe(cfg, target);
-      return `Estado: ${d.status}\n---\n${readableTail(out.get(target.id) || '', lines) || '(sin salida todavía)'}`;
+      return `Status: ${d.status}\n---\n${readableTail(out.get(target.id) || '', lines) || '(no output yet)'}`;
     },
 
     async start_agent(args, ctx) {
       const cfg = deps.loadConfig();
       const want = String(args.agent_type || '').trim().toLowerCase();
       const key = Object.keys(cfg.agents).find((k) => k === want || (cfg.agents[k].label || '').toLowerCase() === want);
-      if (!key || !cfg.agents[key].command) throw new Error(`Tipo de agente desconocido. Opciones: ${Object.entries(cfg.agents).filter(([, a]) => a.command).map(([k]) => k).join(', ')}`);
+      if (!key || !cfg.agents[key].command) throw new Error(`Unknown agent type. Options: ${Object.entries(cfg.agents).filter(([, a]) => a.command).map(([k]) => k).join(', ')}`);
       let cwd = cfg.cards.find((c) => c.id === ctx.from)?.cwd || cfg.selectedProject || null;
       if (args.project) {
         const p = cfg.projects.find((x) => x.name.toLowerCase() === String(args.project).toLowerCase() || x.path === args.project);
-        if (!p) throw new Error(`Proyecto desconocido. Opciones: ${cfg.projects.map((x) => x.name).join(', ')}`);
+        if (!p) throw new Error(`Unknown project. Options: ${cfg.projects.map((x) => x.name).join(', ')}`);
         cwd = p.path;
       }
       if (!rateOk(ctx.from || 'desconocido')) throw new Error('Demasiadas acciones seguidas; espera un minuto.');
       const id = await deps.requestNewCard({ agent: key, cwd, title: args.title ? String(args.title).slice(0, 60) : null });
-      if (!id) throw new Error('No pude abrir el agente.');
+      if (!id) throw new Error('Could not open the agent.');
       deps.notify({ kind: 'start', from: ctx.from, to: id });
       if (args.message) {
-        // Esperamos a que el CLI arranque antes de escribirle.
+        // Wait for the CLI to start before typing into it.
         const t0 = Date.now();
         while (!deps.ptys.has(id) && Date.now() - t0 < 8000) await new Promise((r) => setTimeout(r, 200));
         await new Promise((r) => setTimeout(r, 4000));
         const from = cfg.cards.find((c) => c.id === ctx.from);
-        paste(id, `[Tarea de ${from ? from.title : 'otro agente'} vía AgentBoard]\n${String(args.message).slice(0, 20000)}`);
+        paste(id, `[Task from ${from ? from.title : 'another agent'} via AgentBoard]\n${String(args.message).slice(0, 20000)}`);
       }
-      return `Abrí un agente ${cfg.agents[key].label} (id ${id}).${args.message ? ' Le envié la tarea.' : ''} Usa read_agent_output con ese id para seguir su avance.`;
+      return `Opened a ${cfg.agents[key].label} agent (id ${id}).${args.message ? ' Sent it the task.' : ''} Use read_agent_output with that id to follow its progress.`;
     },
 
-    // ---- Lista de tareas (ToDo) del usuario ----
+    // ---- The user's task list ----
     async list_tasks(args) {
       const cfg = deps.loadConfig();
       const want = String(args.status || '').toLowerCase();
@@ -197,20 +197,20 @@ function createBridge(deps) {
         agent: t.agent, project: cfg.projects.find((p) => p.path === t.cwd)?.name || (t.cwd ? path.basename(t.cwd) : ''),
         group: t.group || '', card: t.cardId || null, summary: t.summary || '',
       }));
-      return tasks.length ? JSON.stringify(tasks, null, 2) : 'No hay tareas.';
+      return tasks.length ? JSON.stringify(tasks, null, 2) : 'No tasks.';
     },
 
     async add_task(args, ctx) {
       const text = String(args.text || '').trim();
-      if (!text) throw new Error('La tarea está vacía.');
-      if (text.length > 8000) throw new Error('Tarea demasiado larga (máx. 8.000 caracteres).');
+      if (!text) throw new Error('The task is empty.');
+      if (text.length > 8000) throw new Error('Task too long (max 8,000 characters).');
       if (!rateOk(ctx.from || 'desconocido')) throw new Error('Demasiadas acciones seguidas; espera un minuto.');
       const r = await deps.askRenderer('task-add', {
         text, agent: args.agent ? String(args.agent) : 'auto', project: args.project ? String(args.project) : '',
         group: args.group ? String(args.group).slice(0, 40) : '', light: !!args.light, from: ctx.from,
       });
-      if (!r || r.error) throw new Error(r?.error || 'AgentBoard no respondió.');
-      return `Tarea agregada (id ${r.id}). Se ejecutará con ${r.agent} cuando haya un cupo libre.`;
+      if (!r || r.error) throw new Error(r?.error || 'AgentBoard did not respond.');
+      return `Task added (id ${r.id}). It will run with ${r.agent} as soon as there is a free slot.`;
     },
 
     async complete_task(args, ctx) {
@@ -218,8 +218,8 @@ function createBridge(deps) {
         id: args.task_id ? String(args.task_id) : null, card: ctx.from,
         summary: String(args.summary || '').slice(0, 500), blocked: !!args.blocked,
       });
-      if (!r || r.error) throw new Error(r?.error || 'No encontré una tarea asignada a este agente.');
-      return `Tarea "${r.text.slice(0, 80)}" marcada como ${r.status}.`;
+      if (!r || r.error) throw new Error(r?.error || 'No task is assigned to this agent.');
+      return `Task "${r.text.slice(0, 80)}" marked as ${r.status}.`;
     },
   };
 
@@ -234,9 +234,9 @@ function createBridge(deps) {
       if (i < 0) return;
       let req;
       const reply = (r) => { try { sock.end(JSON.stringify(r) + '\n'); } catch {} };
-      try { req = JSON.parse(buf.slice(0, i)); } catch { return reply({ ok: false, error: 'Solicitud inválida.' }); }
+      try { req = JSON.parse(buf.slice(0, i)); } catch { return reply({ ok: false, error: 'Invalid request.' }); }
       const a = Buffer.from(String(req.token || '')), b = Buffer.from(token);
-      if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return reply({ ok: false, error: 'Token inválido.' });
+      if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return reply({ ok: false, error: 'Invalid token.' });
       const fn = tools[req.tool];
       if (!fn) return reply({ ok: false, error: 'Herramienta desconocida.' });
       try {
@@ -253,7 +253,7 @@ function createBridge(deps) {
     fs.mkdirSync(deps.dataDir, { recursive: true, mode: 0o700 });
     if (!IS_WIN) { try { fs.unlinkSync(socketPath); } catch {} }
     server = net.createServer(handle);
-    server.on('error', (err) => console.error('[AgentBoard] No pude abrir el puente entre agentes:', err.message));
+    server.on('error', (err) => console.error('[AgentBoard] Could not open the agent bridge:', err.message));
     server.listen(socketPath, () => {
       if (!IS_WIN) { try { fs.chmodSync(socketPath, 0o600); } catch {} }
       fs.writeFileSync(infoFile, JSON.stringify({ socket: socketPath, token, pid: process.pid }), { mode: 0o600 });

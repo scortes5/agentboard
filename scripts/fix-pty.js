@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// node-pty 1.1.0 publica spawn-helper sin permiso de ejecución en Mac: sin esto,
-// abrir una terminal falla con "posix_spawnp failed". Corre en `npm install`.
+// node-pty 1.1.0 publishes spawn-helper without the execute bit on Mac: without this,
+// opening a terminal fails with "posix_spawnp failed". Runs on `npm install`.
 'use strict';
 const fs = require('fs');
 const path = require('path');

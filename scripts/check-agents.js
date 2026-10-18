@@ -1,10 +1,10 @@
-// npm run check — revisa que git y los CLIs de agentes estén en el PATH de este computador.
+// npm run check — verifies that git and the agent CLIs are on this computer's PATH.
 const { execSync } = require('child_process');
 
 const isWin = process.platform === 'win32';
 const tools = [
   ['git', 'git --version'],
-  ['claude', 'claude --version', 'npm i -g @anthropic-ai/claude-code   (o el instalador nativo de Claude Code)'],
+  ['claude', 'claude --version', 'npm i -g @anthropic-ai/claude-code   (or the native Claude Code installer)'],
   ['codex', 'codex --version', 'npm i -g @openai/codex'],
   ['gemini', 'gemini --version', 'npm i -g @google/gemini-cli'],
 ];
@@ -18,9 +18,9 @@ for (const [name, cmd, hint] of tools) {
     console.log(`  ✔ ${name.padEnd(7)} ${v}`);
   } catch {
     missing++;
-    console.log(`  ✘ ${name.padEnd(7)} no encontrado${hint ? `  →  ${hint}` : ''}`);
+    console.log(`  ✘ ${name.padEnd(7)} not found${hint ? `  →  ${hint}` : ''}`);
   }
 }
 console.log(missing
-  ? '\nLos que faltan aparecen atenuados en la app. Después de instalarlos, inicia sesión una vez en cada uno desde la terminal.\n'
+  ? '\nMissing ones appear dimmed in the app. After installing them, sign in once to each one from a terminal.\n'
   : '\nTodo listo. Corre: npm start\n');
