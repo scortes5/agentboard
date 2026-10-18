@@ -9,7 +9,7 @@ Open **Settings** with ⌘, (Ctrl+,). Sections:
 - **Agents**: each agent's command and arguments (resume, light mode, heavy mode) and **custom agents** for any CLI.
 - **Ground Rules**: rules every agent follows (see [[Remote Control and Integrations]]).
 - **Shortcuts**: click one and press the new combination; conflicts are flagged.
-- **Projects** (name and check command), **Tasks** (queue, routing, subagents, checks, cross-review, budgets and limits), **Secrets** (passwords and keys for automations, encrypted; see [[Automations]]), **Integrations** (phone remote and daily summary) and **Advanced** (every setting as JSON, only for what has no control yet).
+- **Projects** (name and check command), **Tasks** (queue, routing, subagents, checks, cross-review, budgets and limits), **Security** (rules for dangerous and automatically approved requests, and the activity log; see [[Privacy and Security]]), **Secrets** (passwords and keys for automations, encrypted; see [[Automations]]), **Integrations** (phone remote and daily summary) and **Advanced** (every setting as JSON, only for what has no control yet).
 
 ![Shortcuts](https://raw.githubusercontent.com/scortes5/agentboard/main/docs/images/shortcuts.png)
 

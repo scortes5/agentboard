@@ -78,6 +78,11 @@ contextBridge.exposeInMainWorld('ab', {
   remoteStatus: () => ipcRenderer.invoke('remote:status'),
   remoteSnapshot: (snap) => ipcRenderer.send('remote:snapshot', snap),
   onRemoteAction: (cb) => ipcRenderer.on('remote:action', (_e, a) => cb(a)),
+  onRemoteDevice: (cb) => ipcRenderer.on('remote:device', (_e, d) => cb(d)),
+  onRemoteExpired: (cb) => ipcRenderer.on('remote:expired', () => cb()),
+  // Security log: what was approved and by whom, remote devices, commands and secrets
+  audit: (kind, detail) => ipcRenderer.send('audit:add', kind, detail),
+  auditRecent: (n) => ipcRenderer.invoke('audit:recent', n),
   postWebhook: (url, text) => ipcRenderer.invoke('webhook:post', url, text),
   githubIssues: (cwd) => ipcRenderer.invoke('github:issues', cwd),
   onMenu: (cb) => ipcRenderer.on('menu', (_e, action) => cb(action)),

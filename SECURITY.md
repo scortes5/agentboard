@@ -19,9 +19,12 @@ Include what you found, how to reproduce it and the impact you expect. You will 
 
 AgentBoard runs CLI agents in real terminals on your computer, so these areas matter most:
 
-- **The agent bridge** (`src/bridge.js`, `scripts/agentboard-mcp.js`): a local socket protected by a random token. Anything that lets another local user or a web page talk to it, bypass the token, or write to a plain shell card is in scope.
-- **Renderer isolation** (`src/preload.js`): any way for terminal output or board content to run code with Node privileges.
-- **Saved data** (`board.json`): it should only be readable by your user.
+- **The agent bridge** (`src/main/bridge/`, `scripts/agentboard-mcp.js`): a local socket protected by a random token. Anything that lets another local user or a web page talk to it, bypass the token, or write to a plain shell card is in scope.
+- **Renderer isolation** (`src/preload/`, sandboxed window): any way for terminal output or board content to run code with Node privileges.
+- **The phone remote** (`src/main/remote/`): bypassing the token, the rate limit or the rule that dangerous requests are approved only at the computer.
+- **Secrets** (`src/main/secrets/`): reading a secret from the window or from an agent, or a secret appearing in output or logs.
+- **Approval rules** (`src/renderer/watchers/ApprovalPolicy.js`): a dangerous request that is approved in bulk, from the phone or by an automatic rule.
+- **Saved data** (`board.json`, `secrets.json`, `audit.log`): they should only be readable by your user.
 - **Worktrees and git commands** run on your behalf.
 
 Problems in the agent CLIs themselves (Claude Code, Codex, Gemini CLI…) should be reported to their vendors.

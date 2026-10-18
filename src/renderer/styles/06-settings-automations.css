@@ -179,3 +179,11 @@ button[data-icon] { display: inline-flex; align-items: center; white-space: nowr
 .u-track { height: 6px; border-radius: 3px; background: var(--fill); overflow: hidden; }
 .u-track span { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
 .u-val { font: 11.5px var(--font-mono); color: var(--text-2); }
+textarea.rules { width: 100%; resize: vertical; background: var(--fill); border: none; box-shadow: inset 0 0 0 .5px var(--line-hi); padding: 8px 10px; color: var(--text); font: 12px/1.5 var(--font-mono); outline: none; border-radius: 8px; }
+.audit { max-height: 300px; overflow: auto; display: flex; flex-direction: column; gap: 2px; font-size: 12px; }
+.audit-row { display: grid; grid-template-columns: 112px 1fr; gap: 10px; padding: 4px 6px; border-radius: 6px; }
+.audit-row:nth-child(odd) { background: var(--fill); }
+.audit-row time { color: var(--muted); font: 11px var(--font-mono); }
+.audit-row span { word-break: break-word; }
+.audit-row.remote-device span, .audit-row.remote-blocked span, .audit-row.remote-refused span { color: var(--warn); }
+code.fp { font-size: 10.5px; word-break: break-all; }

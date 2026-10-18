@@ -16,3 +16,5 @@ button.primary, form button { background: var(--accent); color: #fff; }
 .st.running { background: var(--accent); } .st.review { background: var(--warn); } .st.blocked { background: var(--bad); } .st.done { background: var(--ok); }
 form { display: flex; flex-direction: column; gap: 8px; margin-top: 18px; }
 textarea { font: inherit; padding: 10px; border-radius: 10px; border: 1px solid #8884; background: var(--card); color: var(--text); }
+.item.danger { box-shadow: inset 0 0 0 1px #ff453a; }
+.warn { color: #ff453a; font-size: 13px; margin-top: 6px; }

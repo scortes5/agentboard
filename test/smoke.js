@@ -48,7 +48,7 @@ const step = (name) => console.log(`✓ ${name}`);
     await win.evaluate(async () => {
       if ($('#onboarding').open) $('#onboarding').close();
       await openSettings('general');
-      for (const sec of ['appearance', 'agents', 'rules', 'keys', 'projects', 'tasks', 'secrets', 'integrations', 'advanced']) showSettingsSection(sec);
+      for (const sec of ['appearance', 'agents', 'rules', 'keys', 'projects', 'tasks', 'security', 'secrets', 'integrations', 'advanced']) showSettingsSection(sec);
       $('#settings').close();
       await openAccounts(); $('#accounts').close();
       await openSkills(); $('#skills').close();
