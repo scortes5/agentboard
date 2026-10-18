@@ -39,5 +39,5 @@ function saveNow() {
   return ab.saveConfig(cfg);
 }
 
-function cardData(id) { return cfg.cards.find((c) => c.id === id); }
+function cardData(id) { return cfg?.cards.find((c) => c.id === id); }
 function agentOf(card) { return cfg.agents[card.agent] || cfg.agents.shell; }

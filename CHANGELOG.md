@@ -4,6 +4,14 @@ All notable changes to AgentBoard. The format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-10-18
+
+### Fixed
+- On Windows, the window resized itself before the board had loaded and the interface logged an error at startup ("Cannot read properties of null").
+
+### Added
+- CI opens the real app on macOS and Windows (`npm run test:smoke`): it runs a command in a real terminal and opens every panel.
+
 ## [1.3.0] - 2026-10-18
 
 ### Added
