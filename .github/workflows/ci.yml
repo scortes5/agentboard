@@ -61,3 +61,21 @@ jobs:
       - run: npm ci
       - name: End-to-end test
         run: xvfb-run -a npm run test:e2e
+
+  # The real app on macOS and Windows: opens, starts a terminal in the system shell and
+  # opens every panel (the full end-to-end test above runs on Linux).
+  smoke:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Smoke test
+        run: npm run test:smoke

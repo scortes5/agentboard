@@ -118,7 +118,8 @@ function arrange() {
 const fitQueue = new Set();
 let fitTimer = null;
 function scheduleFit(id) { fitQueue.add(id); clearTimeout(fitTimer); fitTimer = setTimeout(flushFits, 60); }
-function scheduleFitAll() { for (const c of cfg.cards) fitQueue.add(c.id); clearTimeout(fitTimer); fitTimer = setTimeout(flushFits, 80); }
+// the window can resize before the board has loaded (Windows does at startup)
+function scheduleFitAll() { if (!cfg) return; for (const c of cfg.cards) fitQueue.add(c.id); clearTimeout(fitTimer); fitTimer = setTimeout(flushFits, 80); }
 function flushFits() {
   for (const id of fitQueue) {
     const rt = runtime.get(id);
