@@ -640,10 +640,10 @@ function startBridge() {
     loadConfig,
     notify: (ev) => send('bridge:event', ev),
     askRenderer,
-    requestNewCard: ({ agent, cwd, title }) => new Promise((resolve) => {
+    requestNewCard: ({ agent, cwd, title, light, from }) => new Promise((resolve) => {
       const reqId = Math.random().toString(36).slice(2);
       pendingCards.set(reqId, resolve);
-      send('bridge:new-card', { reqId, agent, cwd, title });
+      send('bridge:new-card', { reqId, agent, cwd, title, light, from });
       setTimeout(() => { if (pendingCards.delete(reqId)) resolve(null); }, 5000);
     }),
   });

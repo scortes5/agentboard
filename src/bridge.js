@@ -45,7 +45,7 @@ function parentPid(pid) {
 /**
  * deps: {
  *   dataDir, ptys: Map<id, IPty>, loadConfig(), notify(event),
- *   requestNewCard({ agent, cwd, title }) -> Promise<id|null>
+ *   requestNewCard({ agent, cwd, title, light, from }) -> Promise<id|null>
  *   askRenderer(kind, payload) -> Promise<any>   (tasks: the UI stores them)
  * }
  */
@@ -174,7 +174,7 @@ function createBridge(deps) {
         cwd = p.path;
       }
       if (!rateOk(ctx.from || 'unknown')) throw new Error('Too many actions in a row; wait a minute.');
-      const id = await deps.requestNewCard({ agent: key, cwd, title: args.title ? String(args.title).slice(0, 60) : null });
+      const id = await deps.requestNewCard({ agent: key, cwd, title: args.title ? String(args.title).slice(0, 60) : null, light: !!args.light, from: ctx.from || null });
       if (!id) throw new Error('Could not open the agent.');
       deps.notify({ kind: 'start', from: ctx.from, to: id });
       if (args.message) {
@@ -185,7 +185,7 @@ function createBridge(deps) {
         const from = cfg.cards.find((c) => c.id === ctx.from);
         paste(id, `[Task from ${from ? from.title : 'another agent'} via AgentBoard]\n${String(args.message).slice(0, 20000)}`);
       }
-      return `Opened a ${cfg.agents[key].label} agent (id ${id}).${args.message ? ' Sent it the task.' : ''} Use read_agent_output with that id to follow its progress.`;
+      return `Opened a ${cfg.agents[key].label} agent${args.light ? ' in saving mode' : ''} (id ${id}).${args.message ? ' Sent it the task.' : ''} Use read_agent_output with that id to follow its progress.`;
     },
 
     // ---- The user's task list ----

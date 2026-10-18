@@ -73,7 +73,7 @@ const TOOLS = [
   },
   {
     name: 'start_agent',
-    description: 'Opens a new agent on the board (e.g. "codex", "claude", "gemini") and optionally sends it a first task. By default it opens in the caller\'s project.',
+    description: 'Opens a new agent on the board (e.g. "codex", "claude", "gemini") and optionally sends it a first task. By default it opens in the caller\'s project. For simple subtasks pass light=true (cheaper model, saves tokens).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -81,6 +81,7 @@ const TOOLS = [
         project: { type: 'string', description: 'AgentBoard project name (optional).' },
         title: { type: 'string', description: 'Card name (optional).' },
         message: { type: 'string', description: 'First task (optional).' },
+        light: { type: 'boolean', description: 'Saving mode: opens the agent with its cheap model (e.g. Claude Haiku). Use it for simple subtasks.' },
       },
       required: ['agent_type'],
     },
