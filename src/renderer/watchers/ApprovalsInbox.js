@@ -14,6 +14,7 @@ class ApprovalsInbox {
     this.name = 'approvals';
     this.every = 1000;
     this.waiting = new Map(); // card id → { question, context, at }
+    this.answered = new Map(); // card id → the request already answered, still visible above new output
     $('#approvalsBtn').onclick = (e) => this.open(e.currentTarget);
   }
 
@@ -32,7 +33,10 @@ class ApprovalsInbox {
   // Only idle cards can be waiting for an answer.
   scan(c, rt) {
     const had = this.waiting.get(c.id);
-    const found = rt.alive && rt.status === 'idle' ? ApprovalsInbox.read(c) : null;
+    const idle = rt.alive && rt.status === 'idle';
+    let found = idle ? ApprovalsInbox.read(c) : null;
+    if (found && this.answered.get(c.id) === ApprovalsInbox.key(found)) found = null;
+    else if (idle && !found) this.answered.delete(c.id); // the answered request is off the screen
     if (!found) { if (had) { this.waiting.delete(c.id); this.renderBadge(); } return; }
     if (had && had.question === found.question && had.context === found.context) return;
     this.waiting.set(c.id, { ...found, at: Date.now() });
@@ -44,8 +48,13 @@ class ApprovalsInbox {
     }
   }
 
+  static key(a) { return `${a.context}\n${a.question}`; }
+
   async answer(id, yes) {
-    if (!this.waiting.delete(id)) return;
+    const a = this.waiting.get(id);
+    if (!a) return;
+    this.waiting.delete(id);
+    this.answered.set(id, ApprovalsInbox.key(a));
     if (yes) {
       for (let i = 0; i < 4; i++) { ab.ptyWrite(id, '\x1b[A'); await new Promise((r) => setTimeout(r, 60)); }
       ab.ptyWrite(id, '\r');

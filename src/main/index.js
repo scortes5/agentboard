@@ -2,7 +2,7 @@
 // what it needs and hands them to the App. Each service owns one area and registers its own
 // IPC channels; nothing else creates services or wires them together.
 'use strict';
-const { app } = require('electron');
+const { app, safeStorage } = require('electron');
 const { ConfigStore } = require('./core/ConfigStore');
 const { ShellEnv } = require('./shell/ShellEnv');
 const { PtyHost } = require('./terminals/PtyHost');
@@ -22,6 +22,8 @@ const { Updater } = require('./updates/Updater');
 const { RemoteServer } = require('./remote/RemoteServer');
 const { WebhookNotifier } = require('./integrations/WebhookNotifier');
 const { GitHubIssues } = require('./integrations/GitHubIssues');
+const { SecretVault } = require('./secrets/SecretVault');
+const { CommandRunner } = require('./flows/CommandRunner');
 const { App } = require('./app/App');
 const { AppMenu } = require('./app/AppMenu');
 const { TrayIcon } = require('./app/TrayIcon');
@@ -53,6 +55,7 @@ bridge = new AgentBridge({
   requestNewCard: (opts) => requests.ask('bridge:new-card', opts),
 });
 
+const vault = new SecretVault({ dataDir, crypto: safeStorage });
 const runner = new GitRunner();
 const gitService = new GitService({ runner });
 const claudeAccounts = new ClaudeAccounts({ config });
@@ -71,7 +74,7 @@ application = new App({
     new AgentCatalog({ config, shellEnv }), new LocalModels({ shellEnv }), claudeAccounts,
     new GroundRules({ config, claudeAccounts }),
     new SkillLibrary({ config }), new SkillPack({ claudeAccounts }), new UsageService({ dataDir, claudeAccounts }),
-    new TaskPlanner({ shellEnv }),
+    new TaskPlanner({ shellEnv }), new CommandRunner({ shellEnv, vault }), vault,
     new RemoteServer({ config, send }), new WebhookNotifier(), new GitHubIssues({ shellEnv }),
   ],
 });

@@ -6,14 +6,14 @@
 
 <p align="center">
   A workspace for coding agents: Claude Code, Codex, Gemini CLI and others, side by side,<br/>
-  on your own subscriptions, on Mac and Windows.
+  on your own subscriptions, on Mac, Windows and Linux.
 </p>
 
 <p align="center">
   <a href="https://github.com/scortes5/agentboard/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/scortes5/agentboard?label=release&color=f97316"></a>
   <a href="https://github.com/scortes5/agentboard/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/scortes5/agentboard/total?color=22c55e"></a>
   <a href="https://github.com/scortes5/agentboard/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/scortes5/agentboard/actions/workflows/ci.yml/badge.svg"></a>
-  <img alt="Platforms" src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey">
+  <img alt="Platforms" src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey">
   <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/github/license/scortes5/agentboard?color=blue"></a>
   <a href="https://github.com/scortes5/agentboard/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/scortes5/agentboard?style=social"></a>
 </p>
@@ -26,7 +26,7 @@
   <a href="https://github.com/scortes5/agentboard/discussions">Discussions</a>
 </p>
 
-![AgentBoard board](docs/images/board.png)
+![AgentBoard: three agents take three tasks in parallel, one asks for approval](docs/images/demo.gif)
 
 AgentBoard is a desktop app that puts your AI agents on one board. Each card is a real terminal running the agent's CLI inside your project. From there you give them tasks, see what each one is doing, coordinate them and automate whole workflows.
 
@@ -100,10 +100,12 @@ From [Releases](https://github.com/scortes5/agentboard/releases/latest):
 | Mac with Apple Silicon (M1, M2…) | `AgentBoard-x.y.z-arm64.dmg` |
 | Mac with Intel | `AgentBoard-x.y.z.dmg` |
 | Windows | `AgentBoard-Setup-x.y.z.exe` (`AgentBoard.Setup.x.y.z.exe` up to 0.5.0) |
+| Linux (x64) | `AgentBoard-x.y.z.AppImage` (from 1.2.0) |
 
 The app is not signed. The first time:
 - **Mac**: open AgentBoard once, press *Done* in the warning, then go to **System Settings → Privacy & Security**, scroll to *Security* and press **Open Anyway**. Or, in Terminal: `xattr -cr /Applications/AgentBoard.app`. (Right-click → *Open* no longer works on macOS 15 and later.)
 - **Windows**: in the SmartScreen warning, *More info* → *Run anyway*.
+- **Linux**: make it executable and open it: `chmod +x AgentBoard-*.AppImage && ./AgentBoard-*.AppImage`. On distributions without FUSE 2 (Ubuntu 22.04 and later), install `libfuse2` first.
 
 ### Updates
 
@@ -111,6 +113,7 @@ AgentBoard looks for a new release when it opens and every six hours (turn it of
 
 - **Windows**: the new version downloads in the background. When it is ready, a notice offers **Restart to Update**; if you choose **Later**, it installs the next time you quit.
 - **Mac**: a notice says which version is available. **Download** opens the `.dmg` for your Mac (Apple Silicon or Intel) in the browser; open it and drag AgentBoard to *Applications* to replace the old one. Your board and settings are kept.
+- **Linux**: the notice's **Download** gets the new `.AppImage`; make it executable and open it instead of the old one.
 
 Silent updates on Mac (download and install with no `.dmg`) need the app to be signed and notarized with an Apple Developer ID, which this project does not have yet. When you run AgentBoard from source, it only shows the notice; update with `git pull`.
 
@@ -217,6 +220,7 @@ refactor the payments module !!
 - **Explain Run**: the AI explains what will happen step by step, what may fail and how to improve it.
 - **Run**: independent branches run in parallel. Each agent receives only a one-line summary of the previous steps, not their whole history.
 - Scheduled automations run while AgentBoard is open, including in the background.
+- **Secrets** (*Settings → Secrets*): passwords and API keys for your automations, for example to log in to an app with a Playwright script. Each value is encrypted with your system keychain and never shown again. A **Command** step gets a secret as an environment variable when it mentions it (`$APP_PASSWORD`) or lists it under *Secrets it can use*, and the value is hidden in its output. Agents never see secrets. On Linux the vault needs a keyring (GNOME Keyring or KWallet); without one it refuses to store them rather than keep plain text.
 
 ---
 
@@ -251,7 +255,7 @@ It reads the Claude Code and Codex logs on this computer (every Claude account i
 - **Agents**: each agent's command and arguments (for resuming, light mode and heavy mode), and custom agents for any CLI.
 - **Ground Rules**: rules every agent follows, written once. They go into each CLI's own instructions file (`~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, `~/.gemini/GEMINI.md`…) inside a marked block, so the rest of the file stays yours and agents you open by hand follow them too.
 - **Shortcuts**: all editable; click one and press the new combination.
-- **Projects**, **Tasks**, **Integrations** and **Advanced** (every setting as JSON, to add or remove keys).
+- **Projects**, **Tasks**, **Secrets**, **Integrations** and **Advanced** (every setting as JSON, to add or remove keys).
 
 ![Keyboard shortcuts](docs/images/shortcuts.png)
 
@@ -337,6 +341,7 @@ Example, in Claude: *"ask Codex what it thinks of this change and summarize its 
 
 - The agent bridge is a local socket with a random token. It only writes to cards running an agent (never to a plain terminal), each card can turn it off, and it has a messages-per-minute limit.
 - Optional, and off by default: the phone remote (a page on your local network that needs the random token in its link), the daily summary (sent only to the webhook you paste) and GitHub issues (read through your own `gh` CLI). Ground rules are written only to the CLIs' instructions files, inside a marked block.
+- Secrets are encrypted with your system keychain (`secrets.json` in the app's data folder, readable only by your user). The window can list their names but not read them; only the automation commands that ask for a secret get its value, as an environment variable, and it is hidden in their output.
 
 ---
 

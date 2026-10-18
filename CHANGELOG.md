@@ -4,6 +4,19 @@ All notable changes to AgentBoard. The format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-18
+
+### Added
+- **Secrets vault** (*Settings → Secrets*): passwords and API keys for automations, encrypted with the system keychain (macOS Keychain, Windows DPAPI, GNOME Keyring or KWallet). A **Command** step gets a secret as an environment variable when it mentions it (`$APP_PASSWORD`) or lists it under *Secrets it can use*, and the value is hidden in its output. The window can list names but never read values back, and agents never see them. Without a keyring the vault refuses to store anything rather than keep plain text.
+- **Linux**: an `AgentBoard-x.y.z.AppImage` in every release. The app offers new versions as a download.
+- **Welcome guide** on a new board: which agent CLIs you have (install or sign in from there), your first project, connecting the agents and the token-saving skills, ground rules and a sample task. The palette opens it again (*Welcome Guide*).
+- A demo GIF at the top of the README, recorded from the app by `scripts/demo/record-demo.js`.
+
+### Fixed
+- A permission request you had already answered came back to the approvals inbox when the agent printed more lines below it.
+- A finished task could stay listed as working until something else redrew the Tasks panel.
+- `npm run app` on Windows looked for the old installer name and stopped with "Installer not found"; it now also opens the installer directly instead of through `cmd.exe` (CodeQL `js/shell-command-injection-from-environment`).
+
 ## [1.1.0] - 2026-10-18
 
 ### Added

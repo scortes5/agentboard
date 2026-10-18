@@ -1,7 +1,7 @@
 {
   "name": "agentboard",
   "productName": "AgentBoard",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "A desktop board of real terminals to run Claude Code, Codex, Gemini CLI and other coding agents side by side, on your own subscriptions. macOS and Windows.",
   "keywords": [
     "claude-code",
@@ -32,6 +32,7 @@
   },
   "private": true,
   "main": "src/main/index.js",
+  "desktopName": "agentboard.desktop",
   "scripts": {
     "test": "node --test test/*.test.js",
     "start": "electron .",
@@ -110,6 +111,20 @@
         }
       ],
       "icon": "build/icon.ico"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "Development",
+      "icon": "build/icon.png",
+      "synopsis": "Run many coding agents side by side on one board",
+      "syncDesktopName": true
     },
     "nsis": {
       "artifactName": "${productName}-Setup-${version}.${ext}",

@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="styles/06-settings-automations.css" />
   <link rel="stylesheet" href="styles/07-task-control.css" />
   <link rel="stylesheet" href="styles/08-integrations.css" />
+  <link rel="stylesheet" href="styles/09-onboarding.css" />
 </head>
 <body>
   <main id="board">
@@ -187,6 +188,7 @@
         <button type="button" data-sec="keys" data-icon="keyboard" title="View and change keyboard shortcuts">Shortcuts</button>
         <button type="button" data-sec="projects" data-icon="folder" title="Rename or remove projects">Projects</button>
         <button type="button" data-sec="tasks" data-icon="tasks" title="Queue, parallelism and worktrees for tasks">Tasks</button>
+        <button type="button" data-sec="secrets" data-icon="lock" title="Passwords and keys for automations, encrypted with your system keychain">Secrets</button>
         <button type="button" data-sec="integrations" data-icon="send" title="Control AgentBoard from your phone and send a daily summary to Slack or Discord">Integrations</button>
         <button type="button" data-sec="advanced" data-icon="code" title="Edit every setting as JSON">Advanced</button>
       </nav>
@@ -294,6 +296,17 @@
           </div>
         </section>
 
+        <section data-sec="secrets" class="hidden">
+          <h2>Secrets</h2>
+          <p class="set-note">Passwords, API keys and logins your automations need. Each value is encrypted with your system keychain and never shown again. A <b>Command</b> step gets a secret as an environment variable when it mentions it (<code>$APP_PASSWORD</code>) or lists it under <i>Secrets it can use</i>, and the value is hidden in its output. Agents never see them.</p>
+          <div class="set-group" id="secretRows"></div>
+          <div class="set-group">
+            <label class="set-row">Name <input id="secretName" placeholder="APP_PASSWORD" autocomplete="off" spellcheck="false" /></label>
+            <label class="set-row">Value <input id="secretValue" type="password" autocomplete="new-password" /></label>
+            <div class="row-end"><span id="secretError" class="form-error"></span><button type="button" id="secretAdd" class="primary" title="Encrypt and save it now">Save Secret</button></div>
+          </div>
+        </section>
+
         <section data-sec="integrations" class="hidden">
           <h2>Integrations</h2>
           <h3>Remote control</h3>
@@ -328,6 +341,14 @@
         <button value="ok" id="saveSettings" class="primary" title="Save the changes in every section">Save</button>
       </div>
     </form>
+  </dialog>
+
+  <dialog id="onboarding" class="onboarding">
+    <div class="ob-head"><span class="eyebrow">Welcome to AgentBoard</span><span class="spacer"></span><span id="obDots" class="ob-dots"></span></div>
+    <h2 id="obTitle"></h2>
+    <div id="obBody"></div>
+    <div class="actions"><button type="button" id="obSkip" class="ghost" title="Close the guide; open it again from the palette (Welcome Guide)">Skip</button><span class="spacer"></span>
+      <button type="button" id="obBack" class="ghost">Back</button><button type="button" id="obNext" class="primary">Next</button></div>
   </dialog>
 
   <dialog id="askDialog" class="ask">
@@ -531,5 +552,7 @@
   <script src="integrations/IssueImporter.js"></script>
   <script src="integrations/IntegrationSettings.js"></script>
   <script src="agents/GroundRules.js"></script>
+  <script src="secrets/SecretsSettings.js"></script>
+  <script src="onboarding/Onboarding.js"></script>
 </body>
 </html>

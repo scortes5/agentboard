@@ -48,5 +48,6 @@ function migrateLegacy(c) {
   initDiagram();
   initFlows();
   refreshGit();
+  onboarding.maybeShow();
   if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission();
 })();

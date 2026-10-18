@@ -8,10 +8,12 @@ Download from [Releases](https://github.com/scortes5/agentboard/releases/latest)
 |---|---|
 | Mac with Apple Silicon (M1–M4) | `AgentBoard-x.y.z-arm64.dmg` |
 | Mac with Intel | `AgentBoard-x.y.z.dmg` |
-| Windows (x64) | `AgentBoard.Setup.x.y.z.exe` |
+| Windows (x64) | `AgentBoard-Setup-x.y.z.exe` |
+| Linux (x64) | `AgentBoard-x.y.z.AppImage` |
 
 - **Mac**: open the `.dmg` and drag AgentBoard into *Applications*.
 - **Windows**: run the `.exe` and follow the installer (you can pick the folder).
+- **Linux**: `chmod +x AgentBoard-*.AppImage && ./AgentBoard-*.AppImage`. On Ubuntu 22.04 and later, install `libfuse2` first (`sudo apt install libfuse2`). To update, download the new `.AppImage` the app offers and open it instead of the old one.
 
 ### First launch of an unsigned app
 

@@ -7,8 +7,9 @@ Open **Settings** with ⌘, (Ctrl+,). Sections:
 - **General**: computer name, shell, global shortcut, resuming sessions, running in the background.
 - **Appearance**: light, dark or automatic theme; accent color; interface size; typeface (SF Pro or Geist); terminal font, font size, theme, line height, cursor shape and blinking, and lines of history — with a live preview.
 - **Agents**: each agent's command and arguments (resume, light mode, heavy mode) and **custom agents** for any CLI.
+- **Ground Rules**: rules every agent follows (see [[Remote Control and Integrations]]).
 - **Shortcuts**: click one and press the new combination; conflicts are flagged.
-- **Projects** (name and check command), **Tasks** (queue, routing, subagents, checks, cross-review, budgets and limits) and **Advanced** (every setting as JSON, only for what has no control yet).
+- **Projects** (name and check command), **Tasks** (queue, routing, subagents, checks, cross-review, budgets and limits), **Secrets** (passwords and keys for automations, encrypted; see [[Automations]]), **Integrations** (phone remote and daily summary) and **Advanced** (every setting as JSON, only for what has no control yet).
 
 ![Shortcuts](https://raw.githubusercontent.com/scortes5/agentboard/main/docs/images/shortcuts.png)
 

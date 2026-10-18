@@ -92,3 +92,46 @@ test('ground rules live in one marked block that can be replaced and removed', (
   assert.equal(GroundRules.merge(twice, ''), '# Mine\n');
   assert.equal(GroundRules.merge('', ''), '');
 });
+
+// Stand-in for Electron's safeStorage: reversible, and clearly not the plain text.
+const fakeKeychain = (backend = 'gnome_libsecret') => ({
+  isEncryptionAvailable: () => true, getSelectedStorageBackend: () => backend,
+  encryptString: (s) => Buffer.from([...Buffer.from(s)].map((b) => b ^ 0x5a)),
+  decryptString: (b) => Buffer.from([...b].map((x) => x ^ 0x5a)).toString(),
+});
+
+test('the vault keeps secrets encrypted and gives them only to the commands that ask', () => {
+  const { SecretVault } = require('../src/main/secrets/SecretVault');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vault-'));
+  const vault = new SecretVault({ dataDir: dir, crypto: fakeKeychain() });
+  vault.set('APP_PASSWORD', 'hunter2-very-secret');
+  vault.set('API_KEY', 'key-123456');
+  assert.doesNotMatch(fs.readFileSync(path.join(dir, 'secrets.json'), 'utf8'), /hunter2/);
+  if (process.platform !== 'win32') assert.equal(fs.statSync(path.join(dir, 'secrets.json')).mode & 0o777, 0o600);
+  assert.deepEqual(vault.list().map((s) => s.name), ['API_KEY', 'APP_PASSWORD']);
+  assert.deepEqual(vault.envFor('login --password "$APP_PASSWORD"'), { APP_PASSWORD: 'hunter2-very-secret' });
+  assert.deepEqual(vault.envFor('npm run e2e', ['API_KEY', 'MISSING']), { API_KEY: 'key-123456' });
+  assert.deepEqual(vault.envFor('echo ${API_KEY} %APP_PASSWORD%'), { API_KEY: 'key-123456', APP_PASSWORD: 'hunter2-very-secret' });
+  assert.equal(SecretVault.redact('pw=hunter2-very-secret ok', ['hunter2-very-secret']), 'pw=•••••• ok');
+  assert.throws(() => vault.set('bad name', 'x'), /APP_PASSWORD/);
+  vault.remove('API_KEY');
+  assert.deepEqual(vault.list().map((s) => s.name), ['APP_PASSWORD']);
+});
+
+test('the vault refuses to store secrets without a real keychain', () => {
+  const { SecretVault } = require('../src/main/secrets/SecretVault');
+  const vault = new SecretVault({ dataDir: fs.mkdtempSync(path.join(os.tmpdir(), 'vault-')), crypto: fakeKeychain('basic_text') });
+  assert.throws(() => vault.set('APP_PASSWORD', 'x'), /keychain/);
+});
+
+test('a command gets its secrets as variables and its output hides them', async () => {
+  const { SecretVault } = require('../src/main/secrets/SecretVault');
+  const { CommandRunner } = require('../src/main/flows/CommandRunner');
+  const vault = new SecretVault({ dataDir: fs.mkdtempSync(path.join(os.tmpdir(), 'vault-')), crypto: fakeKeychain() });
+  vault.set('APP_PASSWORD', 'hunter2-very-secret');
+  let seenEnv = null;
+  const shellEnv = { runInShell: async (cmd, cwd, { env }) => { seenEnv = env; return { code: 0, out: `logged in with ${env.APP_PASSWORD}` }; } };
+  const r = await new CommandRunner({ shellEnv, vault }).run('node login.js', '/tmp', ['APP_PASSWORD']);
+  assert.equal(seenEnv.APP_PASSWORD, 'hunter2-very-secret');
+  assert.equal(r.out, 'logged in with ••••••');
+});

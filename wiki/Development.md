@@ -10,6 +10,7 @@ npm run app        # build and install the app
 npm run dist:mac   # .dmg files      ·  npm run dist:win  → .exe
 npm run icon       # regenerate icons from src/assets/logo.svg
 npm run test:e2e   # open the real app and drive a task with a fake agent
+xvfb-run -a node scripts/demo/record-demo.js   # re-record docs/images/demo.gif (Linux, needs Pillow)
 ```
 
 ## Checks

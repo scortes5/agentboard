@@ -184,7 +184,8 @@ function renderInspector() {
   } else if (n.type === 'command') {
     body += field('cmd', 'Command', `<textarea data-c="cmd" rows="3" class="mono" placeholder="npm test">${esc(c.cmd || '')}</textarea>`);
     body += field('project', 'Folder', `<select data-c="project">${projectOptions(c.project)}</select>`);
-    body += `<p class="set-note">If it exits with an error, the following steps do not run.</p>`;
+    body += field('secrets', 'Secrets it can use (optional)', `<input data-c="secrets" class="mono" value="${esc(c.secrets || '')}" placeholder="APP_USER, APP_PASSWORD"/>`);
+    body += `<p class="set-note">If it exits with an error, the following steps do not run. Secrets (Settings → Secrets) arrive as environment variables, and their values are hidden in the output.</p>`;
   } else if (n.type === 'condition') {
     body += field('question', 'Yes/no question', `<textarea data-c="question" rows="3" placeholder="Did all the tests pass?">${esc(c.question || '')}</textarea>`);
     body += `<p class="set-note">Claude (haiku) reads the results of the previous steps and answers YES or NO. Connect the green dot (Yes) and the red one (No).</p>`;
@@ -365,7 +366,7 @@ async function execNode(f, run, n) {
   }
   if (n.type === 'command') {
     if (!c.cmd) return { ok: false, text: 'No command.' };
-    const r = await ab.flowExec(c.cmd, c.project || cfg.selectedProject);
+    const r = await ab.flowExec(c.cmd, c.project || cfg.selectedProject, SecretsSettings.parse(c.secrets));
     if (!r.ok) return { ok: false, text: r.error };
     const tail = r.value.out.split('\n').slice(-6).join('\n');
     return { ok: r.value.code === 0, text: `${r.value.code === 0 ? 'OK' : `exit code ${r.value.code}`}\n${tail}` };

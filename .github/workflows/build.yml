@@ -1,8 +1,9 @@
-# Builds the installers on GitHub (Mac .dmg and Windows .exe) and publishes the release.
+# Builds the installers on GitHub (Mac .dmg, Windows .exe, Linux .AppImage) and publishes the release.
 # Runs on every push to main: when package.json has a version with no v<version> tag yet,
 # it builds and creates that release (and its tag). Pushing a v* tag or running it by hand
 # from Actions also works; a manual run on a released version only builds the artifacts.
 # latest.yml and the .blockmap go with the .exe: the Windows app reads them to update itself.
+# Linux has no in-place update: the app offers the new .AppImage from the release.
 name: build
 
 on:
@@ -50,7 +51,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest]
+        os: [macos-latest, windows-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
@@ -70,6 +71,7 @@ jobs:
             dist/*.exe
             dist/*.blockmap
             dist/latest.yml
+            dist/*.AppImage
 
   release:
     needs: [version, build]
@@ -92,3 +94,4 @@ jobs:
             dist/*.exe
             dist/*.exe.blockmap
             dist/latest.yml
+            dist/*.AppImage
