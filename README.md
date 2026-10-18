@@ -13,7 +13,6 @@
   <a href="https://github.com/scortes5/agentboard/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/scortes5/agentboard?label=release&color=f97316"></a>
   <a href="https://github.com/scortes5/agentboard/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/scortes5/agentboard/total?color=22c55e"></a>
   <a href="https://github.com/scortes5/agentboard/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/scortes5/agentboard/actions/workflows/ci.yml/badge.svg"></a>
-  <a href="https://github.com/scortes5/agentboard/actions/workflows/codeql.yml"><img alt="CodeQL" src="https://github.com/scortes5/agentboard/actions/workflows/codeql.yml/badge.svg"></a>
   <img alt="Platforms" src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey">
   <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/github/license/scortes5/agentboard?color=blue"></a>
   <a href="https://github.com/scortes5/agentboard/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/scortes5/agentboard?style=social"></a>
@@ -302,7 +301,7 @@ npm run dist:mac   # builds the .dmg files  ·  npm run dist:win  builds the .ex
 npm run icon       # regenerates the icons from src/assets/logo.svg
 ```
 
-Pushing a `v*` tag makes the `.github/workflows/build.yml` workflow build the Mac and Windows installers and attach them to the Release. Every push and pull request runs the `ci` and `codeql` workflows; Dependabot keeps npm packages and GitHub Actions up to date.
+Pushing a `v*` tag makes the `.github/workflows/build.yml` workflow build the Mac and Windows installers and attach them to the Release. Every push and pull request runs the `ci` workflow and CodeQL code scanning; Dependabot keeps npm packages and GitHub Actions up to date.
 
 ```
 src/
