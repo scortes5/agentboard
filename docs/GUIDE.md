@@ -80,7 +80,7 @@ You need:
 3. **Mac**: open the `.dmg` and drag AgentBoard into the *Applications* folder.
    **Windows**: open the `.exe` and follow the installer.
 4. The first time, the system warns that the app is not signed (no Apple or Microsoft certificate was bought; it does not mean it is dangerous):
-   - **Mac**: in *Applications*, right-click AgentBoard → *Open* → *Open*.
+   - **Mac**: open AgentBoard; when macOS says it could not verify it, press *Done* (not *Move to Trash*). Open **System Settings → Privacy & Security**, scroll down to *Security* and press **Open Anyway**, then **Open Anyway** again.
    - **Windows**: in the blue warning, *More info* → *Run anyway*.
 
 From then on you open it like any app: Launchpad, Spotlight (⌘ + Space → *AgentBoard*) or the Start menu. You can keep it in the Dock.
@@ -174,7 +174,7 @@ Writing to each agent works, but when you have several to-dos the **Tasks** pane
 - `@claude` = have that specific subscription do it.
 - `#name` = open the agent inside that board group.
 
-> **Not sure how to split the work?** Write everything in one paragraph and press **Split**: Claude breaks it into tasks for you.
+> **Not sure how to split the work?** With **Route** on (the default), just write everything, even in one paragraph, and press **Add**: Claude's cheapest model breaks it into tasks, picks who does each one and they run in parallel.
 
 ---
 
@@ -286,7 +286,7 @@ It is a Claude safety check the first time it opens a folder. If the project is 
 | A card says *"Could not start the shell"* | Update AgentBoard to the latest version. |
 | The agent says the command is not found (`command not found`) | The agent is not installed. See step 5 or *Subscriptions → Install*. |
 | Claude says the session expired (`OAuth token has expired`) | Type `/login` in a Claude card and sign in again. |
-| The Mac says the app "is damaged" or "can't be opened" | In the Terminal: `xattr -cr /Applications/AgentBoard.app`, then open it again. |
+| The Mac says the app "is damaged", "can't be opened" or "could not verify" | In the Terminal: *System Settings → Privacy & Security → Open Anyway*, or in the Terminal `xattr -cr /Applications/AgentBoard.app`, then open it again. |
 | A task is stuck in *Needs your review* | The agent finished or asked you something. Use *Go to the agent card* to see what it needs. |
 | Windows will not run the agents (`cannot be loaded`) | In PowerShell: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`, or in *Settings → General → Shell* type `cmd.exe`. |
 

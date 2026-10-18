@@ -94,6 +94,7 @@
         <select id="taskAgent" title="Subscription that runs the tasks; Auto spreads them across the ones you have"></select>
         <select id="taskProject" title="Project the tasks run in"></select>
         <label class="switch" title="Light mode: use that subscription's cheapest model (same as ! in the text)"><input type="checkbox" id="taskLight" /> Light</label>
+        <label class="switch" title="Route with AI: Claude's cheapest model (haiku, one short call) splits what you write into independent tasks and picks a subscription and model for each; they run in parallel"><input type="checkbox" id="taskRoute" /> Route</label>
         <span class="spacer"></span>
         <button id="taskPlan" class="ghost" title="Split: Claude (haiku, one short call) breaks your text into tasks and suggests who should do each one">Split</button>
         <button id="taskAdd" class="primary" title="Add every line of the text as a task (Enter)">Add</button>
@@ -242,6 +243,7 @@
             <label class="set-row">Parallel tasks (total) <input name="maxParallel" type="number" min="1" max="12" /></label>
             <label class="set-row">Parallel tasks per subscription <input name="perAgentParallel" type="number" min="1" max="6" /></label>
             <label class="set-row check"><span>Each task in its own git worktree</span><input name="taskWorktrees" type="checkbox" class="switch-input" /></label>
+            <label class="set-row check"><span>Route new tasks with AI (haiku splits them and picks who does each one)</span><input name="taskRoute" type="checkbox" class="switch-input" /></label>
           </div>
         </section>
 

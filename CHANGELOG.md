@@ -4,9 +4,18 @@ All notable changes to AgentBoard. The format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-18
+
 ### Added
+- **Route** in Tasks (on by default): adding tasks sends what you wrote to Claude's cheapest model (haiku), which splits it into independent tasks and picks a subscription and a light or heavy model for each one; the queue runs them in parallel. Your `@`, `#`, `+`, `!` and `!!` markers always win. Also in *Settings → Tasks*.
 - Repository setup: CI workflow, Dependabot for npm and GitHub Actions, issue and pull request templates, contributing guide, code of conduct, security policy and a [wiki](https://github.com/scortes5/agentboard/wiki) published from `wiki/`.
 - Releases are published automatically: when a new version in `package.json` reaches `main`, the installers are built and the release and its tag are created, with generated notes.
+
+### Fixed
+- Codex, Gemini and other CLIs installed with npm under nvm, fnm or volta showed as not installed when AgentBoard was opened from Finder. The app now reads the PATH your interactive shell sets up (`~/.zshrc`), so detection, Split, automations and headless runs find them.
+
+### Changed
+- The Mac install steps describe *Privacy & Security → Open Anyway*: right-click → *Open* no longer works on macOS 15 and later.
 
 ## [0.6.0] - 2026-10-17
 
@@ -112,7 +121,8 @@ Includes the 0.2.0 changes, which were not released separately.
 ### Added
 - First release: a board of terminals for CLI agents on Mac and Windows.
 
-[Unreleased]: https://github.com/scortes5/agentboard/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/scortes5/agentboard/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/scortes5/agentboard/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/scortes5/agentboard/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/scortes5/agentboard/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/scortes5/agentboard/compare/v0.3.0...v0.4.0

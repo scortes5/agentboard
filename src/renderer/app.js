@@ -2012,6 +2012,7 @@ async function openSettings(section = 'general') {
   f.maxParallel.value = cfg.maxParallel || 3;
   f.perAgentParallel.value = cfg.perAgentParallel || 2;
   f.taskWorktrees.checked = !!cfg.taskWorktrees;
+  f.taskRoute.checked = cfg.taskRoute !== false;
   const rows = $('#agentRows'); rows.innerHTML = '';
   for (const [k, a] of Object.entries(cfg.agents)) rows.appendChild(agentRow(k, a));
   const prow = $('#projectRows'); prow.innerHTML = '';
@@ -2048,6 +2049,7 @@ $('#settings').addEventListener('close', async () => {
   cfg.maxParallel = clamp(+f.maxParallel.value || 3, 1, 12);
   cfg.perAgentParallel = clamp(+f.perAgentParallel.value || 2, 1, 6);
   cfg.taskWorktrees = f.taskWorktrees.checked;
+  cfg.taskRoute = f.taskRoute.checked;
   cfg.ui = { ...draftUi };
   cfg.shortcuts = Object.fromEntries(Object.entries(draftKeys).filter(([id, k]) => shortcutDefs.find((d) => d.id === id)?.key !== k));
 

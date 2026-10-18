@@ -99,7 +99,7 @@ From [Releases](https://github.com/scortes5/agentboard/releases/latest):
 | Windows | `AgentBoard-Setup-x.y.z.exe` (`AgentBoard.Setup.x.y.z.exe` up to 0.5.0) |
 
 The app is not signed. The first time:
-- **Mac**: right-click AgentBoard in Applications → *Open*, or in Terminal: `xattr -cr /Applications/AgentBoard.app`.
+- **Mac**: open AgentBoard once, press *Done* in the warning, then go to **System Settings → Privacy & Security**, scroll to *Security* and press **Open Anyway**. Or, in Terminal: `xattr -cr /Applications/AgentBoard.app`. (Right-click → *Open* no longer works on macOS 15 and later.)
 - **Windows**: in the SmartScreen warning, *More info* → *Run anyway*.
 
 ### Updates
@@ -176,7 +176,8 @@ refactor the payments module !!
 - **Parallel** and **per subscription** limit how many run at once; with *Run queue* on, queued tasks start by themselves when there is room.
 - **Worktree per task**: each task works on its own branch (`agentboard/<task>`), so several agents do not step on each other in the same repository. When it finishes, **View changes** shows what it did and lets you **Merge** or **Discard**.
 - **Usage limit**: if a subscription runs out, the task moves to another one and the exhausted one waits for its reset time.
-- **Split**: paste free text and Claude breaks it into tasks.
+- **Route** (on by default): when you add tasks, Claude's cheapest model (haiku, one short call with no terminal) splits what you wrote into independent tasks and picks the subscription and the model (light or heavy) for each one; the queue then runs them in parallel. Markers you write (`@agent`, `#group`, `+project`, `!`, `!!`) always win. Turn it off in the composer or in *Settings → Tasks*. Without Claude installed, lines are added as they are.
+- **Split**: paste free text and Claude breaks it into tasks, without starting them.
 - **Summary**: copies what was done today and what is pending, as Markdown.
 - **Global shortcut** (⌃⌥Space, configurable): add a task from any app.
 

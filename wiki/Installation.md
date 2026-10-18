@@ -17,7 +17,7 @@ Download from [Releases](https://github.com/scortes5/agentboard/releases/latest)
 
 The app is not signed with an Apple or Microsoft certificate. That does not mean it is dangerous; the source is all here.
 
-- **Mac**: right-click AgentBoard in *Applications* → *Open* → *Open*. If macOS says it is "damaged": `xattr -cr /Applications/AgentBoard.app`.
+- **Mac**: open AgentBoard once, press *Done* in the warning, then go to **System Settings → Privacy & Security**, scroll to *Security* and press **Open Anyway**. Or, in Terminal: `xattr -cr /Applications/AgentBoard.app`. Never choose *Move to Trash*. Each version installed from a `.dmg` asks once.
 - **Windows**: in the SmartScreen warning, *More info* → *Run anyway*.
 
 ## Option 2: from source
