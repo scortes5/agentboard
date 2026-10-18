@@ -41,7 +41,7 @@ function nodeSummary(n) {
   const c = n.config || {};
   if (n.type === 'trigger') return c.mode === 'every' ? `every ${c.every || 60} min` : c.mode === 'daily' ? `every day at ${c.at || '09:00'}` : 'by hand (Run button)';
   if (n.type === 'agent') {
-    const a = c.agent && c.agent !== 'auto' ? cfg.agents[c.agent]?.label : 'auto';
+    const a = c.agent && c.agent !== 'auto' ? (cfg.agents[c.agent]?.label || 'missing agent') : 'auto';
     return `${a}${c.mode && c.mode !== 'normal' ? ' · ' + c.mode : ''} — ${(c.prompt || 'no instruction').slice(0, 70)}`;
   }
   if (n.type === 'command') return c.cmd ? `$ ${c.cmd.slice(0, 60)}` : 'no command';
