@@ -144,6 +144,7 @@ Copilot CLI, Cursor CLI, Qwen Code, OpenCode, Aider, Amp and local models throug
 - **Project tabs**: the toolbar shows *All* and each project, with how many agents it has and whether any is working. `+` opens another folder as a project. Each tab remembers its view.
 - **Groups**: frames that gather a team of agents (for example *Backend* or *Frontend*). Moving the frame moves its cards. **Arrange** lays everything out while keeping the groups.
 - **Notes** on the same board, a **minimap** at the bottom right and the **agent list** on the left.
+- **Close several at once**: ⌘/Ctrl or Shift + click title bars to select cards, then **Close**. The palette also closes finished-task cards, stopped cards or the whole view, and a group's menu closes its cards.
 - **Options menu** on each card (three dots): rename it, change its agent, project or arguments (for example `--model opus`), duplicate it, or **Send to…** another agent a piece of the conversation.
 - **Help on every button**: hold the pointer over a button for 2 seconds to see what it does.
 
@@ -178,6 +179,8 @@ refactor the payments module !!
 - **Usage limit**: if a subscription runs out, the task moves to another one and the exhausted one waits for its reset time.
 - **Route** (on by default): when you add tasks, Claude's cheapest model (haiku, one short call with no terminal) splits what you wrote into independent tasks and picks the subscription and the model (light or heavy) for each one; the queue then runs them in parallel. Markers you write (`@agent`, `#group`, `+project`, `!`, `!!`) always win. Turn it off in the composer or in *Settings → Tasks*. Without Claude installed, lines are added as they are.
 - **Split**: paste free text and Claude breaks it into tasks, without starting them.
+- **Live progress**: a bar with done, working, blocked and errors; under each running task, its time, last output line and the subagents it opened. A card that prints an error turns red and notifies you.
+- **Subagents you can see**: with *Agent Connection* on, a task agent may split its work with `start_agent`; each helper opens as a `↳` card next to it.
 - **Summary**: copies what was done today and what is pending, as Markdown.
 - **Global shortcut** (⌃⌥Space, configurable): add a task from any app.
 

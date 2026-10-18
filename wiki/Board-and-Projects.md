@@ -14,6 +14,8 @@ The **options menu** (three dots) lets you rename the card, change its agent, pr
 
 Drag the title bar to move, the bottom-right corner to resize, double-click the title to rename.
 
+**Closing several cards**: ⌘/Ctrl or Shift + click title bars (or names in the agent list) to select them and press **Close** in the bar that appears. The palette (⇧⌘P) has *Close Cards of Finished Tasks*, *Close Stopped Cards* and *Close All Cards in This View*; a group's menu has *Close Its Cards*. A card that printed an error has a red mark; clicking it clears the mark.
+
 ## Projects (tabs)
 
 The toolbar shows **All** plus one tab per project, with its number of agents and a dot when any is working. Each tab remembers its own view. **Agents in every project keep working while you look at another.** `+` adds a folder; ⌘⌥→ / ⌘⌥← switch tabs, ⌘⌥0 shows all.

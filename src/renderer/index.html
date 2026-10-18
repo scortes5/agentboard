@@ -76,6 +76,7 @@
       <span class="spacer"></span>
       <button id="tasksClose" class="card-btn" data-icon="close" title="Close the tasks panel"></button>
     </div>
+    <div id="taskProgress" class="tprogress hidden" title="Progress of your tasks; running ones show what they are doing below"><div class="bar"><i></i></div><span></span></div>
     <div class="task-opts">
       <label class="switch" title="Pending tasks start on their own when there is a free slot"><input type="checkbox" id="taskAuto" /> Run queue</label>
       <label class="num" title="Tasks running at once, across all subscriptions">Parallel <input id="taskParallel" type="number" min="1" max="12" /></label>
@@ -150,6 +151,11 @@
   </section>
 
   <canvas id="minimap" class="glass" width="200" height="130" title="Click or drag to move around the board"></canvas>
+  <div id="selBar" class="selbar glass hidden">
+    <span id="selCount"></span>
+    <button id="selClose" class="danger" data-icon="close" title="Close the selected cards and stop their processes">Close</button>
+    <button id="selNone" class="ghost" title="Deselect (⌘/Shift-click a card's title bar to add or remove it)">Deselect</button>
+  </div>
   <div id="toasts"></div>
   <div id="updateBanner" class="glass hidden" role="status">
     <img src="icon.png" width="36" height="36" alt="" aria-hidden="true" draggable="false" />
@@ -244,6 +250,9 @@
             <label class="set-row">Parallel tasks per subscription <input name="perAgentParallel" type="number" min="1" max="6" /></label>
             <label class="set-row check"><span>Each task in its own git worktree</span><input name="taskWorktrees" type="checkbox" class="switch-input" /></label>
             <label class="set-row check"><span>Route new tasks with AI (haiku splits them and picks who does each one)</span><input name="taskRoute" type="checkbox" class="switch-input" /></label>
+            <label class="set-row check"><span>Task agents may open subagents you can see on the board (needs Agent Connection)</span><input name="taskSubagents" type="checkbox" class="switch-input" /></label>
+            <label class="set-row">Subagents per agent, at most <input name="maxSubagents" type="number" min="1" max="8" /></label>
+            <label class="set-row check"><span>Flag cards that print an error (and notify me)</span><input name="watchErrors" type="checkbox" class="switch-input" /></label>
           </div>
         </section>
 

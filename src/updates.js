@@ -51,8 +51,13 @@ function createUpdater({ send, loadConfig, onBeforeInstall }) {
     manual = false;
   }
 
-  function upToDate() {
-    if (manual) info('AgentBoard is up to date', `You have the latest version (${currentVersion()}).`);
+  function upToDate(info0) {
+    // electron-updater passes its UpdateInfo; the GitHub check passes the version string
+    const latest = typeof info0 === 'string' ? info0 : info0?.version;
+    if (manual) {
+      info('AgentBoard is up to date', `This copy is version ${currentVersion()}${latest ? ` and the latest release on GitHub is ${latest}` : ''}.`
+        + (app.isPackaged ? `\n\nRunning from: ${app.getPath('exe').replace(/\/Contents\/MacOS\/.*$/, '')}` : ''));
+    }
     manual = false;
   }
 
@@ -67,11 +72,12 @@ function createUpdater({ send, loadConfig, onBeforeInstall }) {
   }
 
   async function checkGithub() {
-    const res = await net.fetch(LATEST_URL, { headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'AgentBoard' } });
+    // no-store: Chromium's HTTP cache could answer with an older "latest" release
+    const res = await net.fetch(LATEST_URL, { cache: 'no-store', headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'AgentBoard' } });
     if (!res.ok) throw new Error(`GitHub answered ${res.status}`);
     const rel = await res.json();
     const version = String(rel.tag_name || '').replace(/^v/, '');
-    if (!version || !newer(version, currentVersion())) return upToDate();
+    if (!version || !newer(version, currentVersion())) return upToDate(version);
     const url = (process.platform === 'darwin' ? dmgFor(rel.assets, process.arch) : null) || rel.html_url;
     const detail = process.platform === 'darwin'
       ? 'Open the .dmg and drag AgentBoard to Applications to replace this version.'
