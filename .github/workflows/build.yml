@@ -1,5 +1,6 @@
-# Genera los instaladores en GitHub (Mac .dmg y Windows .exe).
-# Se ejecuta al crear un tag v* (ej: git tag v0.1.0 && git push --tags) o a mano desde Actions.
+# Builds the installers on GitHub (Mac .dmg and Windows .exe).
+# Runs when a v* tag is pushed (e.g. git tag v0.1.0 && git push --tags) or by hand from Actions.
+# latest.yml and the .blockmap go with the .exe: the Windows app reads them to update itself.
 name: build
 
 on:
@@ -32,10 +33,14 @@ jobs:
           path: |
             dist/*.dmg
             dist/*.exe
-      - name: Publicar en el Release del tag
+            dist/*.blockmap
+            dist/latest.yml
+      - name: Publish to the tag's release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: |
             dist/*.dmg
             dist/*.exe
+            dist/*.exe.blockmap
+            dist/latest.yml

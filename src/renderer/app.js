@@ -1357,6 +1357,19 @@ function toast(html, ms = 3200) {
   setTimeout(() => t.remove(), ms);
 }
 
+// A new release: on Windows it is already downloaded (restart installs it);
+// on macOS the button opens the .dmg for this Mac in the browser.
+ab.onUpdate((u) => {
+  $('#updateTitle').textContent = `AgentBoard ${u.version} is available`;
+  $('#updateDetail').textContent = u.detail;
+  const go = $('#updateGo');
+  go.textContent = u.ready ? 'Restart to Update' : 'Download';
+  go.title = u.ready ? 'Quit AgentBoard, install the update and open it again' : 'Open the installer for this computer in your browser';
+  go.onclick = () => { $('#updateBanner').classList.add('hidden'); u.ready ? ab.updateInstall() : ab.updateDownload(u.url); };
+  $('#updateBanner').classList.remove('hidden');
+});
+$('#updateLater').onclick = () => $('#updateBanner').classList.add('hidden');
+
 function ping(id) {
   const el = runtime.get(id)?.el;
   if (!el) return;
@@ -1993,6 +2006,7 @@ async function openSettings(section = 'general') {
   f.fontSize.value = cfg.fontSize;
   f.resumeOnOpen.checked = cfg.resumeOnOpen;
   f.keepRunning.checked = cfg.keepRunning !== false;
+  f.checkUpdates.checked = cfg.checkUpdates !== false;
   f.quickKey.value = cfg.quickKey ?? 'Control+Alt+Space';
   f.taskAuto.checked = !!cfg.taskAuto;
   f.maxParallel.value = cfg.maxParallel || 3;
@@ -2028,6 +2042,7 @@ $('#settings').addEventListener('close', async () => {
   cfg.fontSize = clamp(+f.fontSize.value || 13, 9, 24);
   cfg.resumeOnOpen = f.resumeOnOpen.checked;
   cfg.keepRunning = f.keepRunning.checked;
+  cfg.checkUpdates = f.checkUpdates.checked;
   cfg.quickKey = f.quickKey.value.trim();
   cfg.taskAuto = f.taskAuto.checked;
   cfg.maxParallel = clamp(+f.maxParallel.value || 3, 1, 12);

@@ -71,11 +71,20 @@ From [Releases](https://github.com/scortes5/agentboard/releases/latest):
 |---|---|
 | Mac with Apple Silicon (M1, M2…) | `AgentBoard-x.y.z-arm64.dmg` |
 | Mac with Intel | `AgentBoard-x.y.z.dmg` |
-| Windows | `AgentBoard.Setup.x.y.z.exe` |
+| Windows | `AgentBoard-Setup-x.y.z.exe` (`AgentBoard.Setup.x.y.z.exe` up to 0.5.0) |
 
 The app is not signed. The first time:
 - **Mac**: right-click AgentBoard in Applications → *Open*, or in Terminal: `xattr -cr /Applications/AgentBoard.app`.
 - **Windows**: in the SmartScreen warning, *More info* → *Run anyway*.
+
+### Updates
+
+AgentBoard looks for a new release when it opens and every six hours (turn it off in **Settings → General → Check for updates automatically**; **AgentBoard → Check for Updates…** on Mac, or **Board → Check for Updates…** on Windows, checks right away).
+
+- **Windows**: the new version downloads in the background. When it is ready, a notice offers **Restart to Update**; if you choose **Later**, it installs the next time you quit.
+- **Mac**: a notice says which version is available. **Download** opens the `.dmg` for your Mac (Apple Silicon or Intel) in the browser; open it and drag AgentBoard to *Applications* to replace the old one. Your board and settings are kept.
+
+Silent updates on Mac (download and install with no `.dmg`) need the app to be signed and notarized with an Apple Developer ID, which this project does not have yet. When you run AgentBoard from source, it only shows the notice; update with `git pull`.
 
 ### Option 2: from source
 
@@ -267,7 +276,7 @@ Example, in Claude: *"ask Codex what it thinks of this change and summarize its 
 
 ## Privacy and security
 
-- Everything runs on your computer. AgentBoard has no server and no telemetry.
+- Everything runs on your computer. AgentBoard has no server and no telemetry. The only request it makes on its own is the update check to GitHub (`api.github.com` on Mac, the release files on Windows), which sends nothing about you or your board and can be turned off.
 - Each CLI keeps its credentials where it always does; AgentBoard does not read or copy them.
 - The board is saved outside your repositories, readable only by your user:
 
@@ -290,13 +299,16 @@ npm run dist:mac   # builds the .dmg files  ·  npm run dist:win  builds the .ex
 npm run icon       # regenerates the icons from src/assets/logo.svg
 ```
 
-Pushing a `v*` tag makes the `.github/workflows/build.yml` workflow build the Mac and Windows installers and attach them to the Release.
+Pushing a `v*` tag makes the `.github/workflows/build.yml` workflow build the Mac and Windows installers and attach them to the Release, together with `latest.yml` and the `.blockmap` that the Windows app uses to update itself.
+
+To see the update notice from source, pretend to run an older version: `AGENTBOARD_FAKE_VERSION=0.1.0 npm start` (the check runs 10 seconds after opening).
 
 ```
 src/
   main.js         main process: terminals, git, worktrees, menu, tray, settings
   bridge.js       local bridge between agents (socket + token)
   skills.js       reads and edits each CLI's skills, commands and subagents
+  updates.js      update checks: electron-updater on Windows, GitHub releases on Mac
   preload.js      safe bridge between the interface and the main process
   renderer/
     app.js        board, cards, groups, tabs, appearance and settings
@@ -317,7 +329,7 @@ docs/             guide and screenshots
 - The *working* or *waiting* status is estimated from the terminal's recent output, not from the agent's API.
 - Scheduled automations only run while AgentBoard is open (it can be in the background).
 - The board does not sync between computers, on purpose: each machine has its own projects. To copy it, copy `board.json`.
-- The app is not signed with an Apple or Microsoft certificate.
+- The app is not signed with an Apple or Microsoft certificate. Because of that, Mac updates are downloaded by hand (see [Updates](#updates)).
 
 ---
 

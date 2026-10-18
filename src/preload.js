@@ -15,7 +15,7 @@ contextBridge.exposeInMainWorld('ab', {
   gitBranches: (cwd) => ipcRenderer.invoke('git:branches', cwd),
   gitCheckout: (cwd, branch, create) => ipcRenderer.invoke('git:checkout', cwd, branch, create),
 
-  // Config y sistema
+  // Config and system
   loadConfig: () => ipcRenderer.invoke('config:load'),
   saveConfig: (cfg) => ipcRenderer.invoke('config:save', cfg),
   revealConfig: () => ipcRenderer.invoke('config:reveal'),
@@ -58,9 +58,12 @@ contextBridge.exposeInMainWorld('ab', {
   localModels: () => ipcRenderer.invoke('local:models'),
   pickFolder: () => ipcRenderer.invoke('dialog:pickFolder'),
   openPath: (p) => ipcRenderer.invoke('shell:openPath', p),
+  onUpdate: (cb) => ipcRenderer.on('update:available', (_e, u) => cb(u)),
+  updateDownload: (url) => ipcRenderer.send('update:download', url),
+  updateInstall: () => ipcRenderer.send('update:install'),
   onMenu: (cb) => ipcRenderer.on('menu', (_e, action) => cb(action)),
 
-  // Portapapeles
+  // Clipboard
   // Electron 44 no longer exposes `clipboard` in the preload: go through the main process
   copy: (text) => ipcRenderer.send('clip:write', String(text ?? '')),
   paste: () => ipcRenderer.invoke('clip:read'), // async: macOS may ask "Allow paste?"
