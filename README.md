@@ -1,257 +1,310 @@
-# AgentBoard
+<p align="center">
+  <img src="src/assets/icon.png" width="96" alt="AgentBoard" />
+</p>
 
-Tablero infinito con **terminales reales** para correr Claude Code, Codex y Gemini CLI lado a lado, con tus propias suscripciones. Funciona en **Mac y Windows**.
+<h1 align="center">AgentBoard</h1>
 
-- Cada tarjeta es un shell de verdad (PTY) que lanza el CLI del agente en la carpeta del proyecto.
-- Pill de git por tarjeta: rama, cambios sin commit, ↑/↓ vs remoto. Clic para cambiar o crear rama.
-- Estado por agente: **trabajando** (pulsa), **esperando**, **terminado**. Notificación cuando un agente termina y no lo estás mirando.
-- Notas en el mismo tablero.
-- **Panel de agentes** (⇧⌘A): todos tus agentes agrupados por proyecto, con su estado en vivo; clic para ir a la tarjeta.
-- **Minimapa** abajo a la derecha: clic o arrastra para moverte por el tablero.
-- **Menú de opciones de cada tarjeta** (tres puntos): cambia nombre, agente, proyecto y argumentos (ej. `--model opus`) y reinicia; o duplícala.
-- Al reabrir la app vuelven todas las tarjetas y cada agente se relanza con su comando de reanudar (`claude --continue`, `codex resume --last`).
-- No usa API keys ni manda nada a ningún servidor: corre los binarios que ya tienes en el PATH.
-- **App de escritorio con ícono**: `npm run app` la instala en Aplicaciones (Mac) o genera el instalador (Windows). Se abre con un clic desde Launchpad, Spotlight, el Dock o el menú inicio.
+<p align="center">
+  A workspace for coding agents: Claude Code, Codex, Gemini CLI and others, side by side,<br/>
+  on your own subscriptions, on Mac and Windows.
+</p>
 
-## Un IDE para agentes
+<p align="center">
+  <a href="https://github.com/scortes5/agentboard/releases/latest">Download</a> ·
+  <a href="docs/GUIDE.md">Getting started</a> ·
+  <a href="CHANGELOG.md">Changelog</a> ·
+  <a href="LICENSE">MIT License</a>
+</p>
 
-- **Estilo macOS**: barra de herramientas unificada, barra lateral e inspector a los bordes, tipografía del sistema (SF Pro), **modo claro, oscuro o automático** y color de acento a elección.
-- **Proyectos en paralelo**: cada proyecto es una **pestaña** arriba (más *Todos*). Cada una tiene su propia vista del tablero y sus grupos; los agentes de todas siguen trabajando a la vez, y la pestaña muestra cuántos hay y si alguno está trabajando. `⌘⌥→` / `⌘⌥←` cambia de proyecto, `⌘⌥0` muestra todos.
-- **Configuración** (`⌘,`), al estilo de Configuración del Sistema:
-  - *Apariencia*: tema, acento, tamaño del texto de la interfaz, tipografía (SF Pro o Geist), tamaño de letra, tema y alto de línea de las terminales, con vista previa en vivo.
-  - *Atajos*: cada acción con su atajo; haz clic y presiona la combinación nueva (avisa si choca con otra). `⌘/` abre esta sección.
-  - *Agentes*, *Proyectos*, *Tareas* y *General*.
-  - *Avanzado*: todos los ajustes como JSON para agregar, cambiar o quitar claves.
+![AgentBoard board](docs/images/board.png)
 
-## Automatizaciones (estilo n8n, ejecutadas por tus agentes)
+AgentBoard is a desktop app that puts your AI agents on one board. Each card is a real terminal running the agent's CLI inside your project. From there you give them tasks, see what each one is doing, coordinate them and automate whole workflows.
 
-Botón **Automatizaciones** (`⇧⌘F`). Dibuja un flujo con nodos y conexiones:
+It uses no API keys and sends nothing to servers of its own: it runs the programs you already have installed (`claude`, `codex`, `gemini`…) with the session you already signed in to.
 
-| Nodo | Qué hace |
+> **First time?** The [Getting started guide](docs/GUIDE.md) explains everything step by step, with no prior knowledge assumed.
+
+---
+
+## Contents
+
+- [What you can do](#what-you-can-do)
+- [Installation](#installation)
+- [Board and projects](#board-and-projects)
+- [Tasks](#tasks)
+- [Automations](#automations)
+- [Diagram](#diagram)
+- [Settings and shortcuts](#settings-and-shortcuts)
+- [Subscriptions and accounts](#subscriptions-and-accounts)
+- [Token saving](#token-saving)
+- [Agent connection](#agent-connection)
+- [Privacy and security](#privacy-and-security)
+- [Development](#development)
+- [Known limitations](#known-limitations)
+
+---
+
+## What you can do
+
+| | |
 |---|---|
-| Disparador | Cuándo empieza: a mano, cada N minutos o todos los días a una hora |
-| Agente | Un agente hace un trabajo: se vuelve una tarea de la cola (sesión nueva, suscripción auto o elegida, modo ligero/potente) |
-| Comando | Un comando de shell en el proyecto (tests, build, git); si falla, lo que sigue no corre |
-| Decisión | Claude (haiku) lee el resultado de lo anterior y responde SÍ o NO; el flujo sigue por esa rama |
-| Aviso | Notificación |
-| Concepto | Una idea en el diagrama; no se ejecuta |
+| **Many agents at once** | Real terminals on an infinite board, each with its agent, project and git branch. |
+| **Projects in parallel** | Each project is a tab with its own view; all keep working while you look at another. |
+| **Tasks** | Write your to-dos and they are spread across your subscriptions, several at a time. |
+| **Automations** | n8n-style step diagrams run by your agents. The AI can design and explain them. |
+| **Diagram** | A per-project, per-group, per-agent view of what each one is doing. |
+| **Background** | Closing the window does not stop the agents; your sessions are kept. |
+| **Token saving** | A fresh session per task, light mode, compact-context skills and load spreading across accounts. |
 
-- Arrastra desde el punto derecho de un nodo hasta otro para conectarlos; `⌫` borra lo seleccionado; el inspector de la derecha edita cada nodo.
-- **Diseñar con IA**: describe lo que quieres en tus palabras y Claude arma (o cambia) el diagrama.
-- **Explicar ejecución**: la IA explica paso a paso qué va a pasar, qué falta o puede fallar, y cómo mejorarla o ahorrar tokens.
-- **Ejecutar**: las ramas independientes corren en paralelo; cada agente recibe un resumen de una línea de los pasos anteriores, no todo su historial. Ves en vivo qué nodo está corriendo, cuál terminó y cuál se saltó.
-- Las programadas corren mientras AgentBoard esté abierto, también en segundo plano.
+![Dark mode](docs/images/board-dark.png)
 
-## Tareas: tus ToDo repartidos entre suscripciones
+---
 
-Botón **Tareas** (⇧⌘T / Ctrl+Shift+T). Escribe tus pendientes, uno por línea, y Enter:
+## Installation
 
-```
-arreglar el login con Google #backend
-@codex escribir tests para la API de pagos #backend
-actualizar el README !
-#frontend
-nuevo botón de exportar
-```
+### Option 1: download the installer
 
-- `@claude` `@codex` `@gemini` elige la suscripción; sin `@` es **auto**: va a la suscripción con menos tareas corriendo (eliges cuáles participan).
-- `#grupo` abre al agente dentro de ese grupo del tablero (lo crea si no existe). Una línea con solo `#grupo` o `@agente` aplica a las siguientes.
-- `+proyecto` elige el proyecto. `!` = **modo ligero** (modelo barato, ej. haiku) y `!!` = **modo potente** (ej. opus). Se editan en Configuración → Agentes.
-- **Subir** (flecha) lleva una tarea al primer lugar de la cola. **Resumen** copia en Markdown lo hecho hoy y lo pendiente (para una daily, un correo o un commit).
-- **Límite de uso**: si una suscripción avisa que llegó a su límite ("usage limit reached… resets 5pm"), la tarea vuelve a la cola y la toma otra suscripción; la agotada no recibe tareas hasta la hora de renovación (se ve tachada en "auto reparte entre").
-- **Confiar y seguir**: si el CLI pregunta si confías en la carpeta, la tarea lo muestra con un botón que responde por ti.
-- **Dividir**: pega un texto libre y Claude (haiku, una llamada corta y sin herramientas) lo separa en tareas y sugiere a quién dárselas.
-- **Varias a la vez**: *En paralelo* (total) y *por suscripción*. Con *Ejecutar la cola* activo, cada tarea pendiente arranca sola cuando hay cupo.
-- **Worktree por tarea** (opcional): cada tarea trabaja en `.agentboard/worktrees/<tarea>` en su propia rama `agentboard/<tarea>`, así los agentes no se pisan en el mismo repo. Al terminar, **Ver cambios** muestra lo que hizo y te deja **Fusionar** (commitea lo pendiente, hace merge en tu rama actual y borra el worktree; si hay conflictos no toca nada) o **Descartar**.
-- Cada tarea corre en una **sesión nueva** y se marca sola: *Hecho* cuando el agente escribe `HECHO: …` (o llama `complete_task`), *Necesita revisión* si queda esperando (permiso, pregunta), *Bloqueado* con `BLOQUEADO: …`.
-- La primera vez que un CLI abre una carpeta (o un worktree nuevo) puede preguntar si confías en ella: la tarea queda en *Necesita revisión* hasta que respondas en su tarjeta (el botón "Ir a la tarjeta" te lleva ahí), y luego sigue sola.
-- Los agentes conectados también pueden usar la lista: `list_tasks`, `add_task` (repartir trabajo a otras suscripciones) y `complete_task`.
+From [Releases](https://github.com/scortes5/agentboard/releases/latest):
 
-## Varias cuentas de Claude
-
-¿Tienes más de una suscripción de Claude (personal y del trabajo, o dos planes)? **Suscripciones → Cuentas de Claude → Agregar cuenta**. Cada cuenta usa su propia carpeta (`~/.claude-<nombre>`, vía `CLAUDE_CONFIG_DIR`) con su login, historial y skills; inicias sesión una vez en la tarjeta que se abre (`/login`). Desde ahí aparece en la barra y en "auto": la cola reparte entre tus cuentas y, si una llega a su límite, sigue con la otra.
-
-## Más rápido
-
-- **Atajo global** `Control+Alt+Space` (configurable en Configuración → General): desde cualquier app abre AgentBoard con el panel de Tareas listo para escribir.
-- **Paleta** ⇧⌘P / Ctrl+Shift+P (o la lupa arriba): busca un agente, grupo o tarea y salta a él, ejecuta acciones, o escribe algo nuevo y Enter lo agrega como tarea.
-- **Insignia en el Dock** con las tareas que esperan tu revisión.
-- **Ayuda en cada botón**: deja el cursor 2 segundos sobre un botón y aparece qué hace.
-
-## Grupos y diagrama
-
-- **Grupo** (⇧⌘G): un marco en el tablero para un equipo de agentes (ej. *backend*, *frontend*). Las tarjetas cuyo centro queda dentro son del grupo; al mover el marco se mueven con él. El menú de opciones (tres puntos) cambia nombre, color o ajustarlo a sus tarjetas. **Ordenar** respeta los grupos.
-- **Diagrama** (⇧⌘D): vista tipo UML de componentes: un paquete por **proyecto**, dentro sus **grupos**, y en cada uno los **agentes** con su suscripción, tarea, estado, tiempo trabajando, rama git y última línea de salida; notas con la **cola** de tareas pendientes; y flechas de quién le pasó trabajo a quién. Pestañas para ver un proyecto o todos.
-
-## ¿Mis suscripciones quedan guardadas al cerrar?
-
-Sí. Cada CLI guarda su login en este computador (Llavero de macOS, `~/.codex`, `~/.gemini`…): cerrar AgentBoard no cierra tu sesión de Claude, Codex ni Gemini.
-
-Además:
-- **Cerrar la ventana no detiene a los agentes**: AgentBoard sigue en segundo plano (ícono en la barra de menú / bandeja) y la cola de tareas sigue avanzando. Ábrela de nuevo desde el Dock o el ícono. Se desactiva en Configuración → General.
-- **Salir** (⌘Q o la bandeja) sí detiene los procesos, con confirmación. Al volver a abrir, cada tarjeta retoma **su** conversación: las de Claude tienen su propio id de sesión (`--resume <id>`), aunque haya varios Claude en el mismo proyecto; Codex usa `resume --last`.
-- Si el login de una suscripción venció, ábrela en una tarjeta y vuelve a iniciar sesión (en Claude: `/login`).
-
-## Ahorro de tokens
-
-**Skills y agentes → Ahorro de tokens** instala en Claude Code, Codex y Gemini tres skills incluidas en `skills-pack/`:
-
-- `ahorro-contexto`: buscar antes de leer, leer rangos, salidas acotadas, respuestas cortas.
-- `tarea-agentboard`: foco en la tarea, no pisar a otros agentes, cerrar con `HECHO:`.
-- `traspaso-compacto`: delegar con un resumen de ~15 líneas, no con el historial.
-
-Y por diseño: una sesión nueva por tarea, modo ligero por tarea, reparto entre suscripciones para no agotar el límite de una, y "Dividir" con haiku sin herramientas.
-
-## Agentes y modelos
-
-Botón **Agentes y modelos** (o el botón **+** de la barra de abajo):
-
-- **Suscripciones y CLIs**: Claude Code, Codex, Gemini CLI, Copilot CLI, Cursor CLI, Qwen Code, OpenCode, Aider y Amp. Muestra cuáles están instalados y, para Claude, Codex y Gemini, si hay sesión iniciada. Desde ahí puedes instalarlos, iniciar sesión o agregarlos a la barra de abajo.
-- **Modelos locales**: detecta [Ollama](https://ollama.com) (puerto 11434) y el servidor de [LM Studio](https://lmstudio.ai) (puerto 1234), lista tus modelos y los abre como chat (`ollama run`), con Codex (`codex --oss -m <modelo>`) o con Aider. También puedes encender Ollama y descargar modelos (`ollama pull`).
-
-**Tus credenciales no salen de tu computador.** Cada CLI inicia sesión con tu cuenta y guarda la sesión donde siempre (Llavero de macOS para Claude, `~/.codex`, `~/.gemini`…). AgentBoard solo comprueba que exista; nunca lee, copia ni envía tokens, y no los guarda en `board.json`. La detección de modelos locales solo consulta `127.0.0.1`. El `board.json` se guarda con permisos solo para tu usuario.
-
-Si un CLI cambia su comando, edítalo en **Configuración → Agentes**.
-
-## Skills y agentes
-
-Botón **Skills y agentes**:
-
-- **Skills**: todas las skills, comandos y extensiones de Claude Code, Codex y Gemini CLI que hay en este computador: las tuyas, las de cada proyecto y las de los plugins activos. Busca, filtra por suscripción y **copia una skill de una a otra** (el formato `SKILL.md` es el mismo). Las skills que activas en claude.ai viven en tu cuenta web y no aparecen aquí.
-- **Mis agentes**: crea, edita y borra subagentes de Claude Code (`~/.claude/agents` o `.claude/agents` del proyecto): nombre, cuándo usarlo, modelo, herramientas e instrucciones. Borrar los manda a la papelera.
-- **Conexión entre agentes**: conecta cada suscripción con AgentBoard (un clic; corre `claude mcp add`, `codex mcp add` o `gemini mcp add`). Desde ahí cada agente tiene estas herramientas:
-  - `list_agents`: ver qué agentes hay en el tablero y su estado.
-  - `send_to_agent`: pasarle una tarea o pregunta a otro agente.
-  - `read_agent_output`: leer lo que respondió.
-  - `start_agent`: abrir un agente nuevo (ej. un Codex en el mismo proyecto) con una tarea.
-
-  Ejemplo, en Claude: *"pregúntale a Codex qué opina de este diff y resume sus comentarios"*. Reinicia los agentes que ya estaban abiertos después de conectar.
-
-**Pasar a…** (menú de opciones de una tarjeta): envía la selección o las últimas líneas de un agente a otro, o a uno nuevo, con una instrucción.
-
-**Seguridad del puente**: es un socket local (o named pipe en Windows) con un token aleatorio en `bridge.json`, ambos solo legibles por tu usuario, y se borran al cerrar la app. Solo se puede escribir a tarjetas que corren un agente, nunca a una terminal normal; cada tarjeta puede desactivar "Otros agentes pueden escribirle"; hay un límite de mensajes por minuto.
-
-## Una config por computador
-
-El **código** vive en este repo y es igual en todas las máquinas.
-El **tablero** (proyectos, tarjetas, comandos, shell) se guarda fuera del repo, en la carpeta de datos de la app:
-
-| | Ruta |
+| System | File |
 |---|---|
-| Mac | `~/Library/Application Support/AgentBoard/board.json` |
-| Windows | `%APPDATA%\AgentBoard\board.json` |
+| Mac with Apple Silicon (M1, M2…) | `AgentBoard-x.y.z-arm64.dmg` |
+| Mac with Intel | `AgentBoard-x.y.z.dmg` |
+| Windows | `AgentBoard.Setup.x.y.z.exe` |
 
-Así el Mac puede tener tus proyectos de trabajo y el PC los de la U, sin mezclarse. `git pull` actualiza la app sin tocar tu tablero.
+The app is not signed. The first time:
+- **Mac**: right-click AgentBoard in Applications → *Open*, or in Terminal: `xattr -cr /Applications/AgentBoard.app`.
+- **Windows**: in the SmartScreen warning, *More info* → *Run anyway*.
 
-## Instalación
+### Option 2: from source
 
-Requisitos: **Node 20+**, **git** y los CLIs que quieras usar, con sesión iniciada una vez desde la terminal:
+Requirements: [Node.js 20+](https://nodejs.org) and [git](https://git-scm.com).
 
 ```bash
-npm i -g @anthropic-ai/claude-code   # luego: claude   (login con tu plan)
-npm i -g @openai/codex               # luego: codex    (login con ChatGPT)
-npm i -g @google/gemini-cli          # luego: gemini   (login con Google)
+git clone https://github.com/scortes5/agentboard.git
+cd agentboard
+npm install
+npm run app
 ```
 
-### Mac
+`npm run app` builds the app with its icon and installs it in *Applications* (Mac) or opens the installer (Windows). To try it without installing: `npm start`.
+
+### The agents
+
+AgentBoard uses whichever CLIs you have installed. Install at least one and sign in once:
 
 ```bash
-git clone <tu-repo> agentboard && cd agentboard
-npm install
-npm run check     # revisa que git/claude/codex/gemini estén en el PATH
-npm start
+npm i -g @anthropic-ai/claude-code   # then: claude   (Pro or Max plan)
+npm i -g @openai/codex               # then: codex    (ChatGPT Plus or Pro)
+npm i -g @google/gemini-cli          # then: gemini   (Google account)
 ```
 
-### Windows (PowerShell)
+Copilot CLI, Cursor CLI, Qwen Code, OpenCode, Aider, Amp and local models through Ollama or LM Studio also work (see [Subscriptions and accounts](#subscriptions-and-accounts)). `npm run check` shows which ones are available.
 
-```powershell
-git clone <tu-repo> agentboard; cd agentboard
-npm install
-npm run check
-npm start
+---
+
+## Board and projects
+
+- **Cards**: each one is a real terminal (PTY) that opens the agent in the project folder. It shows its status (*working*, *waiting* or *stopped*), the git branch and uncommitted changes; clicking the branch lets you switch it or create a new one.
+- **Project tabs**: the toolbar shows *All* and each project, with how many agents it has and whether any is working. `+` opens another folder as a project. Each tab remembers its view.
+- **Groups**: frames that gather a team of agents (for example *Backend* or *Frontend*). Moving the frame moves its cards. **Arrange** lays everything out while keeping the groups.
+- **Notes** on the same board, a **minimap** at the bottom right and the **agent list** on the left.
+- **Options menu** on each card (three dots): rename it, change its agent, project or arguments (for example `--model opus`), duplicate it, or **Send to…** another agent a piece of the conversation.
+- **Help on every button**: hold the pointer over a button for 2 seconds to see what it does.
+
+Closing the window keeps the app running in the background (menu bar icon). Quitting with ⌘Q asks for confirmation; when you open it again, each Claude card resumes **its own** conversation (`--resume <id>`), even with several in the same project.
+
+---
+
+## Tasks
+
+![Tasks panel](docs/images/tasks.png)
+
+**Tasks** button (⇧⌘T). Write one to-do per line and press Enter:
+
+```
+fix the Google login #backend
+@claude write tests for the payments API
+update the README !
+refactor the payments module !!
 ```
 
-Si PowerShell bloquea los scripts de npm (`claude.ps1 cannot be loaded`):
+| Syntax | Meaning |
+|---|---|
+| `@claude`, `@codex`… | Which subscription does it. Without `@` it is **auto**: the one with the least work. |
+| `#group` | The agent opens inside that board group (created if it does not exist). |
+| `+project` | Which project it runs in. |
+| `!` | **Light**: a cheaper model (for example haiku). |
+| `!!` | **Heavy**: a more capable model (for example opus). |
 
-```powershell
-Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
-```
+- Each task runs in a **fresh session** and updates itself: *Done* when the agent writes `DONE: …`, *Needs your review* when it is waiting for an answer, *Blocked* with `BLOCKED: …`.
+- **Parallel** and **per subscription** limit how many run at once; with *Run queue* on, queued tasks start by themselves when there is room.
+- **Worktree per task**: each task works on its own branch (`agentboard/<task>`), so several agents do not step on each other in the same repository. When it finishes, **View changes** shows what it did and lets you **Merge** or **Discard**.
+- **Usage limit**: if a subscription runs out, the task moves to another one and the exhausted one waits for its reset time.
+- **Split**: paste free text and Claude breaks it into tasks.
+- **Summary**: copies what was done today and what is pending, as Markdown.
+- **Global shortcut** (⌃⌥Space, configurable): add a task from any app.
 
-o en **Configuración → General → Shell** pon `cmd.exe`.
+---
 
-`node-pty` trae binarios precompilados para Mac (Intel y Apple Silicon) y Windows x64, así que no necesitas Visual Studio ni Xcode.
+## Automations
 
-## Uso
+![Automation editor](docs/images/automations.png)
 
-| Acción | Mac | Windows |
+**Automations** button (⇧⌘F). A flow is a diagram of connected steps:
+
+| Step | What it does |
+|---|---|
+| **Trigger** | When it starts: by hand, every N minutes or every day at a set time. |
+| **Agent** | An agent does a piece of work. It becomes a queued task, with its subscription and model. |
+| **Command** | A command in the project (tests, build, git). If it fails, what follows does not run. |
+| **Decision** | Claude reads the previous result and answers yes or no; the flow continues down that branch. |
+| **Notify** | A notification. |
+| **Concept** | An idea written on the diagram; it does not run. |
+
+- Connect steps by dragging from the dot on the right of one onto another. The right panel edits the selected step.
+- **Design with AI**: describe what you want in your own words and Claude builds (or changes) the diagram.
+- **Explain Run**: the AI explains what will happen step by step, what may fail and how to improve it.
+- **Run**: independent branches run in parallel. Each agent receives only a one-line summary of the previous steps, not their whole history.
+- Scheduled automations run while AgentBoard is open, including in the background.
+
+---
+
+## Diagram
+
+![Diagram by project and group](docs/images/diagram.png)
+
+**Diagram** button (⇧⌘D). A UML-style view with one package per project and, inside, its groups and agents. Each agent shows its subscription, task, status, time working, branch and last line of output; task queues appear as notes, and arrows show who handed work to whom. Clicking an agent takes you to its card.
+
+---
+
+## Settings and shortcuts
+
+![Settings](docs/images/settings.png)
+
+**Settings** (⌘,), by section:
+
+- **General**: computer name, shell, global shortcut, resuming sessions and running in the background.
+- **Appearance**: light, dark or automatic theme; accent color; interface size; typeface (SF Pro or Geist); terminal font size, theme and line height. With a live preview.
+- **Agents**: each agent's command and arguments (for resuming, light mode and heavy mode), and custom agents for any CLI.
+- **Shortcuts**: all editable; click one and press the new combination.
+- **Projects**, **Tasks** and **Advanced** (every setting as JSON, to add or remove keys).
+
+![Keyboard shortcuts](docs/images/shortcuts.png)
+
+| Action | Mac | Windows |
 |---|---|---|
-| Nuevo Claude / Codex / Gemini / Terminal | ⇧⌘1 / 2 / 3 / 4 | Ctrl+Shift+1 / 2 / 3 / 4 |
-| Nueva nota | ⇧⌘N | Ctrl+Shift+N |
-| Nuevo grupo | ⇧⌘G | Ctrl+Shift+G |
-| Tareas / Diagrama | ⇧⌘T / ⇧⌘D | Ctrl+Shift+T / Ctrl+Shift+D |
-| Paleta (buscar o ejecutar) | ⇧⌘P | Ctrl+Shift+P |
-| Automatizaciones | ⇧⌘F | Ctrl+Shift+F |
-| Proyecto siguiente / anterior / todos | ⌘⌥→ / ⌘⌥← / ⌘⌥0 | Ctrl+Alt+→ / ← / 0 |
-| Atajos de teclado | ⌘/ | Ctrl+/ |
-| Anotar tarea desde cualquier app | ⌃⌥Espacio | Ctrl+Alt+Espacio |
-| Panel de agentes | ⇧⌘A | Ctrl+Shift+A |
-| Ver todo / ordenar | ⌘0 / ⇧⌘O | Ctrl+0 / Ctrl+Shift+O |
-| Zoom | ⌘ + rueda, pinch | Ctrl + rueda |
-| Moverse | arrastrar el fondo, rueda, botón del medio | igual |
-| Copiar / pegar en terminal | ⌘C / ⌘V | Ctrl+C con selección / Ctrl+V (o Ctrl+Shift+C/V) |
-| Configuración | ⌘, | Ctrl+, |
+| New Claude / Codex / Gemini / Terminal | ⇧⌘1 / 2 / 3 / 4 | Ctrl+Shift+1 / 2 / 3 / 4 |
+| New note / new group | ⇧⌘N / ⇧⌘G | Ctrl+Shift+N / G |
+| Tasks / Diagram / Automations | ⇧⌘T / ⇧⌘D / ⇧⌘F | Ctrl+Shift+T / D / F |
+| Search or run (palette) | ⇧⌘P | Ctrl+Shift+P |
+| Next / previous / all projects | ⌘⌥→ / ⌘⌥← / ⌘⌥0 | Ctrl+Alt+→ / ← / 0 |
+| Agent list | ⇧⌘A | Ctrl+Shift+A |
+| Arrange / fit all | ⇧⌘O / ⌘0 | Ctrl+Shift+O / Ctrl+0 |
+| Shortcuts / Settings | ⌘/ / ⌘, | Ctrl+/ / Ctrl+, |
+| Add a task from any app | ⌃⌥Space | Ctrl+Alt+Space |
+| Zoom / pan | ⌘ + scroll / drag the background | Ctrl + scroll / same |
 
-- Doble clic en el título: renombrar. Doble clic en la cabecera: enfocar la tarjeta. El menú de opciones (tres puntos) sirve para editar o duplicar.
-- El proyecto seleccionado arriba es donde se abre el próximo agente.
-- **Configuración** permite cambiar comandos y args (ej. `claude --model opus`), agregar agentes personalizados (cualquier CLI: `aider`, `opencode`, `ollama run qwen3`…), cambiar el shell y la fuente.
+![Command palette](docs/images/palette.png)
 
-## Instalar como app de escritorio
+The **palette** (⇧⌘P or the magnifier) finds agents, tasks, projects and actions; if you type something that does not exist, Enter adds it as a task.
+
+---
+
+## Subscriptions and accounts
+
+**Subscriptions** button:
+
+- **CLIs**: Claude Code, Codex, Gemini CLI, Copilot CLI, Cursor CLI, Qwen Code, OpenCode, Aider and Amp. It shows which are installed and signed in; you can install them or sign in from there.
+- **Several Claude accounts**: if you have more than one plan (for example personal and work), add each account. Each one uses its own folder (`~/.claude-<name>`), with its login, history and skills, and the queue spreads work across them.
+- **Local models**: detects [Ollama](https://ollama.com) and [LM Studio](https://lmstudio.ai) and opens their models as a chat, with Codex or with Aider.
+
+**Are sessions closed when the app closes?** No. Each CLI keeps its login on your computer (macOS Keychain, `~/.codex`, `~/.gemini`). AgentBoard only checks that it exists; it never reads, copies or sends your credentials.
+
+---
+
+## Token saving
+
+- **A fresh session per task**: each task starts with a clean context.
+- **Light mode** (`!`) for simple tasks.
+- **Spreading across subscriptions and accounts**: you do not burn through a single one's limit.
+- **Minimal context in automations**: each step gets a one-line summary of the previous ones.
+- **Bundled skills** (*Skills and Agents → Token Saving*), installed into Claude Code, Codex and Gemini:
+  - `context-saving`: search before reading, read only what is needed, short answers.
+  - `agentboard-task`: stay on the task, do not step on other agents, report when done.
+  - `compact-handoff`: delegate with a short summary, not the whole history.
+
+---
+
+## Agent connection
+
+In *Skills and Agents → Agent Connection*, one click registers AgentBoard as an MCP server in each CLI. From then on, every agent can:
+
+| Tool | Use |
+|---|---|
+| `list_agents` | See the agents on the board and their status. |
+| `send_to_agent` / `read_agent_output` | Ask another agent for something and read its answer. |
+| `start_agent` | Open a new agent with a task. |
+| `list_tasks` / `add_task` / `complete_task` | Use the task list: hand out work and mark it done. |
+
+Example, in Claude: *"ask Codex what it thinks of this change and summarize its comments"*.
+
+---
+
+## Privacy and security
+
+- Everything runs on your computer. AgentBoard has no server and no telemetry.
+- Each CLI keeps its credentials where it always does; AgentBoard does not read or copy them.
+- The board is saved outside your repositories, readable only by your user:
+
+  | System | Path |
+  |---|---|
+  | Mac | `~/Library/Application Support/AgentBoard/board.json` |
+  | Windows | `%APPDATA%\AgentBoard\board.json` |
+
+- The agent bridge is a local socket with a random token. It only writes to cards running an agent (never to a plain terminal), each card can turn it off, and it has a messages-per-minute limit.
+
+---
+
+## Development
 
 ```bash
-npm run app        # Mac: construye AgentBoard.app con su ícono, la copia a /Applications y la abre
-                   # Windows: genera el instalador y lo abre (acceso directo en escritorio y menú inicio)
+npm install        # installs dependencies (and fixes node-pty permissions)
+npm start          # opens the app in development mode
+npm run app        # builds and installs the app
+npm run dist:mac   # builds the .dmg files  ·  npm run dist:win  builds the .exe
+npm run icon       # regenerates the icons from src/assets/logo.svg
 ```
 
-Para regenerar el ícono desde `src/assets/logo.svg`: `npm run icon`.
-
-## Instaladores (.dmg / .exe)
-
-Para distribuir:
-
-```bash
-npm run dist:mac   # en el Mac  → dist/AgentBoard-x.y.z-arm64.dmg
-npm run dist:win   # en Windows → dist/AgentBoard Setup x.y.z.exe
-```
-
-O crea un tag (`git tag v0.1.0 && git push --tags`): el workflow `.github/workflows/build.yml` genera ambos instaladores y los publica en un Release de GitHub.
-
-La app no está firmada. En Mac, la primera vez: clic derecho → Abrir, o `xattr -cr /Applications/AgentBoard.app`. En Windows SmartScreen: "Más información → Ejecutar de todas formas".
-
-## Estructura
+Pushing a `v*` tag makes the `.github/workflows/build.yml` workflow build the Mac and Windows installers and attach them to the Release.
 
 ```
 src/
-  main.js           proceso principal: PTYs, git, worktrees, config por máquina, menú, bandeja
-  skills.js         lee skills/comandos/agentes de cada CLI; crea y edita subagentes
-  bridge.js         puente local entre agentes (socket + token)
-  preload.js        puente seguro UI ↔ main
+  main.js         main process: terminals, git, worktrees, menu, tray, settings
+  bridge.js       local bridge between agents (socket + token)
+  skills.js       reads and edits each CLI's skills, commands and subagents
+  preload.js      safe bridge between the interface and the main process
   renderer/
-    index.html
-    styles.css
-    app.js          tablero: pan/zoom, tarjetas, grupos, xterm, git pill, ajustes
-    tasks.js        lista de tareas: cola, reparto entre suscripciones, paralelo
-    diagram.js      vista de diagrama por proyecto → grupo → agente
-    palette.js      paleta de comandos (⇧⌘P)
-    flows.js        automatizaciones: editor de nodos, ejecución y diseño con IA
-skills-pack/        skills de ahorro de tokens que se instalan en cada CLI
-build/              íconos (icon.png / .icns / .ico), generados por scripts/build-icons.js (`npm run icon`)
-scripts/check-agents.js     scripts/install-app.js (npm run app)     scripts/fix-pty.js (postinstall)
-scripts/agentboard-mcp.js   servidor MCP que registran los CLIs para hablar entre ellos
-.github/workflows/build.yml
+    app.js        board, cards, groups, tabs, appearance and settings
+    tasks.js      task queue and spreading across subscriptions
+    flows.js      automations: editor, runs and AI design
+    diagram.js    diagram view
+    palette.js    command palette
+    icons.js      icons and contextual help
+skills-pack/      token-saving skills
+scripts/          MCP server, app install and icons
+docs/             guide and screenshots
 ```
 
-## Limitaciones conocidas
+---
 
-- "Trabajando / esperando" se estima por la salida reciente de la terminal, no por la API del agente.
-- Si no hay sesión previa, el comando de reanudar puede fallar; la tarjeta queda en un shell normal y basta con Reiniciar.
-- El tablero no se sincroniza entre computadores (es intencional). Para copiar uno, copia el `board.json`.
+## Known limitations
+
+- The *working* or *waiting* status is estimated from the terminal's recent output, not from the agent's API.
+- Scheduled automations only run while AgentBoard is open (it can be in the background).
+- The board does not sync between computers, on purpose: each machine has its own projects. To copy it, copy `board.json`.
+- The app is not signed with an Apple or Microsoft certificate.
+
+---
+
+Made by Sergio Cortés · [MIT License](LICENSE)
