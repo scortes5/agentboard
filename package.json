@@ -58,7 +58,7 @@
   "devDependencies": {
     "electron": "^44.0.0",
     "electron-builder": "^26.0.0",
-    "playwright-core": "^1.56.1"
+    "playwright-core": "^1.64.1"
   },
   "overrides": {
     "global-agent": "^4.1.3"
