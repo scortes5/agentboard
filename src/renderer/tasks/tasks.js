@@ -148,6 +148,8 @@ async function startTask(t, key) {
     const r = await ab.gitCheckpoint(cwd, t.text);
     if (r.ok) t.checkpoint = r.value.sha;
   }
+  // Snapshot for the work summary, so it shows only this task's changes.
+  if (cwd) await ab.workBegin(t.id, cwd);
   const g = t.group ? ensureGroup(t.group, projectOfPath(t.cwd || cfg.selectedProject || '')) : null;
   const pos = g ? slotIn(g) : looseSpot();
   const title = t.text.length > 34 ? t.text.slice(0, 32).trim() + '…' : t.text;
@@ -158,6 +160,8 @@ async function startTask(t, key) {
   if (!card) { t.status = 'pending'; taskRt.delete(t.id); save(); renderTasks(); return; }
   t.cardId = card.id;
   t.sessionId = card.sessionId; // Claude's session: how its tokens are counted
+  t.runDir = cwd; // where the agent works, so the work summary survives an app restart
+  notifyDesktop('started', { cardId: card.id, text: t.text });
   save(); renderTasks();
   setTimeout(() => { const rt = taskRt.get(t.id); if (rt) rt.dispatching = false; }, 4000);
   toast(`Task → <b>${esc(a.label)}</b>${g ? ` in ${esc(g.title)}` : ''}: ${esc(title)}`);
@@ -233,12 +237,15 @@ async function acceptTrust(t) {
 }
 
 function finishTask(t, status, summary) {
+  const changed = t.status !== status; // the marker and the bridge can both report the same end
   t.status = status; t.summary = summary || t.summary || ''; t.finishedAt = Date.now();
   taskRt.delete(t.id);
   const a = cfg.agents[t.assigned];
   toast(`${status === 'done' ? 'Done' : 'Blocked'} · ${esc(a?.label || '')}: ${esc(t.text.slice(0, 60))}`, 4500);
-  if (!document.hasFocus()) {
-    try { new Notification(status === 'done' ? 'Task done' : 'Task blocked', { body: `${t.text.slice(0, 80)}\n${t.summary}` }); } catch {}
+  if (changed) {
+    notifyDesktop(status === 'done' ? 'completed' : 'blocked', t);
+    ab.workFinish({ id: t.id, text: t.text, agent: t.assigned, status, summary: t.summary, cwd: t.runDir || t.workdir || t.cwd, startedAt: t.startedAt, finishedAt: t.finishedAt })
+      .then((r) => { if (!r.ok) console.warn('Work summary:', r.error); });
   }
   taskPipeline.afterFinish(t);
   save(); renderTasks(); // the pipeline may finish it after the tick that saw the marker has drawn
@@ -265,7 +272,10 @@ function tickTasks() {
     if (t.status !== 'running' && t.status !== 'review') continue;
     const c = t.cardId && cardData(t.cardId);
     const rt = c && runtime.get(c.id);
-    if (!c || !rt) { t.status = 'review'; t.summary = t.summary || 'The agent card was closed.'; t.cardId = null; changed = true; continue; }
+    if (!c || !rt) {
+      if (t.status !== 'review') notifyDesktop('review', { text: t.text, summary: 'The agent card was closed.' });
+      t.status = 'review'; t.summary = t.summary || 'The agent card was closed.'; t.cardId = null; changed = true; continue;
+    }
     const st = taskRt.get(t.id) || { lastBusy: t.startedAt || now };
     taskRt.set(t.id, st);
     if (st.dispatching) continue;
@@ -290,6 +300,7 @@ function tickTasks() {
       if (t.status === 'review') { t.status = 'running'; changed = true; }
     } else if (t.status === 'running' && (rt.status === 'dead' || now - st.lastBusy > IDLE_REVIEW_MS)) {
       t.status = 'review'; changed = true; // finished, or waiting for something (permission, a question)
+      notifyDesktop('review', t);
     }
   }
   dispatchQueued(!cfg.taskAuto);

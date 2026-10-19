@@ -174,6 +174,8 @@ Writing to each agent works, but when you have several to-dos the **Tasks** pane
 - `@claude` = have that specific subscription do it.
 - `#name` = open the agent inside that board group.
 
+**What did each agent change?** The **Work** button lists the tasks in progress and, for each finished one, the files it touched (with lines added and removed), the commits it made and its branch. Files that already had changes before the task started are marked *pre-existing*.
+
 > **Not sure how to split the work?** With **Route** on (the default), just write everything, even in one paragraph, and press **Add**: Claude's cheapest model breaks it into tasks, picks who does each one and they run in parallel.
 
 ---
@@ -240,6 +242,8 @@ Open **Settings** with the gear button (or ⌘,).
 - **Appearance**: light or dark mode, accent color, text and terminal size. Changes show immediately; press *Save* to keep them.
 - **Shortcuts**: click a shortcut and press the combination you prefer.
 - **General**: whether the app keeps running in the background when you close the window, and the shortcut to add tasks from anywhere (⌃⌥Space by default).
+  - *Stop idle agents after*: agent cards with no task in progress stop after that many minutes without input or output (0, the default, never stops them). Plain terminals are never stopped, and *Restart* on the card resumes the session.
+  - *Notifications*: desktop notifications when a task starts, is done, is blocked or needs your review, and when an agent without a task finishes working. Choose which ones, whether they play a sound and whether they only appear while AgentBoard is in the background. *Test* shows one right away; on macOS, allow notifications for AgentBoard in System Settings first.
 - **Tasks**: how many tasks run at once.
 - **Advanced**: for experienced users, every setting as JSON.
 

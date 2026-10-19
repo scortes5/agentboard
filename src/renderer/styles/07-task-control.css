@@ -67,3 +67,21 @@ dialog.limits form { align-items: center; }
 .limits-idea { font-size: 17px; margin: 6px 0 4px; color: var(--accent); }
 dialog.limits .actions { width: 100%; }
 .tprogress b.warn { color: var(--warn); font-weight: 600; }
+
+/* ---------- Work summaries ---------- */
+#workBody { max-height: 62vh; overflow: auto; }
+#workBody h3 { margin: 14px 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.ws-entry { padding: 10px 12px; margin-bottom: 8px; border: 1px solid var(--line); border-radius: 10px; background: var(--fill); }
+.ws-entry header { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.ws-task { margin-top: 4px; }
+.ws-summary { margin-top: 4px; font-size: 12px; color: var(--text-2); }
+.ws-badge { font-size: 11px; padding: 1px 7px; border-radius: 999px; background: var(--fill-hi); color: var(--text-2); }
+.ws-badge.run { background: var(--accent-soft); color: var(--accent); }
+.ws-badge.ok, .ws-entry .ok { color: var(--ok); }
+.ws-badge.warn { color: var(--warn); }
+.ws-badge.bad, .ws-entry .bad { color: var(--bad); }
+.ws-files { list-style: none; margin: 6px 0 0; padding: 0; font-size: 12px; }
+.ws-files li { display: flex; align-items: center; gap: 6px; padding: 2px 0; border-top: 1px solid var(--line); min-width: 0; }
+.ws-files code { font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ws-lines { margin-left: auto; font-family: var(--font-mono); white-space: nowrap; }
+.ws-tag { font-size: 10px; padding: 0 5px; border-radius: 4px; background: var(--fill-hi); color: var(--muted); }

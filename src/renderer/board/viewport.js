@@ -19,7 +19,8 @@ function visibleRect() {
 }
 
 function applyViewport() {
-  const { zoom } = cfg.viewport;
+  // Boards saved before the 10%–100% range may hold a zoom outside it.
+  const zoom = cfg.viewport.zoom = clamp(cfg.viewport.zoom, MIN_ZOOM, MAX_ZOOM);
   paintBackground();
   $('#zoomLabel').textContent = Math.round(zoom * 100) + '%';
   for (const c of cfg.cards) layoutCard(c);
@@ -79,7 +80,7 @@ function fitAll() {
 function focusCardView(c) {
   if (!inSpace(c)) switchSpace(spaceOf(c), { keepView: true });
   const v = visibleRect();
-  const zoom = clamp(Math.min((v.width - 40) / c.w, (v.height - 30) / c.h), MIN_ZOOM, 1.4);
+  const zoom = clamp(Math.min((v.width - 40) / c.w, (v.height - 30) / c.h), MIN_ZOOM, MAX_ZOOM);
   cfg.viewport = { zoom, x: v.left + (v.width - c.w * zoom) / 2 - c.x * zoom, y: v.top + (v.height - c.h * zoom) / 2 - c.y * zoom };
   applyViewport(); save();
 }
