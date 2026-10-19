@@ -237,6 +237,25 @@ $('#cfgJsonApply').onclick = async () => {
 // settingsSections.push({ load(form), save(form), saved() }) without changing this file.
 const settingsSections = [];
 
+// ---------- Notifications ----------
+const DESKTOP_FIELDS = ['enabled', 'sound', 'backgroundOnly', 'started', 'completed', 'blocked', 'review', 'idle'];
+function readDesktopSettings() {
+  const f = $('#settingsForm');
+  return Object.fromEntries(DESKTOP_FIELDS.map((k) => [k, f.elements[`desktop_${k}`].checked]));
+}
+$('#desktopTest').onclick = async () => {
+  const button = $('#desktopTest'), result = $('#desktopTestResult');
+  button.disabled = true;
+  result.textContent = 'Sending a test notification…';
+  try {
+    const r = await ab.desktopTest(readDesktopSettings());
+    result.textContent = r.ok
+      ? 'The system accepted it. If it did not appear, check Do Not Disturb.'
+      : `${r.error} On macOS, allow notifications for AgentBoard in System Settings.`;
+  } catch (err) { result.textContent = err.message; }
+  finally { button.disabled = false; }
+};
+
 async function openSettings(section = 'general') {
   const dlg = $('#settings');
   const f = $('#settingsForm');
@@ -246,6 +265,8 @@ async function openSettings(section = 'general') {
   f.resumeOnOpen.checked = cfg.resumeOnOpen;
   f.keepRunning.checked = cfg.keepRunning !== false;
   f.checkUpdates.checked = cfg.checkUpdates !== false;
+  f.idleCloseMin.value = cfg.idleCloseMin || 0;
+  for (const k of DESKTOP_FIELDS) f.elements[`desktop_${k}`].checked = cfg.desktopNotifications?.[k] ?? (k !== 'started');
   f.quickKey.value = cfg.quickKey ?? 'Control+Alt+Space';
   f.taskAuto.checked = !!cfg.taskAuto;
   f.maxParallel.value = cfg.maxParallel || 3;
@@ -302,6 +323,8 @@ $('#settings').addEventListener('close', async () => {
   cfg.resumeOnOpen = f.resumeOnOpen.checked;
   cfg.keepRunning = f.keepRunning.checked;
   cfg.checkUpdates = f.checkUpdates.checked;
+  cfg.idleCloseMin = clamp(Math.round(+f.idleCloseMin.value) || 0, 0, 1440);
+  cfg.desktopNotifications = readDesktopSettings();
   cfg.quickKey = f.quickKey.value.trim();
   cfg.taskAuto = f.taskAuto.checked;
   cfg.maxParallel = clamp(+f.maxParallel.value || 3, 1, 12);

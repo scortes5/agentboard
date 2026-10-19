@@ -5,7 +5,7 @@
 /* global ab */ // exposed by preload.js as window.ab
 const $ = (s, el = document) => el.querySelector(s);
 
-const MIN_ZOOM = 0.3, MAX_ZOOM = 2;
+const MIN_ZOOM = 0.1, MAX_ZOOM = 1;
 const HEAD_H = 32;            // card header height (does not scale)
 const DEFAULT_W = 720, DEFAULT_H = 440;
 const BUSY_MS = 1500;         // recent output => "working"
