@@ -28,7 +28,30 @@ test('sessionTokens adds up a Claude session once per message, by file name', as
   // the same message streamed twice counts once
   fs.writeFileSync(path.join(dir, 'projects', '-repo', `${id}.jsonl`), [line('m1'), line('m1'), line('m2')].join('\n'));
   const r = await usage.sessionTokens({ claudeDirs: [dir], ids: [id, 'not-a-session-id'] });
-  assert.deepEqual(r, { [id]: 2300 });
+  assert.deepEqual(r, { [id]: { tokens: 2300, input: 200, output: 100, cacheRead: 2000, cacheWrite: 0, context: 1100 } });
+});
+
+test('scanUsage lists each session with its subscription, account and totals', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'usage-'));
+  const main = path.join(root, '.claude'), extra = path.join(root, 'work'), codex = path.join(root, 'codex');
+  const claudeLine = (mid, ts, input) => JSON.stringify({ type: 'assistant', sessionId: mid.slice(0, 1), cwd: '/repo', timestamp: ts, message: { id: mid, usage: { input_tokens: input, output_tokens: 10 } } });
+  fs.mkdirSync(path.join(main, 'projects', '-repo'), { recursive: true });
+  fs.mkdirSync(path.join(extra, 'projects', '-repo'), { recursive: true });
+  fs.mkdirSync(path.join(codex, 'sessions', '2026'), { recursive: true });
+  fs.writeFileSync(path.join(main, 'projects', '-repo', 'a.jsonl'), [claudeLine('a1', '2026-10-01T10:00:00Z', 100), claudeLine('a2', '2026-10-02T10:00:00Z', 300)].join('\n'));
+  fs.writeFileSync(path.join(extra, 'projects', '-repo', 'b.jsonl'), claudeLine('b1', '2026-10-03T10:00:00Z', 50));
+  fs.writeFileSync(path.join(codex, 'sessions', '2026', 'rollout.jsonl'), [
+    JSON.stringify({ timestamp: '2026-10-04T10:00:00Z', type: 'session_meta', payload: { id: 'cx-1', cwd: '/api' } }),
+    JSON.stringify({ timestamp: '2026-10-04T10:05:00Z', type: 'event_msg', payload: { type: 'token_count', info: { total_token_usage: { input_tokens: 500, cached_input_tokens: 400, output_tokens: 20 }, last_token_usage: { input_tokens: 450 } } } }),
+  ].join('\n'));
+  const r = await usage.scanUsage({ tasks: [], historyFile: path.join(root, 'h.json'), claudeDirs: [main, extra], codexDir: codex });
+  assert.deepEqual(r.sessions.map((s) => [s.agent, s.account, s.id, s.tokens]), [['codex', null, 'cx-1', 520], ['claude', 'work', 'b', 60], ['claude', null, 'a', 420]]);
+  const a = r.sessions.find((s) => s.id === 'a');
+  assert.equal(a.context, 300);
+  assert.equal(a.first, '2026-10-01T10:00:00Z');
+  assert.equal(a.messages, 2);
+  assert.equal(r.sessions[0].cacheRead, 400);
+  assert.equal(r.sessions[0].context, 450);
 });
 
 test('the router prompt carries the user\'s subscriptions, local agents and history', () => {

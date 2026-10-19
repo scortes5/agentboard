@@ -4,6 +4,12 @@ All notable changes to AgentBoard. The format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-10-19
+
+### Added
+- **Tokens per session**: *Usage* has a *By Session* table with every Claude and Codex session, its subscription (and Claude account), the card or task that ran it, when it was last used, its turns, its tokens (hover for input, cache and output) and the context its last answer had to read. Filter it by subscription and sort it by most recent or most tokens.
+- **Token counter on each Claude card**: the header shows the session's tokens so far, updated every 10 seconds. It turns orange when each turn re-reads 150k tokens or more, the point where `/compact` or a new session saves tokens. Click it to open *Usage*.
+
 ## [1.7.0] - 2026-10-19
 
 ### Added
@@ -284,7 +290,8 @@ Includes the 0.2.0 changes, which were not released separately.
 ### Added
 - First release: a board of terminals for CLI agents on Mac and Windows.
 
-[Unreleased]: https://github.com/scortes5/agentboard/compare/v1.7.0...HEAD
+[Unreleased]: https://github.com/scortes5/agentboard/compare/v1.8.0...HEAD
+[1.8.0]: https://github.com/scortes5/agentboard/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/scortes5/agentboard/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/scortes5/agentboard/compare/v1.5.1...v1.6.0
 [1.0.1]: https://github.com/scortes5/agentboard/compare/v1.0.0...v1.0.1
