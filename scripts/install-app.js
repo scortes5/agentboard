@@ -1,10 +1,11 @@
 #!/usr/bin/env node
-// Instala AgentBoard como app de escritorio, con su ícono, para abrirla con un clic.
-//   Mac:     construye AgentBoard.app y la copia a /Applications (o ~/Applications).
-//   Windows: genera el instalador (.exe) y lo abre; crea acceso directo en el escritorio y el menú inicio.
-// Uso: npm run app
+// Installs AgentBoard as a desktop app, with its icon, so it opens with one click.
+//   Mac:     builds AgentBoard.app and copies it to /Applications (or ~/Applications).
+//   Windows: builds the installer (.exe) and opens it; it adds desktop and Start menu shortcuts.
+//   Linux:   builds the .AppImage in dist/.
+// Usage: npm run app
 'use strict';
-const { execFileSync, execSync } = require('child_process');
+const { execFileSync, execSync, spawn } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -16,7 +17,7 @@ if (process.platform === 'darwin') {
   const arch = process.arch === 'arm64' ? 'arm64' : 'x64';
   run(`npx electron-builder --mac --dir --${arch} --publish never`);
   const built = path.join(ROOT, 'dist', arch === 'arm64' ? 'mac-arm64' : 'mac', 'AgentBoard.app');
-  if (!fs.existsSync(built)) { console.error('No encontré', built); process.exit(1); }
+  if (!fs.existsSync(built)) { console.error('Not found:', built); process.exit(1); }
 
   let destDir = '/Applications';
   try { fs.accessSync(destDir, fs.constants.W_OK); } catch { destDir = path.join(os.homedir(), 'Applications'); fs.mkdirSync(destDir, { recursive: true }); }
@@ -24,17 +25,21 @@ if (process.platform === 'darwin') {
   try { execFileSync('osascript', ['-e', 'tell application "AgentBoard" to quit'], { stdio: 'ignore' }); } catch {}
   fs.rmSync(dest, { recursive: true, force: true });
   execFileSync('ditto', [built, dest]);
-  // la app no está firmada: sin esto macOS la bloquea la primera vez
+  // the app is unsigned: without this macOS blocks it the first time
   try { execFileSync('xattr', ['-cr', dest]); } catch {}
-  console.log(`\n✓ AgentBoard instalada en ${dest}`);
-  console.log('  Ábrela desde Launchpad, Spotlight (⌘ Espacio → AgentBoard) o el Finder; arrástrala al Dock para tenerla a mano.');
+  console.log(`\n✓ AgentBoard installed in ${dest}`);
+  console.log('  Open it from Launchpad, Spotlight (⌘ Space → AgentBoard) or Finder; drag it to the Dock to keep it handy.');
   if (!process.argv.includes('--no-open')) execFileSync('open', [dest]);
 } else if (process.platform === 'win32') {
   run('npx electron-builder --win nsis --x64 --publish never');
-  const exe = fs.readdirSync(path.join(ROOT, 'dist')).find((f) => /^AgentBoard Setup .*\.exe$/.test(f));
-  if (!exe) { console.error('No encontré el instalador en dist/'); process.exit(1); }
-  console.log(`\n✓ Instalador listo: dist\\${exe}. Abriéndolo…`);
-  execFileSync('cmd.exe', ['/c', 'start', '""', path.join(ROOT, 'dist', exe)]);
+  // AgentBoard-Setup-x.y.z.exe (AgentBoard Setup x.y.z.exe before 0.6)
+  const exe = fs.readdirSync(path.join(ROOT, 'dist')).find((f) => /^AgentBoard[- ]Setup[- ][\d.]+\.exe$/.test(f));
+  if (!exe) { console.error('Installer not found in dist/'); process.exit(1); }
+  console.log(`\n✓ Installer ready: dist\\${exe}. Opening it…`);
+  // started directly, not through cmd.exe, so the file name is never parsed as a command
+  spawn(path.join(ROOT, 'dist', exe), [], { detached: true, stdio: 'ignore' }).unref();
 } else {
   run('npx electron-builder --linux AppImage --publish never');
+  const image = fs.readdirSync(path.join(ROOT, 'dist')).find((f) => f.endsWith('.AppImage'));
+  console.log(`\n✓ Built dist/${image}. Run it with: ./dist/${image}`);
 }

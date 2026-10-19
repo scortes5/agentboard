@@ -1,0 +1,81 @@
+# Fast checks on every push and pull request: install from the lockfile
+# and make sure every JavaScript file parses.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      # Native modules (node-pty) are built by the release workflow; skip them here.
+      - run: npm ci --ignore-scripts
+      - name: Syntax check
+        run: |
+          git ls-files '*.js' | while read -r f; do
+            node --check "$f" || exit 1
+          done
+      - name: Renderer scripts parse as browser scripts
+        # node --check compiles files as CommonJS, which allows a top-level return;
+        # the renderer loads them as plain <script>s, where that is a syntax error.
+        run: |
+          for f in $(find src/renderer -name '*.js'); do
+            node -e "new (require('vm').Script)(require('fs').readFileSync(process.argv[1], 'utf8'), { filename: process.argv[1] })" "$f" || exit 1
+          done
+      - name: Unit and open/closed tests
+        run: npm test
+      - name: Validate JSON
+        run: |
+          for f in package.json; do node -e "JSON.parse(require('fs').readFileSync('$f','utf8'))"; done
+      - name: Skills have front matter
+        run: |
+          for f in skills-pack/*/SKILL.md; do
+            head -1 "$f" | grep -qx -- '---' || { echo "::error file=$f::missing YAML front matter"; exit 1; }
+          done
+
+  # Opens the real app on Linux (no display needed) and drives a task end to end with a fake agent.
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: End-to-end test
+        run: xvfb-run -a npm run test:e2e
+
+  # The real app on macOS and Windows: opens, starts a terminal in the system shell and
+  # opens every panel (the full end-to-end test above runs on Linux).
+  smoke:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Smoke test
+        run: npm run test:smoke

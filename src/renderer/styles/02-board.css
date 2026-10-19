@@ -1,0 +1,115 @@
+/* AgentBoard — The board: agent list, minimap, cards and popovers. */
+/* ---------- Infinite board ---------- */
+#board {
+  position: absolute; inset: 0; overflow: hidden; cursor: default;
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(rgba(var(--fg-rgb), .075) 1.1px, transparent 1.3px),
+    radial-gradient(ellipse 70% 55% at 12% 0%, rgba(var(--accent-rgb), .10), transparent 70%),
+    radial-gradient(ellipse 60% 50% at 100% 100%, rgba(var(--accent-rgb), .05), transparent 70%);
+}
+#board.panning { cursor: grabbing; }
+#world { position: absolute; left: 0; top: 0; width: 0; height: 0; }
+
+.empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; pointer-events: none; color: var(--text-2); }
+.empty h2 { color: var(--text); font-weight: 600; font-size: 30px; letter-spacing: -0.045em; margin: 10px 0 8px; }
+.empty p { line-height: 1.9; margin: 4px; }
+
+/* ---------- Agent list ---------- */
+#sidebar {
+  position: absolute; top: 68px; left: 10px; bottom: 10px; width: var(--left-w); z-index: 15;
+  display: none; flex-direction: column; overflow: hidden;
+}
+body.sidebar-open #sidebar { display: flex; }
+.side-head { display: flex; justify-content: space-between; align-items: baseline; padding: 14px 14px 8px; }
+#sideFilter { margin: 0 10px 8px; background: var(--fill); border: none; box-shadow: inset 0 0 0 1px var(--line); border-radius: 9px; padding: 6px 10px; }
+#sideList { flex: 1; overflow: auto; padding: 0 8px 12px; }
+.side-group { font: 500 10px var(--font-mono); text-transform: uppercase; letter-spacing: .14em; color: var(--muted);
+  padding: 12px 6px 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.side-item {
+  display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; background: transparent; box-shadow: none;
+  border-radius: 9px; padding: 7px 9px; margin: 1px 0; position: relative;
+}
+.side-item::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 2px; border-radius: 2px; background: var(--agent, var(--muted)); opacity: .8; }
+.side-item:hover { background: var(--fill); }
+.side-item.focused { background: var(--fill-hi); box-shadow: inset 0 0 0 1px var(--line-hi); }
+.side-item .name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.side-item .kind { color: var(--muted); font: 10.5px var(--font-mono); white-space: nowrap; }
+.side-empty { color: var(--muted); font-size: 12px; padding: 12px 8px; }
+
+/* ---------- Minimap ---------- */
+#minimap { position: absolute; right: 12px; bottom: 14px; z-index: 18; width: 200px; height: 130px; cursor: crosshair; }
+
+/* ---------- Cards ---------- */
+.card {
+  position: absolute; display: flex; flex-direction: column;
+  background: var(--card); border-radius: var(--radius); overflow: hidden;
+  box-shadow: inset 0 0 0 1px var(--line), 0 24px 60px -24px rgba(0, 0, 0, .9);
+  transition: box-shadow .25s;
+}
+.card.focused {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--agent, var(--accent)) 70%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--agent, var(--accent)) 35%, transparent),
+    0 0 50px -14px color-mix(in srgb, var(--agent, var(--accent)) 55%, transparent),
+    0 28px 70px -24px rgba(0, 0, 0, .95);
+}
+.card.busy:not(.focused) { animation: glow 2.2s ease-in-out infinite; }
+@keyframes glow {
+  50% { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--agent) 45%, transparent), 0 0 40px -16px var(--agent), 0 24px 60px -24px rgba(0, 0, 0, .9); }
+}
+.card-head {
+  height: 34px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 8px 0 12px;
+  background: linear-gradient(180deg, rgba(var(--fg-rgb), .035), transparent); border-bottom: 1px solid var(--line);
+  cursor: grab; user-select: none;
+}
+.card-head:active { cursor: grabbing; }
+.status { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+.status.busy { background: var(--agent, var(--ok)); box-shadow: 0 0 10px var(--agent, var(--ok)); animation: pulse 1s ease-in-out infinite; }
+.status.idle { background: var(--ok); }
+.status.dead { background: var(--bad); }
+@keyframes pulse { 50% { opacity: .35; } }
+.title { font-weight: 600; outline: none; white-space: nowrap; min-width: 30px; letter-spacing: -0.015em; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; }
+.card-head > button, .gitpill { flex: none; }
+.title[contenteditable="true"] { background: var(--fill); padding: 0 5px; border-radius: 5px; }
+.proj { color: var(--muted); font: 10.5px var(--font-mono); text-transform: uppercase; letter-spacing: .1em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 0 3 auto; }
+.spacer { flex: 1; }
+.gitpill { font: 11px var(--font-mono); color: var(--text-2); padding: 2px 9px; border-radius: 20px; white-space: nowrap; cursor: pointer; box-shadow: inset 0 0 0 1px var(--line); }
+.gitpill:hover { box-shadow: inset 0 0 0 1px var(--line-hi); color: var(--text); }
+.gitpill .dirty { color: var(--warn); }
+.gitpill .ab { color: var(--accent); }
+.card-btn { background: transparent; box-shadow: none; padding: 2px 6px; color: var(--muted); font-size: 13px; border-radius: 6px; }
+.card-btn:hover { color: var(--text); background: var(--fill); }
+
+.card-body { flex: 1; min-height: 0; position: relative; padding: 6px 0 0 10px; background: var(--term-bg); }
+.card-body .xterm { height: 100%; }
+.card-body .xterm-viewport { background: transparent !important; }
+.overlay {
+  position: absolute; inset: 0; display: flex; flex-direction: column; gap: 12px; align-items: center; justify-content: center;
+  background: rgba(var(--panel-rgb), .82); color: var(--text-2); backdrop-filter: blur(4px);
+}
+.note { width: 100%; height: 100%; resize: none; border: none; outline: none; background: transparent; color: var(--text); padding: 10px 12px; font: 13px/1.6 var(--font-mono); }
+.card.note-card { --agent: var(--warn); }
+.card.note-card .card-body { background: linear-gradient(180deg, rgba(var(--warn-rgb), .05), transparent 40%), var(--card); }
+
+.resize { position: absolute; right: 0; bottom: 0; width: 16px; height: 16px; cursor: nwse-resize; opacity: .6;
+  background: linear-gradient(135deg, transparent 55%, var(--line-hi) 55%, var(--line-hi) 62%, transparent 62%, transparent 72%, var(--line-hi) 72%, var(--line-hi) 79%, transparent 79%); }
+
+/* ---------- Popovers ---------- */
+.popover {
+  position: fixed; z-index: 50; background: rgba(var(--panel-rgb), .94); backdrop-filter: blur(18px);
+  box-shadow: inset 0 0 0 1px var(--line-hi), var(--shadow); border-radius: 12px;
+  padding: 5px; min-width: 200px; max-height: 320px; overflow: auto;
+}
+.popover button { display: block; width: 100%; text-align: left; background: transparent; box-shadow: none; font: 12px var(--font-mono); padding: 6px 9px; border-radius: 7px; }
+.popover button:hover { background: var(--fill-hi); }
+.popover .current { color: var(--accent); }
+.popover hr { border: none; border-top: 1px solid var(--line); margin: 5px 0; }
+.popover input { width: 100%; background: var(--fill); border: none; box-shadow: inset 0 0 0 1px var(--line); border-radius: 7px; padding: 6px 9px; font: 12px var(--font-mono); }
+
+.popover.edit { width: 290px; padding: 14px; display: flex; flex-direction: column; gap: 10px; max-height: none; }
+.popover.edit label { display: flex; flex-direction: column; gap: 5px; font: 500 10px var(--font-mono); text-transform: uppercase; letter-spacing: .12em; color: var(--muted); }
+.popover.edit input, .popover.edit select { font: 13px var(--font-ui); text-transform: none; letter-spacing: -0.01em; max-width: none; width: 100%; padding: 6px 9px; }
+.popover.edit .row { display: flex; gap: 6px; justify-content: flex-end; margin-top: 2px; }
+.popover.edit .row button { display: inline-block; width: auto; font: 12px var(--font-ui); padding: 5px 11px; box-shadow: inset 0 0 0 1px var(--line-hi); background: var(--fill); }
+.popover.edit .row button.primary { background: var(--accent); color: var(--on-accent); font-weight: 600; box-shadow: none; }
+.popover.edit .hint { color: var(--muted); font-size: 11px; line-height: 1.5; }

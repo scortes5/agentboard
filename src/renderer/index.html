@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="es">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta http-equiv="Content-Security-Policy"
@@ -7,239 +7,547 @@
   <title>AgentBoard</title>
   <link rel="icon" type="image/svg+xml" href="../assets/logo.svg" />
   <link rel="stylesheet" href="../../node_modules/@xterm/xterm/css/xterm.css" />
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles/01-base.css" />
+  <link rel="stylesheet" href="styles/02-board.css" />
+  <link rel="stylesheet" href="styles/03-dialogs.css" />
+  <link rel="stylesheet" href="styles/04-panels.css" />
+  <link rel="stylesheet" href="styles/05-macos.css" />
+  <link rel="stylesheet" href="styles/06-settings-automations.css" />
+  <link rel="stylesheet" href="styles/07-task-control.css" />
+  <link rel="stylesheet" href="styles/08-integrations.css" />
+  <link rel="stylesheet" href="styles/09-onboarding.css" />
+  <link rel="stylesheet" href="styles/10-views.css" />
 </head>
 <body>
   <main id="board">
     <div id="world"></div>
     <div id="empty" class="empty hidden">
-      <span class="eyebrow">Tablero vacío</span>
-      <h2>Pon a tus agentes en el tablero.</h2>
-      <p>Elige un proyecto arriba y abre un agente desde la barra de abajo.<br/>
+      <span class="eyebrow">Empty board</span>
+      <h2>Put your agents on the board.</h2>
+      <p>Pick a project above and open an agent from the bar below.<br/>
         <kbd>⇧⌘1</kbd> Claude · <kbd>⇧⌘2</kbd> Codex · <kbd>⇧⌘3</kbd> Gemini · <kbd>⇧⌘4</kbd> Terminal</p>
-      <p class="muted">Arrastra el fondo para moverte · ⌘/Ctrl + rueda para zoom</p>
+      <p class="muted">Drag the background to move · ⌘/Ctrl + scroll to zoom</p>
     </div>
   </main>
 
   <header id="topbar" class="glass">
     <div class="brand">
-      <button id="sidebarBtn" class="icon" title="Panel de agentes (⇧⌘A / Ctrl+Shift+A)">☰</button>
+      <button id="sidebarBtn" class="icon" data-icon="sidebar" title="Show or hide the agent list, grouped by project (⇧⌘A)"></button>
       <img class="logo" src="../assets/logo.svg" width="28" height="28" alt="" aria-hidden="true" draggable="false" />
       <span class="brand-name">AgentBoard</span>
-      <span id="machine" class="machine" title="Este tablero es solo de este computador"></span>
+      <span id="machine" class="machine" title="This board belongs to this computer only"></span>
+    </div>
+
+    <div class="group spaces-wrap">
+      <div id="spaceTabs" class="seg spaces" title="Open projects, each with its own agents, all working at the same time"></div>
+      <button id="addProject" class="icon" data-icon="plus" title="Open another project: pick a folder and it is added as a tab"></button>
     </div>
 
     <div class="group">
-      <label class="lbl" for="project">Proyecto</label>
-      <select id="project"></select>
-      <button id="addProject" class="icon" title="Agregar carpeta de proyecto">＋</button>
-    </div>
-
-    <div class="group">
-      <button id="tasksBtn" title="Tus tareas: escríbelas y se reparten entre tus suscripciones (⇧⌘T / Ctrl+Shift+T)">☑ Tareas <span id="tasksBadge" class="badge-n hidden"></span></button>
-      <button id="diagramBtn" title="Diagrama: qué hace cada grupo de agentes, por proyecto (⇧⌘D / Ctrl+Shift+D)">◇ Diagrama</button>
+      <button id="tasksBtn" data-icon="tasks" title="Tasks: write your to-dos and they are spread across your subscriptions, in parallel (⇧⌘T)">Tasks <span id="tasksBadge" class="badge-n hidden"></span></button>
+      <button id="paletteBtn" class="icon" data-icon="search" title="Find an agent, task or project, or run an action (⇧⌘P)"></button>
+      <button id="flowsBtn" data-icon="flows" title="Automations: design step-by-step flows that your agents run (⇧⌘F)">Automations</button>
+      <button id="diagramBtn" data-icon="diagram" title="Diagram: what each agent is doing, by project and group (⇧⌘D)">Diagram</button>
     </div>
 
     <div class="group right">
-      <button id="skillsBtn" title="Skills, tus agentes y la conexión entre agentes">Skills y agentes</button>
-      <button id="accountsBtn" title="Suscripciones, CLIs y modelos locales">Suscripciones</button>
-      <button id="settingsBtn" class="icon" title="Ajustes">⚙</button>
+      <button id="approvalsBtn" data-icon="bell" title="Approvals: agents waiting for your permission, answered from one list">Approvals <span id="approvalsBadge" class="badge-n warn hidden"></span></button>
+      <button id="usageBtn" title="Usage and savings: activity per day, tokens and effectiveness (⇧⌘U)">Usage</button>
+      <button id="skillsBtn" title="Skills, your agents and the connection between agents">Skills and Agents</button>
+      <button id="accountsBtn" title="Subscriptions, CLIs and local models">Subscriptions</button>
+      <button id="settingsBtn" class="icon" data-icon="gear" title="Settings: appearance, shortcuts, agents and more (⌘,)"></button>
     </div>
   </header>
 
   <aside id="sidebar" class="glass">
-    <div class="side-head">
-      <span class="eyebrow">Agentes</span>
-      <span id="sideCounts" class="muted small"></span>
+    <div class="side-tools"><span class="eyebrow">Side Bar</span><span class="spacer"></span>
+      <button type="button" class="card-btn" data-views-menu data-icon="more" title="Views: show, hide or move them here; reset the layout"></button>
+      <button type="button" class="card-btn" data-side-close data-icon="close" title="Close the side bar"></button></div>
+    <div class="views">
+      <section class="view" data-view="agents">
+        <div class="view-body">
+          <span id="sideCounts" class="muted small"></span>
+          <input id="sideFilter" placeholder="Search…" />
+          <div id="sideList"></div>
+        </div>
+      </section>
     </div>
-    <input id="sideFilter" placeholder="Buscar…" />
-    <div id="sideList"></div>
+    <div class="side-resizer"></div>
   </aside>
 
   <nav id="dock" class="glass">
-    <div id="agentButtons" class="dock-group"><!-- botones generados --></div>
-    <button id="moreAgents" class="chip ghost" title="Agregar agentes o modelos locales">＋</button>
+    <div id="agentButtons" class="dock-group"><!-- generated buttons --></div>
+    <button id="moreAgents" class="chip ghost icon" data-icon="plus" title="Add subscriptions, accounts or local models to this bar"></button>
     <span class="dock-sep"></span>
-    <button id="addNote" class="chip ghost" title="Nueva nota (⇧⌘N / Ctrl+Shift+N)">✎ Nota</button>
-    <button id="addGroup" class="chip ghost" title="Nuevo grupo: una sección del tablero para un equipo de agentes (⇧⌘G / Ctrl+Shift+G)">▢ Grupo</button>
-    <button id="arrange" class="chip ghost icon" title="Ordenar tarjetas (⇧⌘O)">▦</button>
-    <button id="fit" class="chip ghost icon" title="Ver todo (⌘0)">⤢</button>
+    <button id="addNote" class="chip ghost" data-icon="note" title="New note on the board (⇧⌘N)">Note</button>
+    <button id="addGroup" class="chip ghost" data-icon="group" title="New group: a frame that gathers a team of agents (⇧⌘G)">Group</button>
+    <button id="arrange" class="chip ghost icon" data-icon="grid" title="Arrange the cards in a grid, keeping groups together (⇧⌘O)"></button>
+    <button id="fit" class="chip ghost icon" data-icon="fit" title="Fit the view to show every card (⌘0)"></button>
     <span id="zoomLabel" class="zoom">100%</span>
   </nav>
 
   <aside id="tasks" class="glass">
-    <div class="side-head">
-      <span class="eyebrow">Tareas</span>
-      <span id="taskCounts" class="muted small"></span>
-      <span class="spacer"></span>
-      <button id="tasksClose" class="card-btn" title="Cerrar">✕</button>
+    <div class="side-tools"><span class="eyebrow">Panel</span><span class="spacer"></span>
+      <button type="button" class="card-btn" data-views-menu data-icon="more" title="Views: show, hide or move them here; reset the layout"></button>
+      <button type="button" id="tasksClose" class="card-btn" data-side-close data-icon="close" title="Close this panel"></button></div>
+    <div class="views">
+      <section class="view" data-view="tasks">
+        <div class="view-body">
+          <span id="taskCounts" class="muted small"></span>
+          <div id="taskProgress" class="tprogress hidden" title="Progress of your tasks; running ones show what they are doing below"><div class="bar"><i></i></div><span></span></div>
+          <div id="taskFilter" class="seg task-filter">
+            <button data-f="active" class="active" title="Show queued, running and to-review tasks">Active</button><button data-f="all" title="Show every task, including finished ones">All</button><button data-f="done" title="Show finished tasks only, most recent first">Done</button>
+            <span class="spacer"></span><button id="taskSummary" class="ghost" data-icon="copy" title="Copy a Markdown summary of today's finished and pending tasks">Summary</button><button id="taskIssues" class="ghost" title="Import open GitHub issues of the chosen project as tasks (needs the gh CLI)">Issues</button><button id="taskClear" class="ghost" title="Remove finished tasks from the list">Clear</button>
+          </div>
+          <div id="taskList"></div>
+          <div class="composer">
+            <textarea id="taskInput" rows="3" placeholder="One to-do per line · Enter adds&#10;@claude  #group  +project  ! light  !! heavy  > after the line above"></textarea>
+            <div class="composer-row">
+              <select id="taskAgent" title="Subscription that runs the tasks; Auto spreads them across the ones you have"></select>
+              <select id="taskProject" title="Project the tasks run in"></select>
+              <label class="switch" title="Light mode: use that subscription's cheapest model (same as ! in the text)"><input type="checkbox" id="taskLight" /> Light</label>
+              <label class="switch" title="Route with AI: Claude's cheapest model (haiku, one short call) splits what you write into independent tasks and picks a subscription and model for each; they run in parallel"><input type="checkbox" id="taskRoute" /> Route</label>
+              <span class="spacer"></span>
+              <button id="taskTemplates" class="ghost icon" data-icon="list" title="Templates: insert a to-do you write often, or save the current text as one"></button>
+              <button id="taskPlan" class="ghost" title="Split: Claude (haiku, one short call) breaks your text into tasks and suggests who should do each one">Split</button>
+              <button id="taskAdd" class="primary" title="Add every line of the text as a task (Enter)">Add</button>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section class="view" data-view="approvals">
+        <div class="view-body"><span id="approvalsCount" class="badge-n warn hidden"></span><div id="approvalsList"></div></div>
+      </section>
+      <section class="view" data-view="queue">
+        <div class="view-body">
+          <div class="task-opts">
+            <label class="switch" title="Pending tasks start on their own when there is a free slot"><input type="checkbox" id="taskAuto" /> Run queue</label>
+            <label class="num" title="Tasks running at once, across all subscriptions">Parallel <input id="taskParallel" type="number" min="1" max="12" /></label>
+            <label class="num" title="Maximum per subscription">per subscription <input id="taskPerAgent" type="number" min="1" max="6" /></label>
+            <label class="switch" title="Each task works in its own git worktree and branch (agentboard/…), so agents don't step on each other"><input type="checkbox" id="taskWorktree" /> Worktree per task</label>
+          </div>
+          <div class="task-auto"><span class="muted small">"auto" spreads across:</span> <span id="taskAutoAgents" class="seg"></span></div>
+        </div>
+      </section>
     </div>
-    <div class="task-opts">
-      <label class="switch" title="Las tareas pendientes se ejecutan solas cuando hay cupo"><input type="checkbox" id="taskAuto" /> Ejecutar la cola</label>
-      <label class="num" title="Tareas corriendo a la vez, entre todas las suscripciones">En paralelo <input id="taskParallel" type="number" min="1" max="12" /></label>
-      <label class="num" title="Máximo por suscripción">por suscripción <input id="taskPerAgent" type="number" min="1" max="6" /></label>
-      <label class="switch" title="Cada tarea trabaja en su propio git worktree y rama (agentboard/…): los agentes no se pisan"><input type="checkbox" id="taskWorktree" /> Worktree por tarea</label>
+    <div class="side-resizer"></div>
+  </aside>
+  <div id="viewStash" hidden></div>
+
+  <div id="palette" class="hidden">
+    <div class="pal glass">
+      <input id="palInput" placeholder="Find an agent, a task or an action…  (↑↓ Enter · Esc)" autocomplete="off" />
+      <div id="palList"></div>
     </div>
-    <div class="task-auto"><span class="muted small">"auto" reparte entre:</span> <span id="taskAutoAgents" class="seg"></span></div>
-    <div id="taskFilter" class="seg task-filter">
-      <button data-f="active" class="active">Activas</button><button data-f="all">Todas</button><button data-f="done">Hechas</button>
-      <span class="spacer"></span><button id="taskClear" class="ghost" title="Quitar las tareas hechas">Limpiar hechas</button>
-    </div>
-    <div id="taskList"></div>
-    <div class="composer">
-      <textarea id="taskInput" rows="3" placeholder="Escribe tus pendientes, uno por línea. Enter agrega · Shift+Enter nueva línea&#10;@codex @claude @gemini  ·  #grupo  ·  +proyecto  ·  ! = ligero"></textarea>
-      <div class="composer-row">
-        <select id="taskAgent" title="Suscripción"></select>
-        <select id="taskProject" title="Proyecto"></select>
-        <label class="switch" title="Modelo barato de esa suscripción"><input type="checkbox" id="taskLight" /> Ligero</label>
-        <span class="spacer"></span>
-        <button id="taskPlan" class="ghost" title="Claude (haiku, una llamada corta) divide tu texto en tareas y sugiere a quién dárselas">✨ Dividir</button>
-        <button id="taskAdd" class="primary">Agregar</button>
+  </div>
+
+  <section id="flows" class="hidden">
+    <aside class="fl-side">
+      <div class="side-head"><span class="eyebrow">Automations</span><span class="spacer"></span><button type="button" id="flTemplates" class="card-btn" data-icon="list" title="New automation from a template (fix an issue, nightly tests, review…)"></button><button type="button" id="flNew" class="card-btn" data-icon="plus" title="New blank automation"></button></div>
+      <div id="flList"></div>
+      <button type="button" id="flClose" class="fl-back" data-icon="back" title="Back to the board (Esc)">Back to Board</button>
+    </aside>
+    <div class="fl-center">
+      <div id="flEmpty" class="dg-empty">
+        <h2>Automate with your agents.</h2>
+        <p>Draw a flow like in n8n — trigger, agents, commands, decisions — and AgentBoard runs it with your subscriptions.
+          Or describe it and AI designs it for you.</p>
+        <p><button type="button" id="flEmptyAI" class="primary" title="Describe what you want and AI builds the diagram">Design with AI</button> <button type="button" id="flEmptyTemplates" title="Fix an issue, nightly tests, review before committing, update dependencies…">Start from a Template</button> <button type="button" id="flEmptyNew" title="Start with a trigger and add steps by hand">Start Blank</button></p>
+      </div>
+      <div id="flMain" class="hidden">
+        <div class="fl-bar">
+          <input id="flName" placeholder="Name" />
+          <div id="flAdd" class="seg fl-add"></div>
+          <span class="spacer"></span>
+          <button type="button" id="flDesign" data-icon="wand" title="Describe what you want and AI builds or changes the diagram">Design with AI</button>
+          <button type="button" id="flExplain" data-icon="chat" title="AI explains how it will run, what may fail and how to improve it">Explain Run</button>
+          <button type="button" id="flRun" class="primary" title="Run now; independent branches run in parallel">Run</button>
+        </div>
+        <div id="flCanvas"><svg id="flEdges"></svg><div id="flNodes"></div></div>
       </div>
     </div>
-  </aside>
+    <aside id="flInspector" class="fl-inspector"></aside>
+  </section>
 
   <section id="diagram" class="hidden">
     <div class="dg-bar glass">
-      <span class="eyebrow">Diagrama</span>
+      <span class="eyebrow">Diagram</span>
       <div id="dgTabs" class="seg"></div>
       <span class="spacer"></span>
-      <label class="switch"><input type="checkbox" id="dgShowTasks" checked /> Colas de tareas</label>
-      <label class="switch"><input type="checkbox" id="dgShowIdle" checked /> Agentes inactivos</label>
-      <button id="dgClose">Volver al tablero</button>
+      <label class="switch" title="Show each group's pending tasks as a note"><input type="checkbox" id="dgShowTasks" checked /> Task queues</label>
+      <label class="switch" title="Also show agents that are not working or have no task"><input type="checkbox" id="dgShowIdle" checked /> Idle agents</label>
+      <button id="dgClose" data-icon="back" title="Close the diagram and go back to the board (Esc)">Back to Board</button>
     </div>
     <div id="dgCanvas"><svg id="dgEdges"></svg><div id="dgContent"></div></div>
   </section>
 
-  <canvas id="minimap" class="glass" width="200" height="130" title="Clic o arrastra para moverte"></canvas>
+  <canvas id="minimap" class="glass" width="200" height="130" title="Click or drag to move around the board"></canvas>
+  <div id="selBar" class="selbar glass hidden">
+    <span id="selCount"></span>
+    <button id="selClose" class="danger" data-icon="close" title="Close the selected cards and stop their processes">Close</button>
+    <button id="selNone" class="ghost" title="Deselect (⌘/Shift-click a card's title bar to add or remove it)">Deselect</button>
+  </div>
   <div id="toasts"></div>
+  <div id="updateBanner" class="glass hidden" role="status">
+    <img src="icon.png" width="36" height="36" alt="" aria-hidden="true" draggable="false" />
+    <div class="ub-text"><b id="updateTitle"></b><span id="updateDetail" class="muted small"></span></div>
+    <div class="ub-actions">
+      <button id="updateLater" type="button" title="Hide this message; AgentBoard reminds you again later">Later</button>
+      <button id="updateGo" type="button" class="primary"></button>
+    </div>
+  </div>
 
-  <!-- Ajustes -->
-  <dialog id="settings">
+  <!-- Settings (System Settings style) -->
+  <dialog id="settings" class="settings-sheet">
     <form method="dialog" id="settingsForm">
-      <span class="eyebrow">Este computador</span>
-      <h2>Ajustes</h2>
-      <label>Nombre de la máquina <input name="machineName" /></label>
-      <label>Shell <input name="shell" placeholder="Automático (zsh / PowerShell)" />
-        <small>Ej: <code>pwsh</code>, <code>/bin/bash -l</code>, <code>cmd.exe</code></small></label>
-      <label>Tamaño de fuente <input name="fontSize" type="number" min="9" max="24" /></label>
-      <label class="check"><input name="resumeOnOpen" type="checkbox" /> Reanudar la sesión del agente al reabrir la app</label>
-      <label class="check"><input name="keepRunning" type="checkbox" /> Al cerrar la ventana, seguir en segundo plano (los agentes siguen trabajando)</label>
-      <small>Tus suscripciones quedan con la sesión iniciada aunque cierres la app: cada CLI guarda su login en este computador. Lo que se detiene al salir son los procesos; al reabrir se reanudan.</small>
+      <nav class="set-nav">
+        <span class="set-title">Settings</span>
+        <button type="button" data-sec="general" class="active" data-icon="gear" title="Computer name, shell, global shortcut and background mode">General</button>
+        <button type="button" data-sec="appearance" data-icon="sun" title="Theme, accent color, typography and terminals">Appearance</button>
+        <button type="button" data-sec="agents" data-icon="agent" title="Commands and arguments for each agent">Agents</button>
+        <button type="button" data-sec="rules" data-icon="note" title="Rules every agent follows, like committing as you or explaining before deleting files">Ground Rules</button>
+        <button type="button" data-sec="keys" data-icon="keyboard" title="View and change keyboard shortcuts">Shortcuts</button>
+        <button type="button" data-sec="projects" data-icon="folder" title="Rename or remove projects">Projects</button>
+        <button type="button" data-sec="tasks" data-icon="tasks" title="Queue, parallelism and worktrees for tasks">Tasks</button>
+        <button type="button" data-sec="security" data-icon="alert" title="Rules for what agents ask permission to do, and the log of what was approved, by whom">Security</button>
+        <button type="button" data-sec="secrets" data-icon="lock" title="Passwords and keys for automations, encrypted with your system keychain">Secrets</button>
+        <button type="button" data-sec="integrations" data-icon="send" title="Control AgentBoard from your phone and send a daily summary to Slack or Discord">Integrations</button>
+        <button type="button" data-sec="advanced" data-icon="code" title="Edit every setting as JSON">Advanced</button>
+      </nav>
+      <div class="set-body">
+        <section data-sec="general">
+          <h2>General</h2>
+          <div class="set-group">
+            <label class="set-row">Computer name <input name="machineName" /></label>
+            <label class="set-row">Shell <input name="shell" placeholder="Automatic (zsh / PowerShell)" /></label>
+            <label class="set-row">Global shortcut to add a task <input name="quickKey" placeholder="Empty = disabled" /></label>
+          </div>
+          <div class="set-group">
+            <label class="set-row check"><span>Resume each agent's session when the app opens</span><input name="resumeOnOpen" type="checkbox" class="switch-input" /></label>
+            <label class="set-row check"><span>Keep running in the background when the window closes</span><input name="keepRunning" type="checkbox" class="switch-input" /></label>
+            <label class="set-row check" title="Look for a new AgentBoard release when the app opens and every few hours"><span>Check for updates automatically</span><input name="checkUpdates" type="checkbox" class="switch-input" /></label>
+          </div>
+          <p class="set-note">Your subscriptions stay signed in even if you quit the app: each CLI keeps its login on this computer. Quitting stops the processes; they resume when you open the app again.</p>
+        </section>
 
-      <h3>Agentes</h3>
-      <div id="agentRows"></div>
-      <button type="button" id="addAgent" class="ghost">＋ Agente personalizado</button>
+        <section data-sec="appearance" class="hidden">
+          <h2>Appearance</h2>
+          <div class="set-group">
+            <div class="set-row">Theme
+              <div class="seg" id="themeSeg"><button type="button" data-v="auto" title="Follow the macOS light or dark mode">Automatic</button><button type="button" data-v="light" title="Always light">Light</button><button type="button" data-v="dark" title="Always dark">Dark</button></div></div>
+            <div class="set-row">Accent color <div id="accentSwatches" class="swatches"></div></div>
+            <label class="set-row">Interface text size <span class="range"><input name="uiSize" type="range" min="11" max="16" step="0.5" /><output id="uiSizeOut"></output></span></label>
+            <div class="set-row">Typography
+              <div class="seg" id="fontSeg"><button type="button" data-v="system" title="The system font: SF Pro on Mac, Segoe UI on Windows">System (SF Pro)</button><button type="button" data-v="geist" title="Geist and Geist Mono, bundled with the app">Geist</button></div></div>
+          </div>
+          <div class="set-group">
+            <label class="set-row">Terminal font size <span class="range"><input name="fontSize" type="range" min="9" max="22" step="0.5" /><output id="fontSizeOut"></output></span></label>
+            <div class="set-row">Terminal theme
+              <div class="seg" id="termSeg"><button type="button" data-v="auto" title="Terminals use the same theme as the app">Same as App</button><button type="button" data-v="light" title="Always light terminals">Light</button><button type="button" data-v="dark" title="Always dark terminals">Dark</button></div></div>
+            <label class="set-row">Terminal line height <span class="range"><input name="lineHeight" type="range" min="1" max="1.6" step="0.05" /><output id="lineHeightOut"></output></span></label>
+            <label class="set-row">Terminal font <select name="termFont" title="Fonts you do not have installed fall back to the app's monospace font"></select></label>
+            <div class="set-row">Cursor
+              <div class="seg" id="cursorSeg"><button type="button" data-v="block" title="A filled block">Block</button><button type="button" data-v="bar" title="A thin vertical bar">Bar</button><button type="button" data-v="underline" title="A line under the character">Underline</button></div></div>
+            <label class="set-row check"><span>Blinking cursor</span><input name="cursorBlink" type="checkbox" class="switch-input" /></label>
+            <label class="set-row">Lines kept in each terminal's history <input name="scrollback" type="number" min="1000" max="100000" step="1000" /></label>
+          </div>
+          <p class="set-note">Changes preview instantly; they are kept when you click Save.</p>
+        </section>
 
-      <h3>Proyectos guardados</h3>
-      <div id="projectRows"></div>
+        <section data-sec="agents" class="hidden">
+          <h2>Agents</h2>
+          <p class="set-note">Color · name · command · resume args · light args (<code>!</code>) · heavy args (<code>!!</code>) · local (a free local model)</p>
+          <div id="agentRows"></div>
+          <button type="button" id="addAgent" class="ghost" data-icon="plus" title="Add any CLI as an agent (aider, opencode, ollama…)">Custom Agent</button>
+        </section>
 
-      <p class="muted small">Config guardada en <code id="cfgPath"></code>
-        <a href="#" id="revealCfg">Mostrar</a></p>
+        <section data-sec="rules" class="hidden">
+          <h2>Ground Rules</h2>
+          <p class="set-note">Write once what every agent must follow, so you don't repeat it in each task. AgentBoard puts the rules in the instructions file each CLI reads when it starts (in a marked block; the rest of the file is left alone), so they apply to the agents you open by hand too.</p>
+          <textarea name="groundRules" id="groundRules" rows="9" spellcheck="false" placeholder="- Commit with my git author only; never add Co-Authored-By lines"></textarea>
+          <div class="row-end"><button type="button" id="rulesSuggest" class="ghost" title="Add a set of common rules you can edit">Add Suggested Rules</button></div>
+          <div id="rulesFiles" class="set-note"></div>
+        </section>
 
-      <div class="actions">
-        <button value="cancel" class="ghost">Cancelar</button>
-        <button value="ok" id="saveSettings" class="primary">Guardar</button>
+        <section data-sec="keys" class="hidden">
+          <h2>Keyboard Shortcuts</h2>
+          <p class="set-note">Click a shortcut and press the new combination. <kbd>⌫</kbd> removes it, <kbd>Esc</kbd> cancels.</p>
+          <div id="keyRows"></div>
+          <div class="row-end"><button type="button" id="keysReset" class="ghost" title="Go back to the default shortcuts (applied when you save)">Restore Defaults</button></div>
+          <h3>On the board</h3>
+          <div class="set-group static-keys">
+            <div class="set-row">Move around the board <span class="muted">drag the background · scroll · middle button</span></div>
+            <div class="set-row">Zoom <span class="muted"><kbd>⌘</kbd> + scroll · pinch</span></div>
+            <div class="set-row">Rename a card or group <span class="muted">double-click the title</span></div>
+            <div class="set-row">Add a task <span class="muted"><kbd>Enter</kbd> · new line <kbd>⇧ Enter</kbd></span></div>
+            <div class="set-row">In tasks <span class="muted"><code>@agent</code> <code>#group</code> <code>+project</code> <code>!</code> light <code>!!</code> heavy</span></div>
+          </div>
+        </section>
+
+        <section data-sec="projects" class="hidden">
+          <h2>Projects</h2>
+          <p class="set-note">Each project is a tab at the top; its agents work at the same time as everyone else's. Set a weekly or monthly token budget per project to get a notice at 80% and 100%; past it, new tasks in that project use light models.</p>
+          <div id="projectRows"></div>
+        </section>
+
+        <section data-sec="tasks" class="hidden">
+          <h2>Tasks</h2>
+          <div class="set-group">
+            <label class="set-row check"><span>Run the queue automatically</span><input name="taskAuto" type="checkbox" class="switch-input" /></label>
+            <label class="set-row">Parallel tasks (total) <input name="maxParallel" type="number" min="1" max="12" /></label>
+            <label class="set-row">Parallel tasks per subscription <input name="perAgentParallel" type="number" min="1" max="6" /></label>
+            <label class="set-row check"><span>Each task in its own git worktree</span><input name="taskWorktrees" type="checkbox" class="switch-input" /></label>
+            <label class="set-row check"><span>Route new tasks with AI (haiku splits them and picks who does each one)</span><input name="taskRoute" type="checkbox" class="switch-input" /></label>
+            <label class="set-row check"><span>Task agents may open subagents you can see on the board (needs Agent Connection)</span><input name="taskSubagents" type="checkbox" class="switch-input" /></label>
+            <label class="set-row">Subagents per agent, at most <input name="maxSubagents" type="number" min="1" max="8" /></label>
+            <label class="set-row check"><span>Flag cards that print an error (and notify me)</span><input name="watchErrors" type="checkbox" class="switch-input" /></label>
+            <label class="set-row check"><span>Take a checkpoint before each task, to review and undo it</span><input name="taskCheckpoints" type="checkbox" class="switch-input" /></label>
+            <label class="set-row">Check command after each task (empty = none; a project's own command wins) <input name="verifyCmd" placeholder="npm test" /></label>
+            <label class="set-row">Send failed checks back to the agent, at most <input name="verifyRetries" type="number" min="0" max="5" /></label>
+            <label class="set-row check"><span>Cross-review: another subscription reviews each finished task</span><input name="crossReview" type="checkbox" class="switch-input" /></label>
+          </div>
+          <h3>Costs and limits</h3>
+          <div class="set-group">
+            <label class="set-row">Token budget per task, in thousands (0 = none) <input name="taskBudgetK" type="number" min="0" max="100000" step="10" /></label>
+            <div class="set-row">When a task reaches it
+              <div class="seg" id="budgetSeg"><button type="button" data-v="warn" title="Only tell me">Warn me</button><button type="button" data-v="wrap" title="Ask the agent to finish the smallest working change now">Ask it to wrap up</button></div></div>
+            <label class="set-row">Daily token budget, in thousands (0 = none; past it, new tasks use light models) <input name="dailyBudgetK" type="number" min="0" max="1000000" step="100" /></label>
+            <label class="set-row">Weekly token budget, in thousands (0 = none; weeks start on Monday) <input name="weeklyBudgetK" type="number" min="0" max="10000000" step="1000" /></label>
+            <label class="set-row">Monthly token budget, in thousands (0 = none) <input name="monthlyBudgetK" type="number" min="0" max="100000000" step="1000" /></label>
+            <div class="set-row" title="Used for the dollar estimates in Usage. With a subscription you don't pay per token; this shows what the same work would cost through the API.">API prices for estimates, $ per million tokens
+              <span class="prices"><label>input <input name="priceInput" type="number" min="0" step="0.01" /></label><label>output <input name="priceOutput" type="number" min="0" step="0.01" /></label><label>cache read <input name="priceCacheRead" type="number" min="0" step="0.01" /></label><label>cache write <input name="priceCacheWrite" type="number" min="0" step="0.01" /></label></span></div>
+            <label class="set-row check" title="At 80% and 100% of a budget you get a notice; this also posts it to the channel of the daily summary (Settings → Integrations)"><span>Also send budget alerts to the daily summary's chat</span><input name="budgetAlertsToChat" type="checkbox" class="switch-input" /></label>
+            <label class="set-row check"><span>Send light tasks to local models first (agents marked "local")</span><input name="preferLocalForLight" type="checkbox" class="switch-input" /></label>
+            <label class="set-row check"><span>When a subscription hits its limit, move even tasks pinned to it (<code>@name</code>) to another one</span><input name="limitFallback" type="checkbox" class="switch-input" /></label>
+            <div class="set-row">Subscriptions out of usage <span id="exhaustedList" class="muted">None</span></div>
+          </div>
+        </section>
+
+        <section data-sec="security" class="hidden">
+          <h2>Security</h2>
+          <p class="set-note">Agents run with your permissions: they can do anything you can on this computer. These rules decide what happens when one asks for permission. One rule per line; plain text matches anywhere (ignoring case), <code>/…/</code> is a regular expression.</p>
+          <h3>Dangerous: always ask, never approve in bulk or from the phone</h3>
+          <textarea name="approvalDanger" class="rules" rows="7" spellcheck="false"></textarea>
+          <div class="row-end"><button type="button" id="dangerDefaults" class="ghost" title="Put back the built-in list">Restore Defaults</button></div>
+          <h3>Approve automatically (unless it is also dangerous)</h3>
+          <textarea name="approvalAuto" class="rules" rows="4" spellcheck="false" placeholder="npm test&#10;git status&#10;/^\s*ls\b/"></textarea>
+          <p class="set-note">Leave it empty to answer every request yourself. Keep it to commands that only read or test.</p>
+          <h3>Activity</h3>
+          <p class="set-note">What was approved or rejected and by whom (you, your phone or a rule), devices that used the remote, automation commands and the secrets they got, and secrets saved or removed.</p>
+          <input id="auditSearch" class="audit-search" placeholder="Search the activity (a card, a command, a device…)" />
+          <div id="auditList" class="audit"></div>
+          <div class="row-end"><button type="button" id="auditExport" class="ghost" title="Save the whole log as a CSV file">Export CSV</button><button type="button" id="auditRefresh" class="ghost">Refresh</button></div>
+        </section>
+
+        <section data-sec="secrets" class="hidden">
+          <h2>Secrets</h2>
+          <p class="set-note">Passwords, API keys and logins your automations need. Each value is encrypted with your system keychain and never shown again. A <b>Command</b> step gets a secret as an environment variable when it mentions it (<code>$APP_PASSWORD</code>) or lists it under <i>Secrets it can use</i>, and the value is hidden in its output. Agents never see them.</p>
+          <div class="set-group" id="secretRows"></div>
+          <div class="set-group">
+            <label class="set-row">Name <input id="secretName" placeholder="APP_PASSWORD" autocomplete="off" spellcheck="false" /></label>
+            <label class="set-row">Value <input id="secretValue" type="password" autocomplete="new-password" /></label>
+            <div class="row-end"><span id="secretError" class="form-error"></span><button type="button" id="secretAdd" class="primary" title="Encrypt and save it now">Save Secret</button></div>
+          </div>
+        </section>
+
+        <section data-sec="integrations" class="hidden">
+          <h2>Integrations</h2>
+          <h3>Remote control</h3>
+          <p class="set-note">See your tasks, approve what the agents ask and add tasks from your phone's browser, on the same Wi-Fi as this computer. Requests flagged as dangerous (Settings → Security) can only be approved here.</p>
+          <div class="set-group">
+            <label class="set-row check"><span>Let my phone control AgentBoard</span><input name="remoteEnabled" type="checkbox" class="switch-input" /></label>
+            <label class="set-row">Turn it off by itself after, in hours (0 = never) <input name="remoteHours" type="number" min="0" max="168" /></label>
+            <label class="set-row">Port <input name="remotePort" type="number" min="1024" max="65535" /></label>
+            <div id="remoteLinks"></div>
+            <div class="set-row">Anyone with the link can control your agents: share it with no one.
+              <button type="button" id="remoteNewLink" class="ghost" title="Create a new link; the old one stops working">New Link</button></div>
+          </div>
+          <p class="set-note">The page uses HTTPS with a certificate made on this computer, so the link and what you do travel encrypted. The first time, the phone warns that the certificate is not known: check that its SHA-256 fingerprint is the one shown above, then continue. Each new device that connects is announced here and recorded in Settings → Security.</p>
+          <h3>Daily summary</h3>
+          <p class="set-note">Once a day, today's done and pending tasks are sent to a channel. Create an incoming webhook in Slack, Discord, Teams or Google Chat and paste its URL: it is kept encrypted in Secrets, because whoever has it can post to your channel.</p>
+          <div class="set-group">
+            <label class="set-row check"><span>Send the daily summary</span><input name="summaryEnabled" type="checkbox" class="switch-input" /></label>
+            <label class="set-row">Webhook URL <input name="summaryWebhook" type="password" autocomplete="off" placeholder="https://hooks.slack.com/services/…" /></label>
+            <label class="set-row">Send it at <input name="summaryTime" type="time" /></label>
+            <div class="row-end"><span id="summaryState" class="muted small"></span><button type="button" id="summaryTest" class="ghost" title="Send today's summary now (to the URL typed above, or the saved one)">Send Test</button></div>
+          </div>
+        </section>
+
+        <section data-sec="advanced" class="hidden">
+          <h2>Advanced</h2>
+          <p class="set-note">Every setting as JSON: add, change or remove keys and apply. Cards, tasks and automations are not listed here (edit them in the app).</p>
+          <textarea id="cfgJson" spellcheck="false"></textarea>
+          <div class="row-end"><span id="cfgJsonError" class="form-error"></span><button type="button" id="cfgJsonApply" title="Save this JSON as your settings and reload the window">Apply JSON</button></div>
+          <p class="set-note">File: <code id="cfgPath"></code> <a href="#" id="revealCfg">Show in Finder</a></p>
+        </section>
+      </div>
+      <div class="actions set-actions">
+        <button value="cancel" class="ghost" title="Discard the changes">Cancel</button>
+        <button value="ok" id="saveSettings" class="primary" title="Save the changes in every section">Save</button>
       </div>
     </form>
   </dialog>
 
-  <!-- Agentes y modelos -->
+  <dialog id="onboarding" class="onboarding">
+    <div class="ob-head"><span class="eyebrow">Welcome to AgentBoard</span><span class="spacer"></span><span id="obDots" class="ob-dots"></span></div>
+    <h2 id="obTitle"></h2>
+    <div id="obBody"></div>
+    <div class="actions"><button type="button" id="obSkip" class="ghost" title="Close the guide; open it again from the palette (Welcome Guide)">Skip</button><span class="spacer"></span>
+      <button type="button" id="obBack" class="ghost">Back</button><button type="button" id="obNext" class="primary">Next</button></div>
+  </dialog>
+
+  <dialog id="askDialog" class="ask">
+    <form method="dialog">
+      <h2 id="askTitle"></h2>
+      <p id="askHint" class="set-note"></p>
+      <textarea id="askText" rows="5"></textarea>
+      <div class="actions"><button value="cancel" class="ghost">Cancel</button><button value="ok" class="primary" id="askOk" title="Continue (⌘ Enter)">Continue</button></div>
+    </form>
+  </dialog>
+
+  <!-- Agents and models -->
   <dialog id="accounts" class="wide">
     <form method="dialog">
-      <span class="eyebrow">Tus cuentas, en tu computador</span>
-      <h2>Suscripciones y modelos</h2>
-      <p class="muted small">Cada CLI inicia sesión con tu suscripción y guarda la sesión en este computador.
-        AgentBoard solo revisa si existe: no lee, copia ni envía tus tokens. Los modelos locales corren en tu máquina, sin cuenta.</p>
+      <span class="eyebrow">Your accounts, on your computer</span>
+      <h2>Subscriptions and Models</h2>
+      <p class="muted small">Each CLI signs in with your subscription and keeps the session on this computer.
+        AgentBoard only checks that it exists: it never reads, copies or sends your tokens. Local models run on your machine, with no account.</p>
 
-      <h3>Suscripciones y CLIs</h3>
+      <h3>Subscriptions and CLIs</h3>
       <div id="catalogRows" class="rows"></div>
 
-      <h3>Modelos locales</h3>
+      <h3>Claude Accounts</h3>
+      <p class="muted small">Have more than one Claude subscription (personal and work, or two plans)? Add them: each one uses its own folder and session,
+        and the task queue spreads work across them — when one hits its usage limit, the next one takes over.</p>
+      <div id="claudeAccounts" class="rows"></div>
+      <div class="pull-row"><input id="claudeAccountName" placeholder="Account name (e.g. Work)" /><button type="button" id="addClaudeAccount" data-icon="plus" title="Create a separate Claude account with its own login">Add Account</button></div>
+
+      <h3>Local Models</h3>
       <div id="localRows" class="rows"></div>
 
       <div class="actions">
-        <button type="button" id="accountsRefresh" class="ghost">↻ Revisar</button>
-        <button value="ok" class="primary">Listo</button>
+        <button type="button" id="accountsRefresh" class="ghost" data-icon="refresh" title="Check again what is installed and signed in">Refresh</button>
+        <button value="ok" class="primary">Done</button>
       </div>
     </form>
   </dialog>
 
-  <!-- Skills y agentes -->
+  <!-- Skills and agents -->
+  <dialog id="limits" class="limits">
+    <form method="dialog">
+      <div class="limits-emoji" aria-hidden="true">☕</div>
+      <h2>You have reached your limits</h2>
+      <p id="limitsWhen" class="limits-when"></p>
+      <p id="limitsIdea" class="limits-idea"></p>
+      <p class="muted small">Every subscription in the queue hit its usage limit. Queued tasks start by themselves as soon as one is back.</p>
+      <div class="actions"><button type="button" id="limitsAnother" class="ghost" title="Another idea">Another Idea</button><span class="spacer"></span><button value="ok" class="primary">OK</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="review" class="wide review">
+    <form method="dialog">
+      <h2 id="reviewTitle">Review</h2>
+      <p id="reviewMeta" class="muted small"></p>
+      <div class="review-body"><nav id="reviewFiles"></nav><div id="reviewDiff" class="diff"></div></div>
+      <label>Comments for the agent <textarea id="reviewComment" rows="3" placeholder="Click a line of the diff to quote it, then write what to change"></textarea></label>
+      <div class="actions">
+        <button type="button" id="reviewSend" data-icon="send" title="Send the comments to the task's agent; it goes back to work">Send to Agent</button>
+        <button type="button" id="reviewRestore" class="ghost" data-icon="back" title="Put the project back as it was before this task">Undo Task</button>
+        <button type="button" id="reviewDiscard" class="ghost" data-icon="trash" title="Delete the worktree and its branch">Discard</button>
+        <span class="spacer"></span>
+        <button type="button" id="reviewPR" data-icon="branch" title="Push the branch and open a pull request on GitHub">Create Pull Request</button>
+        <button type="button" id="reviewMerge" class="primary" title="Commit pending changes, merge the branch and remove the worktree">Merge</button>
+        <button value="close" class="ghost">Close</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="usage" class="wide">
+    <form method="dialog">
+      <span class="eyebrow">Your activity with agents, on this computer</span>
+      <h2>Usage and Savings</h2>
+      <div id="usageBody"></div>
+      <div class="actions">
+        <button type="button" id="usageRefresh" class="ghost" data-icon="refresh" title="Read the logs again">Refresh</button>
+        <button value="ok" class="primary">Done</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog id="skills" class="wide">
     <form method="dialog" id="skillsForm">
-      <span class="eyebrow">Todo lo que saben tus agentes</span>
-      <h2>Skills y agentes</h2>
+      <span class="eyebrow">Everything your agents know</span>
+      <h2>Skills and Agents</h2>
       <div class="tabs" role="tablist">
-        <button type="button" data-tab="skills" class="active">Skills</button>
-        <button type="button" data-tab="agents">Mis agentes</button>
-        <button type="button" data-tab="connect">Conexión entre agentes</button>
-        <button type="button" data-tab="saving">Ahorro de tokens</button>
+        <button type="button" data-tab="skills" class="active" title="Skills, commands and extensions of each CLI on this computer">Skills</button>
+        <button type="button" data-tab="agents" title="Create and edit Claude Code subagents">My Agents</button>
+        <button type="button" data-tab="connect" title="Connect your subscriptions so agents can talk to each other">Agent Connection</button>
+        <button type="button" data-tab="saving" title="Bundled skills that reduce token and context usage">Token Saving</button>
       </div>
 
       <section data-pane="skills">
         <div class="toolbar">
-          <input id="skillFilter" placeholder="Buscar skill…" />
+          <input id="skillFilter" placeholder="Search skills…" />
           <div id="skillProviders" class="seg"></div>
         </div>
         <div id="skillRows" class="rows"></div>
       </section>
 
       <section data-pane="agents" class="hidden">
-        <p class="muted small">Subagentes de Claude Code: asistentes especializados con sus propias instrucciones y herramientas.
-          Claude los usa cuando la descripción encaja con la tarea, o cuando se lo pides ("usa el agente revisor").</p>
+        <p class="muted small">Claude Code subagents: specialized assistants with their own instructions and tools.
+          Claude uses them when the description matches the task, or when you ask ("use the reviewer agent").</p>
         <div id="agentDefRows" class="rows"></div>
         <div id="agentForm" class="agent-form hidden">
           <div class="grid2">
-            <label>Nombre <input name="adName" placeholder="revisor-codigo" /></label>
-            <label>Dónde <select name="adProject"></select></label>
+            <label>Name <input name="adName" placeholder="code-reviewer" /></label>
+            <label>Where <select name="adProject"></select></label>
           </div>
-          <label>Cuándo usarlo <input name="adDescription" placeholder="Revisa cambios de código buscando bugs antes de hacer commit" /></label>
+          <label>When to use it <input name="adDescription" placeholder="Reviews code changes for bugs before committing" /></label>
           <div class="grid2">
-            <label>Modelo <select name="adModel">
-              <option value="">Por defecto</option><option value="inherit">El mismo de la sesión</option>
+            <label>Model <select name="adModel">
+              <option value="">Default</option><option value="inherit">Same as the session</option>
               <option value="sonnet">Sonnet</option><option value="opus">Opus</option><option value="haiku">Haiku</option>
             </select></label>
-            <label>Herramientas <input name="adTools" placeholder="Vacío = todas. Ej: Read, Grep, Glob" /></label>
+            <label>Tools <input name="adTools" placeholder="Empty = all. E.g. Read, Grep, Glob" /></label>
           </div>
-          <label>Instrucciones <textarea name="adPrompt" rows="7" placeholder="Eres un revisor de código. Busca errores de lógica, casos borde…"></textarea></label>
+          <label>Instructions <textarea name="adPrompt" rows="7" placeholder="You are a code reviewer. Look for logic errors, edge cases…"></textarea></label>
           <div class="row-end">
             <span id="agentFormError" class="form-error"></span>
-            <button type="button" id="agentFormCancel" class="ghost">Cancelar</button>
-            <button type="button" id="agentFormSave" class="primary">Guardar agente</button>
+            <button type="button" id="agentFormCancel" class="ghost">Cancel</button>
+            <button type="button" id="agentFormSave" class="primary" title="Save the subagent to its folder">Save Agent</button>
           </div>
         </div>
-        <button type="button" id="newAgentDef" class="ghost">＋ Nuevo agente</button>
+        <button type="button" id="newAgentDef" class="ghost" data-icon="plus" title="Create a Claude Code subagent with its own instructions">New Agent</button>
       </section>
 
       <section data-pane="connect" class="hidden">
-        <p class="muted small">Conecta tus suscripciones con AgentBoard y podrán hablar entre ellas: un agente puede ver a los demás,
-          pasarles una tarea, leer su respuesta o abrir uno nuevo. Ejemplo: pídele a Claude <em>"pregúntale a Codex qué opina de este cambio"</em>.
-          Todo pasa por un canal local de este computador; nunca se escribe en terminales normales, solo en agentes.</p>
-        <h3>Conectar cada suscripción</h3>
+        <p class="muted small">Connect your subscriptions to AgentBoard and they can talk to each other: an agent can see the others,
+          hand them a task, read their answer or open a new one. Example: ask Claude <em>"ask Codex what it thinks of this change"</em>.
+          Everything goes through a local channel on this computer; it only ever writes to agents, never to plain terminals.</p>
+        <h3>Connect each subscription</h3>
         <div id="mcpRows" class="rows"></div>
-        <h3>Agentes en el tablero</h3>
+        <h3>Agents on the board</h3>
         <div id="boardAgentRows" class="rows"></div>
       </section>
 
       <section data-pane="saving" class="hidden">
-        <p class="muted small">Skills incluidas con AgentBoard para que cada suscripción gaste menos tokens y contexto.
-          Se instalan como <code>SKILL.md</code> en la carpeta de skills de cada CLI; puedes editarlas o borrarlas cuando quieras.</p>
+        <p class="muted small">Skills bundled with AgentBoard so each subscription spends fewer tokens and less context.
+          They are installed as <code>SKILL.md</code> in each CLI's skills folder; you can edit or delete them at any time.</p>
         <div id="packRows" class="rows"></div>
-        <div class="row-end"><button type="button" id="packInstall" class="primary">Instalar / actualizar en todas</button></div>
-        <h3>Qué más hace AgentBoard para ahorrar</h3>
+        <div class="row-end"><button type="button" id="packInstall" class="primary" title="Copy the token-saving skills to Claude Code, Codex and Gemini (and your extra Claude accounts)">Install or Update in All</button></div>
+        <h3>What else AgentBoard does to save tokens</h3>
         <ul class="tips">
-          <li><b>Una sesión nueva por tarea</b>: cada ToDo parte con contexto limpio, sin arrastrar conversaciones largas.</li>
-          <li><b>Modo ligero</b> (<code>!</code> en la tarea): usa el modelo barato de esa suscripción (<code>--model haiku</code>, razonamiento bajo en Codex, Flash en Gemini). Se edita en Ajustes → Agentes.</li>
-          <li><b>Dividir con IA</b> usa <code>claude -p --model haiku --tools ""</code>: una sola llamada corta, sin herramientas (prompt de sistema mínimo), sin terminal ni leer el repo.</li>
-          <li><b>Reparto entre suscripciones</b>: "auto" manda cada tarea a la suscripción con menos trabajo, así no agotas el límite de una sola.</li>
-          <li><b>Traspasos compactos</b>: "Pasar a…" y <code>send_to_agent</code> envían un resumen, no el historial.</li>
+          <li><b>A new session per task</b>: each to-do starts with a clean context instead of dragging along long conversations.</li>
+          <li><b>Light mode</b> (<code>!</code> in the task): uses that subscription's cheaper model (<code>--model haiku</code>, low reasoning in Codex, Flash in Gemini). Edit it in Settings → Agents.</li>
+          <li><b>Split with AI</b> uses <code>claude -p --model haiku --tools ""</code>: one short call, no tools (minimal system prompt), no terminal and no repository access.</li>
+          <li><b>Spread across subscriptions</b>: "auto" sends each task to the least busy subscription, so you don't exhaust a single limit.</li>
+          <li><b>Compact handoffs</b>: "Send to…" and <code>send_to_agent</code> send a summary, not the whole history.</li>
         </ul>
       </section>
 
       <div class="actions">
-        <button type="button" id="skillsRefresh" class="ghost">↻ Revisar</button>
-        <button value="ok" class="primary">Listo</button>
+        <button type="button" id="skillsRefresh" class="ghost" data-icon="refresh" title="Read the skills and agents from disk again">Refresh</button>
+        <button value="ok" class="primary">Done</button>
       </div>
     </form>
   </dialog>
@@ -247,8 +555,55 @@
   <script src="../../node_modules/@xterm/xterm/lib/xterm.js"></script>
   <script src="../../node_modules/@xterm/addon-fit/lib/addon-fit.js"></script>
   <script src="../../node_modules/@xterm/addon-web-links/lib/addon-web-links.js"></script>
-  <script src="app.js"></script>
-  <script src="tasks.js"></script>
-  <script src="diagram.js"></script>
+  <script src="core/format.js"></script>
+  <script src="core/icons.js"></script>
+  <script src="core/state.js"></script>
+  <script src="layout/ViewLayout.js"></script>
+  <script src="board/viewport.js"></script>
+  <script src="board/cards.js"></script>
+  <script src="board/selection.js"></script>
+  <script src="board/groups.js"></script>
+  <script src="board/status.js"></script>
+  <script src="watchers/TerminalWatchers.js"></script>
+  <script src="board/git.js"></script>
+  <script src="board/pan-zoom.js"></script>
+  <script src="board/card-menu.js"></script>
+  <script src="board/sidebar.js"></script>
+  <script src="board/minimap.js"></script>
+  <script src="agents/accounts.js"></script>
+  <script src="core/notify.js"></script>
+  <script src="agents/handoff.js"></script>
+  <script src="agents/bridge-events.js"></script>
+  <script src="agents/skills-dialog.js"></script>
+  <script src="board/spaces.js"></script>
+  <script src="main.js"></script>
+  <script src="settings/settings.js"></script>
+  <script src="tasks/tasks.js"></script>
+  <script src="diagram/diagram.js"></script>
+  <script src="palette/palette.js"></script>
+  <script src="flows/flows.js"></script>
+  <script src="flows/FlowTemplates.js"></script>
+  <script src="usage/usage-panel.js"></script>
+  <script src="watchers/ErrorWatch.js"></script>
+  <script src="watchers/ApprovalPolicy.js"></script>
+  <script src="watchers/ApprovalsInbox.js"></script>
+  <script src="review/UnifiedDiff.js"></script>
+  <script src="review/ReviewDialog.js"></script>
+  <script src="tasks/pipeline/TaskPipeline.js"></script>
+  <script src="tasks/pipeline/ChecksStep.js"></script>
+  <script src="tasks/pipeline/CrossReviewStep.js"></script>
+  <script src="tasks/TemplateLibrary.js"></script>
+  <script src="usage/CostEstimate.js"></script>
+  <script src="tasks/Budgets.js"></script>
+  <script src="tasks/CostTracker.js"></script>
+  <script src="tasks/LimitsNotice.js"></script>
+  <script src="integrations/RemoteBridge.js"></script>
+  <script src="integrations/DailySummary.js"></script>
+  <script src="integrations/IssueImporter.js"></script>
+  <script src="integrations/IntegrationSettings.js"></script>
+  <script src="agents/GroundRules.js"></script>
+  <script src="security/SecuritySettings.js"></script>
+  <script src="secrets/SecretsSettings.js"></script>
+  <script src="onboarding/Onboarding.js"></script>
 </body>
 </html>

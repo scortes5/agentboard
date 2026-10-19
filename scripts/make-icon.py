@@ -1,4 +1,4 @@
-# Compatibilidad con el comando anterior; el SVG es la fuente del logo.
+# Kept for compatibility with the old command; the SVG is the source of the logo.
 import pathlib
 import subprocess
 

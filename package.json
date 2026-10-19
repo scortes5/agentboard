@@ -1,32 +1,67 @@
 {
   "name": "agentboard",
   "productName": "AgentBoard",
-  "version": "0.1.2",
-  "description": "Tablero infinito con terminales reales para Claude Code, Codex y Gemini CLI. Mac y Windows.",
+  "version": "1.5.1",
+  "description": "A desktop board of real terminals to run Claude Code, Codex, Gemini CLI and other coding agents side by side, on your own subscriptions. macOS and Windows.",
+  "keywords": [
+    "claude-code",
+    "codex",
+    "gemini-cli",
+    "ai-agents",
+    "coding-agents",
+    "agent-orchestration",
+    "multi-agent",
+    "mcp",
+    "electron",
+    "terminal",
+    "xterm",
+    "worktree",
+    "developer-tools",
+    "llm",
+    "productivity"
+  ],
   "author": "Sergio Cortés",
   "license": "MIT",
+  "homepage": "https://github.com/scortes5/agentboard#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scortes5/agentboard.git"
+  },
+  "bugs": {
+    "url": "https://github.com/scortes5/agentboard/issues"
+  },
   "private": true,
-  "main": "src/main.js",
+  "main": "src/main/index.js",
+  "desktopName": "agentboard.desktop",
   "scripts": {
+    "test": "node --test test/*.test.js",
     "start": "electron .",
     "check": "node scripts/check-agents.js",
     "app": "node scripts/install-app.js",
-    "icon": "node scripts/build-icons.js",
+    "icon": "python3 scripts/make-icon.py",
     "dist": "electron-builder",
     "dist:mac": "electron-builder --mac",
     "dist:win": "electron-builder --win",
-    "postinstall": "node scripts/fix-pty.js"
+    "postinstall": "node scripts/fix-pty.js",
+    "test:e2e": "node test/e2e.js",
+    "test:smoke": "node test/smoke.js"
   },
   "dependencies": {
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/addon-web-links": "^0.12.0",
     "@xterm/xterm": "^6.0.0",
+    "electron-updater": "^6.8.9",
     "geist": "^1.8.1",
-    "node-pty": "^1.1.0"
+    "node-pty": "^1.1.0",
+    "selfsigned": "^5.5.0"
   },
   "devDependencies": {
     "electron": "^44.0.0",
-    "electron-builder": "^26.0.0"
+    "electron-builder": "^26.0.0",
+    "playwright-core": "^1.64.1"
+  },
+  "overrides": {
+    "global-agent": "^4.1.3"
   },
   "build": {
     "appId": "cl.scortes.agentboard",
@@ -47,6 +82,13 @@
       "scripts/agentboard-mcp.js"
     ],
     "npmRebuild": false,
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "scortes5",
+        "repo": "agentboard"
+      }
+    ],
     "mac": {
       "target": [
         {
@@ -72,7 +114,22 @@
       ],
       "icon": "build/icon.ico"
     },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "Development",
+      "icon": "build/icon.png",
+      "synopsis": "Run many coding agents side by side on one board",
+      "syncDesktopName": true
+    },
     "nsis": {
+      "artifactName": "${productName}-Setup-${version}.${ext}",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
     }
