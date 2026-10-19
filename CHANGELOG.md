@@ -4,6 +4,12 @@ All notable changes to AgentBoard. The format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+## [1.7.2] - 2026-10-19
+
+### Fixed
+- Windows and Linux: tooltips, the palette, the welcome guide and the empty board show shortcuts with Ctrl (Ctrl+Shift+T) instead of the Mac symbols (⇧⌘T).
+- Windows and Linux: the File/Edit/View menu bar no longer sits above the app's own top bar; press Alt to show it.
+
 ## [1.7.0] - 2026-10-19
 
 ### Added
@@ -284,7 +290,8 @@ Includes the 0.2.0 changes, which were not released separately.
 ### Added
 - First release: a board of terminals for CLI agents on Mac and Windows.
 
-[Unreleased]: https://github.com/scortes5/agentboard/compare/v1.7.0...HEAD
+[Unreleased]: https://github.com/scortes5/agentboard/compare/v1.7.2...HEAD
+[1.7.2]: https://github.com/scortes5/agentboard/compare/v1.7.1...v1.7.2
 [1.7.0]: https://github.com/scortes5/agentboard/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/scortes5/agentboard/compare/v1.5.1...v1.6.0
 [1.0.1]: https://github.com/scortes5/agentboard/compare/v1.0.0...v1.0.1
