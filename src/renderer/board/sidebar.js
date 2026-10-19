@@ -54,7 +54,7 @@ function renderSidebar() {
       b.style.setProperty('--agent', c.type === 'note' ? 'var(--warn)' : a.color);
       b.innerHTML = (c.type === 'term' ? `<span class="status ${st}" title="${STATUS_LABEL[st] || ''}"></span>` : '')
         + `<span class="name">${esc(c.title)}</span><span class="kind">${c.type === 'note' ? 'note' : esc(a.label)}</span>`;
-      b.title = c.type === 'note' ? 'Go to the note' : `Go to the ${c.title} card (${a.label}) · ⌘/Shift-click to select`;
+      b.title = c.type === 'note' ? 'Go to the note' : keyLabel(`Go to the ${c.title} card (${a.label}) · ⌘/Shift-click to select`);
       b.onclick = (e) => {
         if (e.metaKey || e.ctrlKey || e.shiftKey) return toggleSelect(c.id);
         focusCardView(c); focusCard(c.id);

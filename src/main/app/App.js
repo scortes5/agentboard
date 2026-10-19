@@ -46,6 +46,8 @@ class App {
     this.win = new BrowserWindow({
       icon: ICON, width: 1500, height: 950, minWidth: 800, minHeight: 500, backgroundColor: '#0f1115', title: 'AgentBoard',
       titleBarStyle: IS_MAC ? 'hiddenInset' : 'default',
+      // Windows and Linux: no File/Edit/View bar above the app's own top bar (Alt shows it).
+      autoHideMenuBar: !IS_MAC,
       webPreferences: {
         preload: PRELOAD, contextIsolation: true, nodeIntegration: false, sandbox: true,
         backgroundThrottling: false, // keep statuses and the task queue up to date while hidden

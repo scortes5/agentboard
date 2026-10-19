@@ -128,7 +128,7 @@ class Onboarding {
   }
 
   task(el) {
-    el.innerHTML = `<p>Write to-dos in <b>Tasks</b> (⇧⌘T), one per line. They are spread across your subscriptions and run in parallel, each in its own terminal; you see their progress live and review the changes before keeping them.</p>
+    el.innerHTML = `<p>Write to-dos in <b>Tasks</b> (${keyLabel('⇧⌘T')}), one per line. They are spread across your subscriptions and run in parallel, each in its own terminal; you see their progress live and review the changes before keeping them.</p>
       <p class="muted small"><code>@claude</code> picks who does it · <code>!</code> uses a cheaper model · <code>&gt;</code> waits for the line above</p>
       <button type="button" class="primary" data-try>Try a Sample Task</button>`;
     el.onclick = (e) => {
