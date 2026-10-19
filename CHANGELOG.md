@@ -4,6 +4,18 @@ All notable changes to AgentBoard. The format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-10-19
+
+### Added
+- **Close a task's terminals**: each task in the Tasks panel has a button that closes its agent card and every subagent it opened, with one confirmation. The new button next to *Clear* does the same for every finished or blocked task.
+
+### Changed
+- Task agents and the subagents they open are told to finish in their session and not to start `/goal`, `/loop`, scheduled wakeups or recurring jobs unless the task explicitly asks to repeat something or keep watching. The bundled `agentboard-task` skill says the same; update it from *Skills and Agents → Token Saving*.
+
+### Fixed
+- Cards no longer cover the top bar, menus and popovers after you click on them many times.
+- The Tasks panel's filter row wraps on narrow panels instead of cutting off its last buttons.
+
 ## [1.6.0] - 2026-10-19
 
 ### Added
@@ -272,7 +284,8 @@ Includes the 0.2.0 changes, which were not released separately.
 ### Added
 - First release: a board of terminals for CLI agents on Mac and Windows.
 
-[Unreleased]: https://github.com/scortes5/agentboard/compare/v1.6.0...HEAD
+[Unreleased]: https://github.com/scortes5/agentboard/compare/v1.7.0...HEAD
+[1.7.0]: https://github.com/scortes5/agentboard/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/scortes5/agentboard/compare/v1.5.1...v1.6.0
 [1.0.1]: https://github.com/scortes5/agentboard/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/scortes5/agentboard/compare/v0.9.0...v1.0.0
