@@ -38,7 +38,7 @@ async function cached(file, parse) {
 function parseClaude(text) {
   const seen = new Set();
   const days = {};
-  let cwd = null, session = null;
+  let cwd = null, session = null, first = null, last = null, context = 0;
   for (const line of text.split('\n')) {
     if (!line.includes('"usage"')) continue;
     let d;
@@ -51,6 +51,9 @@ function parseClaude(text) {
     cwd = d.cwd || cwd; session = d.sessionId || session;
     const day = dayOf(d.timestamp);
     if (!day) continue;
+    first = first || d.timestamp; last = d.timestamp;
+    // What the last answer had to read: it grows with the conversation and is paid on every turn.
+    context = (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0);
     const r = days[day] || (days[day] = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, messages: 0 });
     r.input += u.input_tokens || 0;
     r.output += u.output_tokens || 0;
@@ -58,25 +61,31 @@ function parseClaude(text) {
     r.cacheWrite += u.cache_creation_input_tokens || 0;
     r.messages++;
   }
-  return { cwd, session, days };
+  return { cwd, session, days, first, last, context };
 }
 
 // Codex: the session's last token_count carries the running total (input includes the cached part).
 function parseCodex(text) {
-  let cwd = null, first = null, total = null, messages = 0;
+  let cwd = null, session = null, first = null, last = null, total = null, context = 0, messages = 0;
   for (const line of text.split('\n')) {
     if (!line) continue;
     if (!first) { try { first = JSON.parse(line).timestamp; } catch {} }
-    if (!cwd && line.includes('"session_meta"')) { try { cwd = JSON.parse(line).payload?.cwd || null; } catch {} }
+    if (!cwd && line.includes('"session_meta"')) {
+      try { const p = JSON.parse(line).payload || {}; cwd = p.cwd || null; session = p.id || null; } catch {}
+    }
     if (line.includes('"token_count"')) {
-      try { const t = JSON.parse(line).payload?.info?.total_token_usage; if (t) { total = t; messages++; } } catch {}
+      try {
+        const d = JSON.parse(line), info = d.payload?.info;
+        if (info?.total_token_usage) { total = info.total_token_usage; messages++; last = d.timestamp || last; }
+        if (info?.last_token_usage) context = info.last_token_usage.input_tokens || 0;
+      } catch {}
     }
   }
   const day = dayOf(first);
-  if (!total || !day) return { cwd, days: {} };
+  if (!total || !day) return { cwd, session, days: {} };
   const cacheRead = total.cached_input_tokens || 0;
   return {
-    cwd,
+    cwd, session, first, last: last || first, context,
     days: { [day]: {
       input: Math.max(0, (total.input_tokens || 0) - cacheRead), output: total.output_tokens || 0,
       cacheRead, cacheWrite: total.cache_write_input_tokens || 0, messages,
@@ -101,6 +110,17 @@ function mergeTaskHistory(file, tasks = []) {
   return Object.values(hist);
 }
 
+const MAX_SESSIONS = 200; // most recent first; older ones still count in the totals
+
+// A session's totals across its days, and what its last answer had to read.
+function sessionRow(s) {
+  const r = Object.values(s.days).reduce((acc, d) => addInto(acc, d), {});
+  return {
+    id: s.session || null, cwd: s.cwd || null, first: s.first || null, last: s.last || null, context: s.context || 0,
+    input: r.input || 0, output: r.output || 0, cacheRead: r.cacheRead || 0, cacheWrite: r.cacheWrite || 0, messages: r.messages || 0,
+  };
+}
+
 function addInto(acc, r) {
   for (const k of ['input', 'output', 'cacheRead', 'cacheWrite', 'messages']) acc[k] = (acc[k] || 0) + (r[k] || 0);
   return acc;
@@ -108,15 +128,17 @@ function addInto(acc, r) {
 
 // claudeDirs: the default Claude folder plus the extra accounts' folders.
 async function scanUsage({ tasks, historyFile, claudeDirs = [], codexDir }) {
+  // account: the extra Claude account a session belongs to (null = the CLI's default folder).
   const sources = [
-    { agent: 'claude', files: [...new Set(claudeDirs)].flatMap((d) => listJsonl(path.join(d, 'projects'))), parse: parseClaude },
-    { agent: 'codex', files: codexDir ? listJsonl(path.join(codexDir, 'sessions')) : [], parse: parseCodex },
+    ...[...new Set(claudeDirs)].map((d, i) => ({ agent: 'claude', account: i ? path.basename(d) : null, files: listJsonl(path.join(d, 'projects')), parse: parseClaude })),
+    { agent: 'codex', account: null, files: codexDir ? listJsonl(path.join(codexDir, 'sessions')) : [], parse: parseCodex },
   ];
   const days = {};          // day → { tokens, sessions, tasks }
   const byAgent = {};       // agent → totals
   const byProject = {};     // cwd → tokens
   const projectDays = {};   // cwd → day → tokens (cost history per project)
   const sessionTokens = {}; // Claude sessionId → tokens (for tokens per task)
+  const sessions = [];      // one row per session, for the Usage panel
 
   for (const src of sources) {
     for (const f of src.files) {
@@ -136,6 +158,7 @@ async function scanUsage({ tasks, historyFile, claudeDirs = [], codexDir }) {
       tot.sessions++;
       if (s.cwd) byProject[s.cwd] = (byProject[s.cwd] || 0) + fileTokens;
       if (s.session) sessionTokens[s.session] = (sessionTokens[s.session] || 0) + fileTokens;
+      sessions.push({ agent: src.agent, account: src.account, ...sessionRow(s), tokens: fileTokens });
     }
   }
 
@@ -156,11 +179,12 @@ async function scanUsage({ tasks, historyFile, claudeDirs = [], codexDir }) {
 
   return {
     days, byAgent, taskStats, projectDays,
+    sessions: sessions.sort((a, b) => String(b.last).localeCompare(String(a.last))).slice(0, MAX_SESSIONS),
     byProject: Object.entries(byProject).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([cwd, tokens]) => ({ cwd, tokens })),
   };
 }
 
-// Tokens used so far by specific Claude sessions (a running task's card), found by file name
+// Tokens used so far by specific Claude sessions (cards and running tasks), found by file name
 // (<claude dir>/projects/<project>/<session id>.jsonl), so a task's cost can be shown live.
 async function sessionTokens({ claudeDirs = [], ids = [] }) {
   const want = new Set(ids.filter((id) => /^[0-9a-f-]{36}$/i.test(id)));
@@ -173,8 +197,12 @@ async function sessionTokens({ claudeDirs = [], ids = [] }) {
       for (const id of want) {
         const s = await cached(path.join(dir, 'projects', p.name, `${id}.jsonl`), parseClaude);
         if (!s) continue;
-        const total = Object.values(s.days).reduce((n, r) => n + r.input + r.output + r.cacheRead + r.cacheWrite, 0);
-        out[id] = (out[id] || 0) + total;
+        const row = sessionRow(s);
+        const prev = out[id] || { tokens: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0, context: 0 };
+        out[id] = {
+          tokens: prev.tokens + row.input + row.output + row.cacheRead + row.cacheWrite, context: row.context || prev.context,
+          input: prev.input + row.input, output: prev.output + row.output, cacheRead: prev.cacheRead + row.cacheRead, cacheWrite: prev.cacheWrite + row.cacheWrite,
+        };
       }
     }
   }
