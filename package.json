@@ -1,7 +1,7 @@
 {
   "name": "agentboard",
   "productName": "AgentBoard",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "description": "A desktop board of real terminals to run Claude Code, Codex, Gemini CLI and other coding agents side by side, on your own subscriptions. macOS and Windows.",
   "keywords": [
     "claude-code",
