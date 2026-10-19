@@ -1,6 +1,8 @@
 // Usage and savings: activity per day (GitHub style), tokens per subscription and task effectiveness.
 let usageMetric = 'tokens';
 let usageData = null;
+const sessionView = { agent: 'all', sort: 'recent', all: false }; // the By Session table's filter, order and length
+const SESSION_ROWS = 25;
 
 const median = (xs) => { if (!xs.length) return 0; const s = [...xs].sort((a, b) => a - b); return s[Math.floor(s.length / 2)]; };
 const dayKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -51,6 +53,38 @@ function costByProject(rows, perToken) {
     ${rows.map((r) => `<tr><td title="${esc(r.path)}">${esc(r.name)}</td><td>${fmt.count(r.today)}</td><td>${fmt.count(r.week)}</td><td>${fmt.count(r.month)}</td><td>${CostEstimate.fmt(r.month * perToken)}</td>
       <td><span class="spark">${r.last30.map((d) => `<i style="height:${Math.max(d.tokens ? 8 : 0, Math.round((d.tokens / max) * 100))}%" title="${esc(d.day)}: ${fmt.count(d.tokens)}"></i>`).join('')}</span></td></tr>`).join('')}
   </tbody></table>`;
+}
+
+// One row per CLI session, so you can see which conversations cost the most. A Claude session
+// that a card or a task ran is named after it; the rest show their project.
+function sessionsTable(list) {
+  if (!list?.length) return '';
+  const label = (s) => (cfg.agents[s.agent]?.label || s.agent) + (s.account ? ` · ${s.account}` : '');
+  const owner = (s) => (s.id && (cfg.cards.find((c) => c.sessionId === s.id)?.title || tasks().find((t) => t.sessionId === s.id)?.text)) || '';
+  const agents = [...new Set(list.map((s) => s.agent))];
+  if (!agents.includes(sessionView.agent)) sessionView.agent = 'all';
+  let rows = list.filter((s) => sessionView.agent === 'all' || s.agent === sessionView.agent);
+  if (sessionView.sort === 'tokens') rows = [...rows].sort((a, b) => b.tokens - a.tokens);
+  const shown = sessionView.all ? rows : rows.slice(0, SESSION_ROWS);
+  const when = (ts) => (ts ? `${new Date(ts).toLocaleDateString()} ${fmt.clock(ts)}` : '—');
+  const seg = (key, opts) => `<div class="seg" data-sv="${key}">${opts.map(([v, l, tip]) =>
+    `<button type="button" data-v="${esc(v)}" class="${sessionView[key] === v ? 'active' : ''}" title="${esc(tip)}">${esc(l)}</button>`).join('')}</div>`;
+  return `<div class="u-sess-head">
+      ${seg('agent', [['all', 'All', 'Sessions of every subscription'], ...agents.map((a) => [a, cfg.agents[a]?.label || a, `Only ${cfg.agents[a]?.label || a} sessions`])])}
+      ${seg('sort', [['recent', 'Recent', 'Most recently used first'], ['tokens', 'Most Tokens', 'The most expensive sessions first']])}
+    </div>
+    <table class="u-cost u-sess"><thead><tr><th>Subscription</th><th>Card or project</th><th>Last used</th><th title="Answers in the session">Turns</th>
+      <th title="Every token of the session: input, cache reads and writes, and output">Tokens</th>
+      <th title="What the last answer had to read. It is paid again on every turn, so a big number means /compact or a new session would save tokens">Context</th></tr></thead><tbody>
+    ${shown.map((s) => {
+      const name = owner(s);
+      return `<tr><td>${esc(label(s))}</td><td title="${esc(s.cwd || '')}">${esc(name || basename(s.cwd || '') || '—')}${name && s.cwd ? ` <span class="muted">${esc(basename(s.cwd))}</span>` : ''}</td>
+        <td>${when(s.last)}</td><td>${s.messages}</td>
+        <td title="Input ${fmt.count(s.input)} · cache read ${fmt.count(s.cacheRead)} · cache write ${fmt.count(s.cacheWrite)} · output ${fmt.count(s.output)}">${fmt.count(s.tokens)}</td>
+        <td class="${s.context >= CONTEXT_WARN ? 'warn' : ''}">${s.context ? fmt.count(s.context) : '—'}</td></tr>`;
+    }).join('')}
+    </tbody></table>
+    ${rows.length > SESSION_ROWS ? `<button type="button" class="ghost" data-sv-more title="${sessionView.all ? 'Show only the first sessions' : 'Show every session in the list'}">${sessionView.all ? 'Show Fewer' : `Show All ${rows.length}`}</button>` : ''}`;
 }
 
 // Progress of every budget set in Settings (all projects and per project).
@@ -107,11 +141,22 @@ function renderUsage() {
       ${tile('Tokens per task', ts.tokensPerTask.length ? fmt.count(median(ts.tokensPerTask)) : '—', 'median (Claude tasks)')}
     </div>
     <h3>By Subscription</h3><div class="rows">${agentRows}</div>
+    ${usageData.sessions?.length ? `<h3>By Session</h3><div id="usageSessions">${sessionsTable(usageData.sessions)}</div>` : ''}
     ${budgetRows ? `<h3>Budgets</h3><div class="rows">${budgetRows}</div>` : ''}
     ${projRows ? `<h3>Cost by Project</h3>${projRows}` : ''}
     <p class="muted small">Read from the Claude Code and Codex logs on this computer; nothing leaves it.
       Savings are an estimate: a cache read costs about 10% of normal input.</p>`;
   $('#usageMetric').onclick = (e) => { const k = e.target.closest('button')?.dataset.k; if (k) { usageMetric = k; renderUsage(); } };
+  const sess = $('#usageSessions');
+  if (sess) {
+    sess.onclick = (e) => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      if (b.hasAttribute('data-sv-more')) sessionView.all = !sessionView.all;
+      else { const key = b.closest('[data-sv]')?.dataset.sv; if (!key) return; sessionView[key] = b.dataset.v; sessionView.all = false; }
+      sess.innerHTML = sessionsTable(usageData.sessions);
+    };
+  }
 }
 
 $('#usageBtn').onclick = openUsage;

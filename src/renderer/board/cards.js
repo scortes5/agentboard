@@ -64,7 +64,7 @@ function mountCard(c, { resume }) {
       <span class="title">${esc(c.title)}</span>
       ${c.type === 'term' ? `<span class="proj" title="${esc(c.cwd || 'Home folder')}">${esc(basename(c.cwd) || '~')}</span>` : ''}
       <span class="spacer"></span>
-      ${c.type === 'term' ? `<span class="alertpill hidden" title="">${icon('alert', 12)}</span><span class="gitpill hidden"></span>
+      ${c.type === 'term' ? `<span class="alertpill hidden" title="">${icon('alert', 12)}</span><span class="tokpill hidden"></span><span class="gitpill hidden"></span>
         <button class="card-btn" data-act="open" title="Open the project folder in Finder">${icon('folder', 14)}</button>
         <button class="card-btn" data-act="restart" title="Restart the agent (resumes its session)">${icon('refresh', 14)}</button>` : ''}
       <button class="card-btn" data-act="edit" title="${c.type === 'term' ? 'Change name, agent, project or arguments; send context to another agent' : 'Edit or duplicate the note'}">${icon('more', 14)}</button>
@@ -75,7 +75,7 @@ function mountCard(c, { resume }) {
     <div class="resize"></div>`;
   world.appendChild(el);
 
-  const rt = { el, statusEl: $('.status', el), gitEl: $('.gitpill', el), alertEl: $('.alertpill', el), lastData: 0, busySince: 0, alive: false, alert: null };
+  const rt = { el, statusEl: $('.status', el), gitEl: $('.gitpill', el), tokEl: $('.tokpill', el), alertEl: $('.alertpill', el), lastData: 0, busySince: 0, alive: false, alert: null };
   runtime.set(c.id, rt);
   const body = $('.card-body', el);
 

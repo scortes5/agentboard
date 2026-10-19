@@ -2,7 +2,10 @@
 // session logs), a budget per task, the usage that the day/week/month budgets are measured
 // against (Budgets) and the history the router learns from.
 'use strict';
-/* global cfg, esc, ab, toast, save, cardData, runtime, tasks, updateTaskLive, fmt, viewLayout, budgets */
+/* global cfg, esc, ab, toast, save, cardData, runtime, tasks, updateTaskLive, fmt, viewLayout, budgets, openUsage */
+
+// A session that re-reads this much on every turn is worth compacting or restarting.
+const CONTEXT_WARN = 150_000;
 
 class CostTracker {
   constructor() {
@@ -18,18 +21,39 @@ class CostTracker {
   // The day/week/month budget a task in `cwd` is over ("weekly budget of shop-api"), or null.
   overBudget(cwd) { return budgets.over(cwd); }
 
-  // Tokens of the running tasks; once a task reaches its budget, warn or ask it to wrap up.
+  // Tokens of the running tasks and of every Claude card's session, read in one call. Once a
+  // task reaches its budget, warn or ask it to wrap up.
   async pollTasks() {
     const running = tasks().filter((t) => t.status === 'running' && t.sessionId);
-    if (!running.length) return;
-    const r = await ab.usageSessions(running.map((t) => t.sessionId));
+    const cards = cfg.cards.filter((c) => c.type === 'term' && c.sessionId && c.sessionUsed && runtime.get(c.id)?.tokEl);
+    const ids = [...new Set([...running.map((t) => t.sessionId), ...cards.map((c) => c.sessionId)])];
+    if (!ids.length) return;
+    const r = await ab.usageSessions(ids);
     if (!r.ok) return;
+    for (const c of cards) this.showCardTokens(c, r.value[c.sessionId]);
+    if (!running.length) return;
     for (const t of running) {
-      t.tokens = r.value[t.sessionId] || t.tokens || 0;
+      t.tokens = r.value[t.sessionId]?.tokens || t.tokens || 0;
       if (this.taskBudget() && !t.budgetHit && t.tokens >= this.taskBudget()) this.budgetReached(t);
     }
     save();
     if (viewLayout.visible('tasks')) updateTaskLive();
+  }
+
+  // The card's session so far, in its header; the tooltip splits it and flags a heavy context.
+  showCardTokens(c, s) {
+    const el = runtime.get(c.id)?.tokEl;
+    if (!el) return;
+    el.classList.toggle('hidden', !s?.tokens);
+    if (!s?.tokens) return;
+    const heavy = s.context >= CONTEXT_WARN;
+    el.textContent = `${fmt.tokens(s.tokens)} tok`;
+    el.classList.toggle('warn', heavy);
+    el.title = `This session: ${fmt.count(s.tokens)} tokens (input ${fmt.count(s.input)}, cache read ${fmt.count(s.cacheRead)}, `
+      + `cache write ${fmt.count(s.cacheWrite)}, output ${fmt.count(s.output)}).\nEach turn re-reads ${fmt.count(s.context)} tokens of context.`
+      + (heavy ? ' That is a lot: /compact or a new session would save tokens.' : '')
+      + '\nClick to open Usage.';
+    el.onclick = openUsage;
   }
 
   budgetReached(t) {
