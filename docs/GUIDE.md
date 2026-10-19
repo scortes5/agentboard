@@ -260,6 +260,7 @@ Your subscription has a usage limit. These habits make it go further:
 3. **Use `!` for simple tasks** (text, renaming, questions): they use a cheaper model.
 4. **Prefer Tasks over long conversations**: each task starts with a clean memory.
 5. **If you have two Claude accounts**, add them under *Subscriptions*: the queue spreads work across both and, if one hits its limit, carries on with the other.
+6. **Watch what each session costs.** Every Claude card shows its session's tokens in the header; it turns orange when each turn re-reads a lot of context (150k tokens or more), which is the moment to run `/compact` or start a new session. *Usage* → *By Session* lists every Claude and Codex session, most recent or most expensive first, per subscription.
 
 ---
 
