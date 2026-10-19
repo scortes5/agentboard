@@ -116,14 +116,19 @@ function issuePrompt(issue) {
     + `<<<ISSUE\n${issue.body.slice(0, 3000).replace(/ISSUE>>>/g, 'ISSUE>>')}\nISSUE>>>\n`;
 }
 
+// /goal, /loop and scheduled wakeups keep an agent running turn after turn, spending tokens even
+// when the work is done: the agent may use them only when the task itself asks for it.
+const NO_LOOPS = '(Finish in this session: do not start /goal, /loop, scheduled wakeups or recurring jobs unless the task explicitly asks to repeat something or keep watching over time.)';
+
 function taskPrompt(t, subagents = false) {
   const custom = taskPipeline.prompt(t);
-  if (custom) return custom;
+  if (custom) return `${custom}\n${NO_LOOPS}`;
   const max = cfg.maxSubagents || 4;
   return `[AgentBoard task ${t.id}] ${t.text}\n`
     + issuePrompt(t.issue)
     + groundRules.forTask(t)
     + '(Only this, keep it short; use the agentboard-task skill if you have it. When finished, call complete_task if available and end with the line «DONE: …» or «BLOCKED: …».)'
+    + `\n${NO_LOOPS}`
     + (subagents && !t.light
       ? `\n(If the task has parts that can be done at the same time, split it: open up to ${max} helpers with the AgentBoard tool start_agent — light=true for simple parts, each with a self-contained message — so they work in parallel on the user's board next to you. Follow them with read_agent_output, check and combine their work, then write your own DONE line. Do not split small tasks.)`
       : '');
@@ -394,13 +399,15 @@ function renderTasks() {
     const done = B('done', 'check', 'Mark as done');
     const retry = B('retry', 'refresh', 'Put it back in the queue');
     const del = B('del', 'trash', 'Delete the task');
+    const open = taskCards(t).length;
+    const close = open ? B('close', 'close', open === 1 ? 'Close its terminal' : `Close its ${open} terminals: the agent and the subagents it opened`) : '';
     const acts = {
       pending: B('top', 'up', 'Move to the top of the queue') + B('run', 'play', 'Run now, without waiting for the queue') + del,
-      running: go + done,
-      verifying: go,
-      review: wt + go + done,
-      blocked: wt + undo + go + retry + done,
-      done: wt + undo + retry + del,
+      running: go + done + close,
+      verifying: go + close,
+      review: wt + go + done + close,
+      blocked: wt + undo + go + retry + done + close,
+      done: wt + undo + retry + close + del,
     }[t.status];
     return `<div class="task st-${t.status}" data-id="${esc(t.id)}">
       <span class="tdot" title="${STATUS[t.status]}"></span>
@@ -479,6 +486,23 @@ function updateProgress() {
 
 function taskById(id) { return tasks().find((t) => t.id === id); }
 
+// Every terminal working for a task: its agent card and the subagents it opened, at any depth.
+function taskCards(t) {
+  const ids = new Set(cfg.cards.filter((c) => c.type === 'term' && (c.id === t.cardId || c.taskId === t.id || c.parentTask === t.id)).map((c) => c.id));
+  for (let grew = true; grew;) {
+    grew = false;
+    for (const c of cfg.cards) if (c.parent && ids.has(c.parent) && !ids.has(c.id)) { ids.add(c.id); grew = true; }
+  }
+  return cfg.cards.filter((c) => ids.has(c.id));
+}
+
+// One confirmation for all of them; a running task whose card closes goes to review.
+function closeTaskCards(list) {
+  const cards = [...new Set(list.flatMap(taskCards))];
+  if (!cards.length) { toast('No terminals are open for these tasks.'); return; }
+  if (closeCards(cards)) { tickTasks(); renderTasks(); }
+}
+
 $('#taskList').addEventListener('click', (e) => {
   const ap = e.target.closest('[data-approve]');
   if (ap) { approvalsInbox.decide(ap.dataset.card, ap.dataset.approve === 'yes'); return; }
@@ -501,6 +525,8 @@ $('#taskList').addEventListener('click', (e) => {
     if (c) { if (diagramOpen()) toggleDiagram(false); focusCardView(c); focusCard(c.id); }
   } else if (act === 'done') {
     finishTask(t, 'done', t.summary || 'Marked by hand.'); save(); renderTasks();
+  } else if (act === 'close') {
+    closeTaskCards([t]);
   } else if (act === 'trust') {
     acceptTrust(t);
   } else if (act === 'top') {
@@ -717,6 +743,7 @@ function initTasks() {
       renderTasks();
     }
   });
+  $('#taskCloseDone').onclick = () => closeTaskCards(tasks().filter((t) => t.status === 'done' || t.status === 'blocked'));
   $('#taskClear').onclick = () => { cfg.tasks = tasks().filter((t) => t.status !== 'done'); save(); renderTasks(); };
   $('#taskSummary').onclick = dailySummary;
 }

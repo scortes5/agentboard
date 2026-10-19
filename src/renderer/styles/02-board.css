@@ -1,7 +1,9 @@
 /* AgentBoard — The board: agent list, minimap, cards and popovers. */
 /* ---------- Infinite board ---------- */
+/* z-index 0 makes the board its own stacking layer: each focus raises a card's z-index without
+   limit, and without this layer cards ended up above the top bar, menus and popovers. */
 #board {
-  position: absolute; inset: 0; overflow: hidden; cursor: default;
+  position: absolute; inset: 0; overflow: hidden; cursor: default; z-index: 0;
   background-color: var(--bg);
   background-image:
     radial-gradient(rgba(var(--fg-rgb), .075) 1.1px, transparent 1.3px),
