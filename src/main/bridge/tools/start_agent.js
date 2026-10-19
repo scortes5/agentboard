@@ -35,7 +35,9 @@ module.exports = {
       while (!bridge.ptys.has(id) && Date.now() - t0 < 8000) await new Promise((r) => setTimeout(r, 200));
       await new Promise((r) => setTimeout(r, 4000));
       const from = cfg.cards.find((c) => c.id === ctx.from);
-      bridge.paste(id, `[Task from ${from ? from.title : 'another agent'} via AgentBoard]\n${String(args.message).slice(0, 20000)}`);
+      // Subagents get the same rule as task agents: no /goal or /loop unless the task asks to repeat.
+      bridge.paste(id, `[Task from ${from ? from.title : 'another agent'} via AgentBoard]\n${String(args.message).slice(0, 20000)}\n`
+        + '(Finish in this session: do not start /goal, /loop, scheduled wakeups or recurring jobs unless the task explicitly asks to repeat something or keep watching over time.)');
     }
     return `Opened a ${cfg.agents[key].label} agent${args.light ? ' in saving mode' : ''} (id ${id}).${args.message ? ' Sent it the task.' : ''} Use read_agent_output with that id to follow its progress.`;
   },

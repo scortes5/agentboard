@@ -174,6 +174,8 @@ Writing to each agent works, but when you have several to-dos the **Tasks** pane
 - `@claude` = have that specific subscription do it.
 - `#name` = open the agent inside that board group.
 
+**Done with a task?** Its close button closes the agent's terminal and every subagent it opened, after one confirmation. The close button next to *Clear* does it for every finished or blocked task at once.
+
 **What did each agent change?** The **Work** button lists the tasks in progress and, for each finished one, the files it touched (with lines added and removed), the commits it made and its branch. Files that already had changes before the task started are marked *pre-existing*.
 
 > **Not sure how to split the work?** With **Route** on (the default), just write everything, even in one paragraph, and press **Add**: Claude's cheapest model breaks it into tasks, picks who does each one and they run in parallel.
