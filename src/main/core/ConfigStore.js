@@ -6,6 +6,7 @@ const os = require('os');
 const path = require('path');
 const { IS_WIN } = require('./platform');
 const { defaultAgents } = require('../agents/registry');
+const { DEFAULTS: DESKTOP_DEFAULTS } = require('../notifications/DesktopNotifications');
 
 class ConfigStore {
   // dataDir: where board.json lives (the app's userData folder).
@@ -23,6 +24,8 @@ class ConfigStore {
       fontSize: 13,
       resumeOnOpen: true,      // when the app reopens, relaunch agents with their "resume" args
       keepRunning: true,       // closing the window hides it; agents keep working (quit with ⌘Q / tray)
+      idleCloseMin: 0,         // stop agent terminals idle this many minutes (0 = never); Restart resumes them
+      desktopNotifications: { ...DESKTOP_DEFAULTS },
       maxParallel: 3,          // tasks running at once, across all subscriptions
       perAgentParallel: 2,     // tasks running at once per subscription
       taskWorktrees: false,    // each task in its own git worktree, so agents don't step on each other

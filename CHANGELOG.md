@@ -4,6 +4,28 @@ All notable changes to AgentBoard. The format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-10-19
+
+### Added
+- **Close a task's terminals**: each task in the Tasks panel has a button that closes its agent card and every subagent it opened, with one confirmation. The new button next to *Clear* does the same for every finished or blocked task.
+
+### Changed
+- Task agents and the subagents they open are told to finish in their session and not to start `/goal`, `/loop`, scheduled wakeups or recurring jobs unless the task explicitly asks to repeat something or keep watching. The bundled `agentboard-task` skill says the same; update it from *Skills and Agents → Token Saving*.
+
+### Fixed
+- Cards no longer cover the top bar, menus and popovers after you click on them many times.
+- The Tasks panel's filter row wraps on narrow panels instead of cutting off its last buttons.
+
+## [1.6.0] - 2026-10-19
+
+### Added
+- **Work summaries**: the *Work* button shows what each agent is doing and, for every finished task, the files it changed (lines added and removed), its commits and its branch. Files that were already modified before the task started are flagged as pre-existing.
+- **Desktop notifications for tasks**: native notifications when a task starts, is done, is blocked or needs review, and when an agent without a task finishes working. *Settings → General → Notifications* chooses which ones, the sound and whether they only show while AgentBoard is in the background, with a *Test* button. Clicking one brings the window forward on that card.
+- **Stop idle agents**: optionally stop agent cards with no task in progress after a number of minutes without activity (*Settings → General*, off by default). Plain terminals are never stopped and *Restart* resumes the session.
+
+### Changed
+- Board zoom now goes from 10% to 100%; boards saved with a zoom outside that range are adjusted when opened.
+
 ## [1.5.1] - 2026-10-18
 
 ### Added
@@ -262,7 +284,9 @@ Includes the 0.2.0 changes, which were not released separately.
 ### Added
 - First release: a board of terminals for CLI agents on Mac and Windows.
 
-[Unreleased]: https://github.com/scortes5/agentboard/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/scortes5/agentboard/compare/v1.7.0...HEAD
+[1.7.0]: https://github.com/scortes5/agentboard/compare/v1.6.0...v1.7.0
+[1.6.0]: https://github.com/scortes5/agentboard/compare/v1.5.1...v1.6.0
 [1.0.1]: https://github.com/scortes5/agentboard/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/scortes5/agentboard/compare/v0.9.0...v1.0.0
 [0.9.0]: https://github.com/scortes5/agentboard/compare/v0.8.0...v0.9.0

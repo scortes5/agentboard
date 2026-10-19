@@ -2,7 +2,9 @@
 // what it needs and hands them to the App. Each service owns one area and registers its own
 // IPC channels; nothing else creates services or wires them together.
 'use strict';
-const { app, safeStorage } = require('electron');
+const { app, safeStorage, Notification } = require('electron');
+const path = require('path');
+const { IS_WIN } = require('./core/platform');
 const { ConfigStore } = require('./core/ConfigStore');
 const { ShellEnv } = require('./shell/ShellEnv');
 const { PtyHost } = require('./terminals/PtyHost');
@@ -26,6 +28,8 @@ const { SecretVault } = require('./secrets/SecretVault');
 const { CommandRunner } = require('./flows/CommandRunner');
 const { AuditLog } = require('./security/AuditLog');
 const { TlsIdentity } = require('./remote/TlsIdentity');
+const { DesktopNotifications } = require('./notifications/DesktopNotifications');
+const { WorkLog } = require('./git/WorkLog');
 const { App } = require('./app/App');
 const { AppMenu } = require('./app/AppMenu');
 const { TrayIcon } = require('./app/TrayIcon');
@@ -66,6 +70,15 @@ const claudeAccounts = new ClaudeAccounts({ config });
 const confirmRestart = () => { if (!application.confirmQuit()) return false; application.quitting = true; return true; };
 const updater = new Updater({ send, config, onBeforeInstall: confirmRestart });
 const menu = new AppMenu({ config, send, checkUpdates: () => updater.check(true), reload: () => application.win?.reload() });
+// Clicking a notification brings the window forward and shows the card it is about.
+const desktopNotifications = new DesktopNotifications({
+  Notification,
+  getPreferences: () => config.load().desktopNotifications,
+  isFocused: () => !!application?.win && !application.win.isDestroyed() && application.win.isFocused(),
+  onClick: (cardId) => { application.showWindow(); if (cardId) send('desktop:click', cardId); },
+});
+// Windows only shows notifications for an app with an identity (the installer's appId).
+if (IS_WIN) app.setAppUserModelId('cl.scortes.agentboard');
 const quickKey = new QuickKey({ config, onPress: () => { application.showWindow(); send('menu', 'quick-task'); } });
 
 application = new App({
@@ -77,6 +90,7 @@ application = new App({
     new AgentCatalog({ config, shellEnv }), new LocalModels({ shellEnv }), claudeAccounts,
     new GroundRules({ config, claudeAccounts }),
     new SkillLibrary({ config }), new SkillPack({ claudeAccounts }), new UsageService({ dataDir, claudeAccounts }),
+    desktopNotifications, new WorkLog({ file: path.join(dataDir, 'work-log.json'), runner }),
     new TaskPlanner({ shellEnv }), new CommandRunner({ shellEnv, vault, audit }), vault, audit,
     new RemoteServer({ config, send, audit, tls: new TlsIdentity({ dataDir }) }), new WebhookNotifier({ vault }), new GitHubIssues({ shellEnv }),
   ],

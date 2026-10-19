@@ -49,6 +49,27 @@ jobs:
             head -1 "$f" | grep -qx -- '---' || { echo "::error file=$f::missing YAML front matter"; exit 1; }
           done
 
+  # Branch protection on main requires this check: every release bumps the version in
+  # three files together and documents it in the changelog.
+  version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Version is the same everywhere
+        run: |
+          pkg=$(node -p "require('./package.json').version")
+          lock=$(node -p "require('./package-lock.json').version")
+          lockRoot=$(node -p "require('./package-lock.json').packages[''].version")
+          mcp=$(sed -n "s/^const VERSION = '\(.*\)';$/\1/p" scripts/agentboard-mcp.js)
+          echo "package.json $pkg · package-lock.json $lock/$lockRoot · agentboard-mcp.js $mcp"
+          for v in "$lock" "$lockRoot" "$mcp"; do
+            [ "$v" = "$pkg" ] || { echo "::error::version mismatch: expected $pkg everywhere"; exit 1; }
+          done
+      - name: Changelog has the version
+        run: |
+          pkg=$(node -p "require('./package.json').version")
+          grep -q "^## \[$pkg\]" CHANGELOG.md || { echo "::error file=CHANGELOG.md::no section for $pkg"; exit 1; }
+
   # Opens the real app on Linux (no display needed) and drives a task end to end with a fake agent.
   e2e:
     runs-on: ubuntu-latest

@@ -30,3 +30,17 @@ function ping(id) {
   void el.offsetWidth; // restart the animation
   el.classList.add('pinged');
 }
+
+// ---------- Desktop notifications ----------
+// Native notifications go through the main process, which applies Settings → General → Notifications.
+// Failures only reach the console: a notice about a notice that could not be shown would be noise.
+function notifyDesktop(kind, { cardId, text, summary } = {}) {
+  ab.desktopNotify({ kind, cardId, body: [text, summary].filter(Boolean).join('\n') })
+    .then((r) => { if (!r.ok) console.warn('Desktop notification:', r.error); })
+    .catch((err) => console.warn('Desktop notification:', err.message));
+}
+
+ab.onDesktopClick((id) => {
+  const c = cfg && cardData(id);
+  if (c) { focusCardView(c); focusCard(id); }
+});

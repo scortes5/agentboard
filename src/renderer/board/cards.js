@@ -95,7 +95,7 @@ function mountCard(c, { resume }) {
     term.loadAddon(new WebLinksAddon.WebLinksAddon((_e, url) => window.open(url)));
     term.open(body);
     term.attachCustomKeyEventHandler((e) => clipboardKeys(e, term));
-    term.onData((d) => ab.ptyWrite(c.id, d));
+    term.onData((d) => { rt.lastActivity = Date.now(); ab.ptyWrite(c.id, d); });
     term.textarea && term.textarea.addEventListener('focus', () => focusCard(c.id, false));
     rt.term = term; rt.fit = fit;
     layoutCard(c);
@@ -160,7 +160,8 @@ async function startPty(c, resume) {
   const res = await ab.ptyCreate({ id: c.id, cwd: c.cwd, command, env: Object.keys(env).length ? env : undefined, cols: rt.term.cols, rows: rt.term.rows });
   if (!res.ok) { showOverlay(c, res.error); return; }
   rt.alive = true;
-  rt.lastData = Date.now();
+  rt.idleClosed = false;
+  rt.lastData = rt.lastActivity = Date.now();
   if (focusedId === c.id) rt.term.focus();
   let dirty = false;
   if (c.sessionId && !c.sessionUsed && isClaude(agentOf(c))) { c.sessionUsed = true; dirty = true; }

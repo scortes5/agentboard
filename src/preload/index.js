@@ -15,6 +15,11 @@ contextBridge.exposeInMainWorld('ab', {
   gitBranches: (cwd) => ipcRenderer.invoke('git:branches', cwd),
   gitCheckout: (cwd, branch, create) => ipcRenderer.invoke('git:checkout', cwd, branch, create),
 
+  // Native notifications for task automations and finished agents
+  desktopNotify: (event) => ipcRenderer.invoke('desktop:notify', event),
+  desktopTest: (prefs) => ipcRenderer.invoke('desktop:test', prefs),
+  onDesktopClick: (cb) => ipcRenderer.on('desktop:click', (_e, id) => cb(id)),
+
   // Config and system
   loadConfig: () => ipcRenderer.invoke('config:load'),
   saveConfig: (cfg) => ipcRenderer.invoke('config:save', cfg),
@@ -65,6 +70,9 @@ contextBridge.exposeInMainWorld('ab', {
   applyQuickKey: () => ipcRenderer.invoke('app:quickKey'),
   packStatus: () => ipcRenderer.invoke('pack:status'),
   packInstall: (providers) => ipcRenderer.invoke('pack:install', providers),
+  workBegin: (taskId, cwd) => ipcRenderer.invoke('work:begin', taskId, cwd),
+  workFinish: (task) => ipcRenderer.invoke('work:finish', task),
+  workRecent: () => ipcRenderer.invoke('work:recent'),
   usageScan: (tasks) => ipcRenderer.invoke('usage:scan', tasks),
   usageSessions: (ids) => ipcRenderer.invoke('usage:sessions', ids),
   localModels: () => ipcRenderer.invoke('local:models'),
