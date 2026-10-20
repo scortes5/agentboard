@@ -4,6 +4,20 @@ All notable changes to AgentBoard. The format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+### Added
+- **Branches view**: a branch button in the Tasks panel (and *All branches…* in a card's branch menu) lists every branch of the project, the ones being worked on first, with the tasks and agent cards on each, its worktree, last commit, commits ahead of and behind the main branch, and whether it is pushed. Switch to a branch or copy its name from there.
+- **Automation history**: the automations list shows when each one last ran, and its panel shows the next scheduled run and the last runs with their result and duration.
+
+### Changed
+- **Issues** has a cleaner layout: label colors, age, author, comments, assignees and milestone for each issue, a text filter, label filters, *Select all*, a button to read the issue's text and another to open it on GitHub.
+
+### Fixed
+- Automations: a new daily schedule (for example the *Nightly tests* template created in the afternoon) no longer runs right away, and turning an automation back on no longer catches up on missed runs.
+- Automations: what you type in the side panel, and nodes you drag, are no longer lost when a running automation refreshes the diagram.
+- Automations: a *Command* step set to run in the previous task's folder uses the task that leads to it, not one from a parallel branch.
+- Automations: deleting a running automation stops it first; skipped steps are no longer passed to agents as context; a stopped run says so; a *Decision* answered "Sí" counts as yes.
+- The *Fix a GitHub issue* template accepts only an issue number.
+
 ## [1.8.0] - 2026-10-19
 
 ### Added

@@ -167,6 +167,25 @@ test('issues say whether their author belongs to the project; pull requests are 
   assert.deepEqual(list.map((i) => [i.number, i.author, i.trusted]), [[1, 'me', true], [2, 'stranger', false]]);
 });
 
+test('the branch overview reads refs and worktrees', () => {
+  const { GitService } = require('../src/main/git/GitService');
+  const [a, b] = GitService.parseRefs('main\t1700000000\tAna\torigin/main\tbehind 2\tabc1234\tFix: a\tb\nfeat/x\t1700000100\tBo\t\t\tdef5678\tAdd x\n');
+  assert.deepEqual([a.name, a.at, a.upstream, a.behind, a.ahead, a.subject], ['main', 1700000000000, 'origin/main', 2, 0, 'Fix: a\tb']);
+  assert.deepEqual([b.name, b.upstream, b.gone], ['feat/x', '', false]);
+  assert.deepEqual(GitService.parseWorktrees('worktree /r\nHEAD 1\nbranch refs/heads/main\n\nworktree /r/.agentboard/worktrees/t\nHEAD 2\nbranch refs/heads/agentboard/t\n'),
+    { main: '/r', 'agentboard/t': '/r/.agentboard/worktrees/t' });
+});
+
+test('issue label colors are kept only when they are plain hex', () => {
+  const { GitHubIssues } = require('../src/main/integrations/GitHubIssues');
+  const [i] = GitHubIssues.parse(JSON.stringify([
+    { number: 1, title: 'Bug', labels: [{ name: 'bug', color: 'd73a4a' }, { name: 'x', color: 'red;background:url(x)' }], comments: 2, created_at: '2026-01-02T00:00:00Z', user: { login: 'me' }, author_association: 'OWNER' },
+  ]));
+  assert.deepEqual(i.labelColors, { bug: 'd73a4a' });
+  assert.equal(i.comments, 2);
+  assert.equal(i.createdAt, Date.parse('2026-01-02T00:00:00Z'));
+});
+
 test('the audit log keeps one JSON line per event, newest first', () => {
   const { AuditLog } = require('../src/main/security/AuditLog');
   const log = new AuditLog({ dataDir: fs.mkdtempSync(path.join(os.tmpdir(), 'audit-')) });

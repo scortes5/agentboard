@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('ab', {
   // Git
   gitStatus: (cwd) => ipcRenderer.invoke('git:status', cwd),
   gitBranches: (cwd) => ipcRenderer.invoke('git:branches', cwd),
+  gitOverview: (cwd) => ipcRenderer.invoke('git:overview', cwd),
   gitCheckout: (cwd, branch, create) => ipcRenderer.invoke('git:checkout', cwd, branch, create),
 
   // Native notifications for task automations and finished agents
