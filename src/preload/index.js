@@ -50,7 +50,6 @@ contextBridge.exposeInMainWorld('ab', {
   // Tasks, worktrees and token-saving skills
   planTasks: (text, opts) => ipcRenderer.invoke('tasks:plan', text, opts),
   gitWorktree: (cwd, slug) => ipcRenderer.invoke('git:worktree', cwd, slug),
-  worktreeInfo: (dir, branch) => ipcRenderer.invoke('git:worktreeInfo', dir, branch),
   worktreeMerge: (dir, branch, msg) => ipcRenderer.invoke('git:worktreeMerge', dir, branch, msg),
   worktreeDiscard: (dir, branch) => ipcRenderer.invoke('git:worktreeDiscard', dir, branch),
   // Review: checkpoints, the full diff of a task and pull requests

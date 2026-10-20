@@ -37,23 +37,6 @@ class WorktreeService {
     } catch {}
   }
 
-  async info(dir, branch) {
-    if (!dir || !fs.existsSync(dir)) throw new Error('The worktree no longer exists.');
-    const top = await this.git.worktreeTop(dir);
-    const base = await this.git.text(top, ['rev-parse', '--abbrev-ref', 'HEAD']);
-    const [dirty, ahead, stat, wip] = await Promise.all([
-      this.git.run(dir, ['status', '--porcelain']),
-      this.git.run(top, ['rev-list', '--count', `${base}..${branch}`]),
-      this.git.run(top, ['diff', '--stat', `${base}...${branch}`]),
-      this.git.text(dir, ['diff', '--stat', 'HEAD']),
-    ]);
-    const uncommitted = dirty.out.trim() ? `Uncommitted:\n${dirty.out.trimEnd()}${wip ? `\n\n${wip}` : ''}` : '';
-    return {
-      base, top, branch, uncommitted: dirty.out.split('\n').filter(Boolean).length, commits: parseInt(ahead.out, 10) || 0,
-      stat: [stat.out.trim(), uncommitted].filter(Boolean).join('\n\n').split('\n').slice(-40).join('\n'),
-    };
-  }
-
   // The diff of a task: its worktree since its branch left the base, or its folder since its checkpoint.
   async fullDiff({ dir, branch, checkpoint }) {
     if (!branch) return this.gitService.diffSince(dir, checkpoint);
@@ -106,7 +89,6 @@ class WorktreeService {
 
   register(ipcMain) {
     ipcMain.handle('git:worktree', wrap((_e, cwd, slug) => this.create(cwd, slug)));
-    ipcMain.handle('git:worktreeInfo', wrap((_e, dir, branch) => this.info(dir, branch)));
     ipcMain.handle('git:worktreeMerge', wrap((_e, dir, branch, message) => this.merge(dir, branch, message)));
     ipcMain.handle('git:worktreeDiscard', wrap((_e, dir, branch) => this.discard(dir, branch)));
     ipcMain.handle('git:fullDiff', wrap((_e, opts) => this.fullDiff(opts)));
