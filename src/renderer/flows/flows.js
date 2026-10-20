@@ -2,7 +2,7 @@
 // agents run. Each "Agent" node becomes a queue task (new session, with a short summary
 // of the previous steps = few tokens); independent branches run in parallel.
 'use strict';
-/* global ab, cfg, $, esc, uid, basename, clamp, toast, save, addTask, taskById, subscriptions, agentKeyFrom, projectFrom,
+/* global ab, cfg, fmt, SecretsSettings, $, esc, uid, basename, clamp, toast, save, addTask, taskById, subscriptions, agentKeyFrom, projectFrom,
    openTasks, tickTasks, diagramOpen, toggleDiagram, cardData, focusCardView, focusCard, icon */
 
 const NODE_TYPES = {
@@ -21,7 +21,9 @@ let flowSel = null;          // id of the open flow
 let nodeSel = null;          // id of the selected node
 let edgeSel = null;          // index of the selected connection
 let flowPlan = {};           // flowId -> "Explain Run" text
+let flowDragging = false;    // a node or a connection is being dragged: redraws would drop it
 const activeRuns = new Map(); // flowId -> run
+const RUN_HISTORY = 8;       // runs kept per automation (time, result, duration only)
 
 const flows = () => cfg.flows || (cfg.flows = []);
 const curFlow = () => flows().find((f) => f.id === flowSel);
@@ -50,19 +52,46 @@ function nodeSummary(n) {
   return (c.text || '').slice(0, 90);
 }
 
+// When a scheduled automation runs next (null when it only runs by hand or is off).
+function nextRunAt(f, now = Date.now()) {
+  const c = f.nodes.find((n) => n.type === 'trigger')?.config;
+  if (f.enabled === false || !c || c.mode === 'manual') return null;
+  if (c.mode === 'every') return (f.lastScheduled || now) + Math.max(5, +c.every || 60) * 60_000;
+  const [h, m] = String(c.at || '09:00').split(':').map(Number);
+  const due = new Date(now); due.setHours(h || 0, m || 0, 0, 0);
+  if ((f.lastScheduled || now) >= due.getTime()) due.setDate(due.getDate() + 1);
+  return due.getTime();
+}
+
+const whenText = (ts) => {
+  const d = new Date(ts), today = new Date();
+  const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
+  const day = d.toDateString() === today.toDateString() ? 'today' : d.toDateString() === tomorrow.toDateString() ? 'tomorrow' : d.toLocaleDateString();
+  return `${day} ${fmt.clock(ts)}`;
+};
+
 // ---------- Drawing ----------
 function renderFlowList() {
   $('#flList').innerHTML = flows().map((f) => {
     const run = activeRuns.get(f.id);
     const trig = f.nodes.find((n) => n.type === 'trigger');
-    const sched = trig && trig.config?.mode !== 'manual' && f.enabled !== false;
-    return `<button type="button" class="fl-item ${f.id === flowSel ? 'active' : ''}" data-flow="${esc(f.id)}" title="Open ${esc(f.name)}${f.lastRun ? ` · last run ${new Date(f.lastRun.at).toLocaleString()}` : ''}">
+    const next = trig && nextRunAt(f);
+    const state = run ? 'Running now' : f.lastRun ? `Last run ${whenText(f.lastRun.at)}${f.lastRun.ok ? '' : ' · with errors'}` : 'Never run';
+    return `<button type="button" class="fl-item ${f.id === flowSel ? 'active' : ''}${f.enabled === false ? ' off' : ''}" data-flow="${esc(f.id)}" title="Open ${esc(f.name)}">
       <span class="fl-dot ${run ? 'running' : f.lastRun ? (f.lastRun.ok ? 'ok' : 'fail') : ''}"></span>
-      <span class="fl-item-name">${esc(f.name)}</span>${sched ? `<span class="fl-sched" title="Scheduled: runs on its own according to its trigger">${icon('clock', 13)}</span>` : ''}</button>`;
+      <span class="fl-item-text"><span class="fl-item-name">${esc(f.name)}</span><span class="fl-item-sub">${esc(state)}</span></span>${next ? `<span class="fl-sched" title="Scheduled: next run ${esc(whenText(next))}">${icon('clock', 13)}</span>` : ''}</button>`;
   }).join('') || '<div class="side-empty">No automations yet. Start a blank one, or describe what you want and use Design with AI.</div>';
 }
 
-function renderFlow() {
+// Periodic and log-driven redraws: never in the middle of a drag, and without rebuilding the
+// inspector while you type in it (that would drop the focus and the text being written).
+function refreshFlow() {
+  if (!flowsOpen()) return renderFlowList();
+  if (flowDragging) return renderFlowList();
+  renderFlow({ keepInspector: $('#flInspector').contains(document.activeElement) });
+}
+
+function renderFlow({ keepInspector = false } = {}) {
   renderFlowList();
   const f = curFlow();
   $('#flEmpty').classList.toggle('hidden', !!f);
@@ -94,7 +123,7 @@ function renderFlow() {
   const maxY = Math.max(900, ...f.nodes.map((n) => n.y + 260));
   box.style.width = maxX + 'px'; box.style.height = maxY + 'px';
   drawFlowEdges();
-  renderInspector();
+  if (!keepInspector) renderInspector();
 }
 
 function portPos(nodeId, kind, branch) {
@@ -156,10 +185,14 @@ function renderInspector() {
     const run = activeRuns.get(f.id);
     const trig = f.nodes.find((x) => x.type === 'trigger');
     const last = f.lastRun;
+    const next = nextRunAt(f);
+    const history = (f.runs || []).slice().reverse();
     box.innerHTML = `<h3>Automation</h3>
       <label class="set-row check" title="When off, the schedule is ignored; you can still run it by hand"><span>Enabled (follows its schedule)</span><input type="checkbox" class="switch-input" data-f="enabled" ${f.enabled !== false ? 'checked' : ''}/></label>
       <p class="set-note">${trig ? `Starts ${esc(nodeSummary(trig))}.` : 'Add a Trigger to say when it starts.'}
-        ${last ? `<br/>Last run: ${new Date(last.at).toLocaleString()} — ${last.ok ? 'no errors' : 'with errors'}.` : ''}</p>
+        ${next ? `<br/>Next run: ${esc(whenText(next))}.` : ''}
+        ${last ? `<br/>Last run: ${esc(whenText(last.at))} — ${last.stopped ? 'stopped' : last.ok ? 'no errors' : 'with errors'}.` : ''}</p>
+      ${history.length > 1 ? `<h3>Recent runs</h3><ul class="fl-runs">${history.map((h) => `<li><span class="fl-dot ${h.stopped ? '' : h.ok ? 'ok' : 'fail'}"></span><span>${esc(whenText(h.at))}</span><span class="muted">${esc(h.reason || '')}</span><span class="muted">${h.ms != null ? esc(fmt.elapsed(h.ms)) : ''}</span></li>`).join('')}</ul>` : ''}
       ${run ? `<h3>Running</h3><ol class="fl-log">${run.log.slice(-12).map((l) => `<li>${esc(l)}</li>`).join('')}</ol>` : last?.log ? `<h3>Log</h3><ol class="fl-log">${last.log.slice(-12).map((l) => `<li>${esc(l)}</li>`).join('')}</ol>` : ''}
       ${flowPlan[f.id] ? `<h3>How it runs (AI analysis)</h3><div class="fl-plan">${mdLite(flowPlan[f.id])}</div>` : `<p class="set-note">Select a node to edit it. Drag from the dot on the right of a node to another node to connect them. <kbd>⌫</kbd> deletes the selection.</p>`}
       <div class="row-end"><button type="button" data-x="dup-flow" title="Create a copy of this automation">Duplicate</button><button type="button" data-x="del-flow" title="Delete this automation">Delete Automation</button></div>`;
@@ -255,8 +288,10 @@ function wireFlowCanvas() {
       // drag a new connection
       const branch = port.dataset.branch;
       const a = portPos(n.id, 'out', branch);
+      flowDragging = true;
       const move = (ev) => drawFlowEdges({ a, b: { x: ev.clientX - origin.left, y: ev.clientY - origin.top } });
       const up = (ev) => {
+        flowDragging = false;
         window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up);
         const target = document.elementFromPoint(ev.clientX, ev.clientY)?.closest('.fl-node');
         const to = target && f.nodes.find((x) => x.id === target.dataset.node);
@@ -273,6 +308,7 @@ function wireFlowCanvas() {
     nodeSel = n.id; edgeSel = null;
     const start = { x: e.clientX, y: e.clientY, nx: n.x, ny: n.y };
     let moved = false;
+    flowDragging = true;
     const move = (ev) => {
       moved = true;
       n.x = Math.max(0, Math.round((start.nx + ev.clientX - start.x) / 10) * 10);
@@ -281,6 +317,7 @@ function wireFlowCanvas() {
       drawFlowEdges();
     };
     const up = () => {
+      flowDragging = false;
       window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up);
       if (moved) save();
       renderFlow();
@@ -294,26 +331,32 @@ function wireFlowCanvas() {
   });
   $('#flInspector').addEventListener('input', (e) => {
     const f = curFlow(); const n = f?.nodes.find((x) => x.id === nodeSel);
-    if (e.target.dataset.f === 'enabled') { f.enabled = e.target.checked; save(); renderFlowList(); return; }
+    if (e.target.dataset.f === 'enabled') {
+      // turning it back on counts from now, instead of catching up on the runs it missed
+      f.enabled = e.target.checked; if (f.enabled) f.lastScheduled = Date.now();
+      save(); renderFlowList(); renderInspector(); return;
+    }
     if (!n) return;
     if (e.target.dataset.k) n[e.target.dataset.k] = e.target.value;
     if (e.target.dataset.c) n.config[e.target.dataset.c] = e.target.type === 'number' ? +e.target.value : e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+    if (n.type === 'trigger') f.lastScheduled = Date.now(); // a new schedule starts counting now
     save();
     const el = $(`#flNodes [data-node="${CSS.escape(n.id)}"]`);
     if (el) { $('.fl-node-title', el).textContent = n.title || NODE_TYPES[n.type].label; $('.fl-node-sum', el).textContent = nodeSummary(n); }
+    if (n.type === 'trigger') renderFlowList();
     if (e.target.tagName === 'SELECT') renderInspector();
   });
   $('#flInspector').addEventListener('click', (e) => {
     const x = e.target.closest('[data-x]')?.dataset.x;
     const f = curFlow();
     if (x === 'del-node' || x === 'del-edge') deleteSelection();
-    if (x === 'del-flow' && confirm(`Delete "${f.name}"?`)) { cfg.flows = flows().filter((q) => q !== f); flowSel = flows()[0]?.id || null; save(); renderFlow(); }
+    if (x === 'del-flow' && confirm(`Delete "${f.name}"?${activeRuns.has(f.id) ? ' It is running: it will be stopped first.' : ''}`)) { stopFlow(f); cfg.flows = flows().filter((q) => q !== f); flowSel = flows()[0]?.id || null; save(); renderFlow(); }
     if (x === 'dup-flow') {
       const copy = JSON.parse(JSON.stringify(f));
       const ids = new Map(copy.nodes.map((n) => [n.id, uid()]));
       copy.nodes.forEach((n) => { n.id = ids.get(n.id); });
       copy.edges.forEach((ed) => { ed.from = ids.get(ed.from); ed.to = ids.get(ed.to); });
-      Object.assign(copy, { id: uid(), name: `${f.name} (copy)`, lastRun: null });
+      Object.assign(copy, { id: uid(), name: `${f.name} (copy)`, lastRun: null, runs: [], lastScheduled: Date.now() });
       flows().push(copy); flowSel = copy.id; save(); renderFlow();
     }
   });
@@ -325,22 +368,29 @@ function wireFlowCanvas() {
 }
 
 // ---------- Running ----------
-function contextFor(f, run, nodeId) {
-  // one-line summaries of the finished steps leading to this node
+// The steps that lead to a node, nearest ones last (the order they ran in).
+function ancestorsOf(f, nodeId) {
   const seen = new Set();
-  const lines = [];
+  const order = [];
   const walk = (id) => {
     for (const e of f.edges.filter((x) => x.to === id)) {
       if (seen.has(e.from)) continue;
       seen.add(e.from);
       walk(e.from);
-      const n = f.nodes.find((x) => x.id === e.from);
-      const r = run.results[e.from];
-      if (n && r && n.type !== 'trigger') lines.push(`- ${n.title || NODE_TYPES[n.type].label}: ${(r.text || '').replace(/\s+/g, ' ').slice(0, 300)}`);
+      order.push(e.from);
     }
   };
   walk(nodeId);
-  return lines.join('\n');
+  return order;
+}
+
+// One-line summaries of the finished steps leading to this node (skipped ones say nothing).
+function contextFor(f, run, nodeId) {
+  return ancestorsOf(f, nodeId).map((id) => {
+    const n = f.nodes.find((x) => x.id === id);
+    const r = run.results[id];
+    return n && r && !r.skip && n.type !== 'trigger' ? `- ${n.title || NODE_TYPES[n.type].label}: ${(r.text || '').replace(/\s+/g, ' ').slice(0, 300)}` : '';
+  }).filter(Boolean).join('\n');
 }
 
 function waitForTask(id, run) {
@@ -355,10 +405,13 @@ function waitForTask(id, run) {
   });
 }
 
-// The folder of the last agent task this run finished: its own worktree when "Worktree per
-// task" is on, so a check or a git command right after it sees what the agent changed.
-function lastTaskFolder(run) {
-  const done = Object.keys(run.taskNode).map(taskById).filter((t) => t && t.status === 'done').sort((a, b) => (b.finishedAt || 0) - (a.finishedAt || 0));
+// The folder of the last agent task that led to this step: its own worktree when "Worktree per
+// task" is on, so a check or a git command right after it sees what the agent changed. Only
+// steps upstream count, so a parallel branch never lends its folder to this one.
+function lastTaskFolder(f, run, nodeId) {
+  const upstream = new Set(ancestorsOf(f, nodeId));
+  const done = Object.keys(run.taskNode).filter((id) => upstream.has(run.taskNode[id])).map(taskById)
+    .filter((t) => t && t.status === 'done').sort((a, b) => (b.finishedAt || 0) - (a.finishedAt || 0));
   return done[0] ? done[0].workdir || done[0].cwd : null;
 }
 
@@ -374,7 +427,8 @@ async function execNode(f, run, n) {
   }
   if (n.type === 'command') {
     if (!c.cmd) return { ok: false, text: 'No command.' };
-    const folder = (c.inTaskFolder && lastTaskFolder(run)) || c.project || cfg.selectedProject;
+    const folder = (c.inTaskFolder && lastTaskFolder(f, run, n.id)) || c.project || cfg.selectedProject;
+    if (!folder) return { ok: false, text: 'No project: choose a folder for this step or select a project.' };
     const r = await ab.flowExec(c.cmd, folder, SecretsSettings.parse(c.secrets));
     if (!r.ok) return { ok: false, text: r.error };
     const tail = r.value.out.split('\n').slice(-6).join('\n');
@@ -383,7 +437,7 @@ async function execNode(f, run, n) {
   if (n.type === 'condition') {
     const r = await ab.aiAsk(`Answer only "YES" or "NO", nothing else.\nQuestion: ${c.question || n.title}\nResults of the previous steps:\n${ctx || '(none)'}`, 'haiku');
     if (!r.ok) return { ok: false, text: r.error };
-    const yes = /^\W*(yes|s[ií])\b/i.test(r.value);
+    const yes = /^\W*(yes|s[ií])(?![a-z])/i.test(r.value.trim());
     return { ok: true, branch: yes ? 'yes' : 'no', text: yes ? 'Yes' : 'No' };
   }
   if (n.type === 'agent') {
@@ -407,7 +461,7 @@ async function runFlow(f, reason = 'by hand') {
   const edges = f.edges.map((e, i) => ({ ...e, i })).filter((e) => nodes.some((n) => n.id === e.from) && nodes.some((n) => n.id === e.to));
   const run = { id: uid(), reason, status: {}, results: {}, edge: {}, log: [], taskNode: {}, startedAt: Date.now() };
   activeRuns.set(f.id, run);
-  const log = (m) => { run.log.push(`${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} ${m}`); if (flowsOpen() && flowSel === f.id) renderFlow(); else renderFlowList(); };
+  const log = (m) => { run.log.push(`${fmt.clock(Date.now())} ${m}`); if (flowSel === f.id) refreshFlow(); else renderFlowList(); };
   log(`Start (${reason})`);
   let failed = false;
 
@@ -450,12 +504,15 @@ async function runFlow(f, reason = 'by hand') {
   // wait until nothing is left running
   while (pending.length) await pending.shift();
 
-  f.lastRun = { at: Date.now(), ok: !failed && !run.stopped, results: run.results, log: run.log.slice(-30) };
+  const outcome = run.stopped ? 'was stopped' : failed ? 'finished with errors' : 'finished';
   log(run.stopped ? 'Stopped.' : failed ? 'Finished with errors.' : 'Finished successfully.');
+  const at = Date.now();
+  f.lastRun = { at, ok: !failed && !run.stopped, stopped: !!run.stopped, results: run.results, log: run.log.slice(-30) };
+  f.runs = [...(f.runs || []), { at, ok: f.lastRun.ok, stopped: f.lastRun.stopped, reason, ms: at - run.startedAt }].slice(-RUN_HISTORY);
   activeRuns.delete(f.id);
   save();
-  if (!document.hasFocus()) { try { new Notification(`${f.name}: ${failed ? 'finished with errors' : 'finished'}`, { body: run.log.slice(-1)[0] || '' }); } catch {} }
-  toast(`Automation "${esc(f.name)}" ${failed ? 'finished with errors' : 'finished'}`, 4500);
+  if (!document.hasFocus()) { try { new Notification(`${f.name}: ${outcome}`, { body: run.log.slice(-1)[0] || '' }); } catch {} }
+  toast(`Automation "${esc(f.name)}" ${outcome}`, 4500);
   if (flowsOpen()) renderFlow(); else renderFlowList();
 }
 
@@ -482,6 +539,8 @@ function checkSchedules() {
       if (!last) { f.lastScheduled = Date.now(); save(); continue; } // start counting from now
       if (Date.now() - last >= every) { f.lastScheduled = Date.now(); save(); runFlow(f, `every ${c.every} min`); }
     } else if (c.mode === 'daily') {
+      // a new or just-changed daily schedule waits for its next time instead of running right away
+      if (!last) { f.lastScheduled = Date.now(); save(); continue; }
       const [h, m] = String(c.at || '09:00').split(':').map(Number);
       const due = new Date(now); due.setHours(h, m || 0, 0, 0);
       if (now >= due && last < due.getTime()) { f.lastScheduled = Date.now(); save(); runFlow(f, `daily ${c.at}`); }
@@ -636,5 +695,5 @@ function initFlows() {
   $('#flClose').onclick = () => toggleFlows(false);
   $('#flowsBtn').onclick = () => toggleFlows();
   setInterval(checkSchedules, 30_000);
-  setInterval(() => { if (flowsOpen() && activeRuns.size) renderFlow(); }, 2000);
+  setInterval(() => { if (flowsOpen() && activeRuns.size) refreshFlow(); }, 2000);
 }

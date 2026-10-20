@@ -54,7 +54,10 @@ body.flows-open #dock, body.flows-open #minimap, body.flows-open #sidebar, body.
 #flList { overflow: auto; padding: 0 8px 12px; display: flex; flex-direction: column; gap: 2px; }
 .fl-item { display: flex; align-items: center; gap: 8px; text-align: left; background: transparent; box-shadow: none; padding: 6px 9px; border-radius: 6px; }
 .fl-item.active { background: rgba(var(--accent-rgb), .2); }
-.fl-item-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fl-item-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.fl-item-name { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fl-item-sub { font-size: 10.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fl-item.off .fl-item-name { color: var(--text-2); }
 .fl-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(var(--fg-rgb), .2); flex: none; }
 .fl-dot.ok { background: var(--ok); } .fl-dot.fail { background: var(--bad); }
 .fl-dot.running { background: var(--accent); animation: pulse 1s ease-in-out infinite; }
@@ -112,6 +115,9 @@ body.flows-open #dock, body.flows-open #minimap, body.flows-open #sidebar, body.
 .fl-field textarea { resize: vertical; line-height: 1.45; }
 .fl-field textarea.mono { font: 12px var(--font-mono); }
 .fl-plan { font-size: 12.5px; line-height: 1.55; color: var(--text-2); background: var(--fill); border-radius: 8px; padding: 10px 12px; white-space: normal; }
+.fl-runs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; font-size: 11.5px; }
+.fl-runs li { display: grid; grid-template-columns: 8px auto 1fr auto; align-items: center; gap: 8px; color: var(--text-2); }
+.fl-runs li > :nth-child(3) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fl-log { margin: 0; padding-left: 18px; font-size: 12px; color: var(--text-2); line-height: 1.6; }
 .fl-inspector .set-row { padding: 6px 0; min-height: 0; box-shadow: none !important; }
 .fl-back { margin: auto 10px 12px; background: transparent; box-shadow: none; color: var(--text-2); text-align: left; }
