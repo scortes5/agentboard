@@ -25,6 +25,7 @@ const { RemoteServer } = require('./remote/RemoteServer');
 const { WebhookNotifier } = require('./integrations/WebhookNotifier');
 const { GitHubIssues } = require('./integrations/GitHubIssues');
 const { BranchCleanup } = require('./git/BranchCleanup');
+const { BranchSync } = require('./git/BranchSync');
 const { SecretVault } = require('./secrets/SecretVault');
 const { CommandRunner } = require('./flows/CommandRunner');
 const { AuditLog } = require('./security/AuditLog');
@@ -96,6 +97,7 @@ application = new App({
     new TaskPlanner({ shellEnv }), new CommandRunner({ shellEnv, vault, audit }), vault, audit,
     new RemoteServer({ config, send, audit, tls: new TlsIdentity({ dataDir }) }), new WebhookNotifier({ vault }), github,
     new BranchCleanup({ runner, gitService, github, audit }),
+    new BranchSync({ runner, gitService, audit }),
   ],
 });
 application.start();
