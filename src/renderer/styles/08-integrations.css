@@ -91,3 +91,53 @@
 .popover.branches .is-foot button { width: auto; font: 500 12px var(--font-ui); padding: 5px 12px; }
 .is-branch { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; font: 500 10.5px var(--font-mono); padding: 1px 8px; border-radius: 6px; background: var(--accent-soft); color: var(--accent); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .is-branch em { font: 500 10px var(--font-ui); font-style: normal; color: var(--text-2); margin-left: 4px; }
+
+/* Branch graph: colored lanes per branch, merges as hollow dots, a legend and a detail pane */
+:root { --lane-0: var(--accent); --lane-1: #bf5af2; --lane-2: #ff9f0a; --lane-3: #34c759; --lane-4: #ff375f; --lane-5: #32ade6; --lane-6: #5e5ce6; --lane-7: #a2845e; }
+dialog.branch-graph { width: min(1240px, 94vw); height: min(820px, 88vh); max-height: none; display: flex; flex-direction: column; overflow: hidden; }
+dialog.branch-graph > .hint { padding: 20px; color: var(--muted); }
+.bg-head { display: flex; align-items: center; gap: 10px; padding: 14px 16px 12px 20px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.bg-head b { font-size: 15px; }
+.bg-head button { width: auto; font: 500 12px var(--font-ui); padding: 4px 11px; }
+.bg-head .card-btn { padding: 4px 6px; }
+.bg-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 210px 1fr 320px; }
+.bg-legend { overflow: auto; padding: 8px; border-right: 1px solid var(--line); display: flex; flex-direction: column; gap: 1px; }
+.bg-legend p { padding: 10px 8px; line-height: 1.5; }
+.bg-section { font: 600 10px var(--font-ui); text-transform: uppercase; letter-spacing: .1em; color: var(--muted); padding: 8px 8px 6px; }
+.bg-section span { font-weight: 500; margin-left: 4px; }
+.bg-branch { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; background: transparent; box-shadow: none; padding: 5px 8px; border-radius: 7px; font: 12px var(--font-mono); color: var(--text-2); }
+.bg-branch:hover { background: var(--fill); color: var(--text); }
+.bg-branch.active { background: var(--fill-hi); color: var(--text); }
+.bg-branch i { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.bg-branch span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bg-branch em { font: 500 10px var(--font-ui); font-style: normal; color: var(--accent); }
+.bg-scroll { overflow: auto; outline: none; }
+.bg-rows { position: relative; min-width: 100%; }
+.bg-svg { position: absolute; left: 0; top: 0; pointer-events: none; }
+.bg-line { fill: none; stroke-width: 2; stroke-linecap: round; }
+.bg-dot { stroke: var(--surface); stroke-width: 1.5; }
+.bg-merge { fill: var(--surface); stroke-width: 2.5; }
+.bg-row { height: 28px; display: flex; align-items: center; gap: 10px; padding: 0 12px 0 calc(var(--graph-w) + 4px); font-size: 12px; cursor: pointer; white-space: nowrap; }
+.bg-row:hover { background: var(--fill); }
+.bg-row.sel { background: var(--accent-soft); }
+dialog.branch-graph.focus .bg-row:not(.on) .bg-msg, dialog.branch-graph.focus .bg-row:not(.on) .bg-author, dialog.branch-graph.focus .bg-row:not(.on) .bg-date { opacity: .35; }
+.bg-msg { flex: 1; min-width: 0; display: flex; align-items: center; gap: 5px; overflow: hidden; }
+.bg-subject { overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+.bg-author { color: var(--text-2); max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
+.bg-date { color: var(--muted); width: 74px; text-align: right; }
+.bg-sha { color: var(--muted); font-size: 11px; }
+.bg-ref { display: inline-flex; align-items: center; gap: 3px; flex: none; font: 600 10.5px var(--font-mono); padding: 1px 7px; border-radius: 6px; color: var(--k); background: color-mix(in srgb, var(--k) 16%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--k) 45%, transparent); }
+.bg-tag { flex: none; font: 500 10.5px var(--font-mono); padding: 1px 7px; border-radius: 6px; color: var(--text-2); box-shadow: inset 0 0 0 1px var(--line-hi); }
+.bg-mergelabel { flex: none; font: 500 10.5px var(--font-ui); padding: 1px 7px; border-radius: 20px; color: var(--k); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--k) 45%, transparent); }
+.bg-detail { overflow: auto; border-left: 1px solid var(--line); padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; font-size: 12px; }
+.bg-detail .hint { color: var(--muted); line-height: 1.5; }
+.bg-d-subject { font-size: 13.5px; font-weight: 600; line-height: 1.35; }
+.bg-d-sha { display: flex; align-items: center; gap: 4px; color: var(--muted); font-size: 10.5px; word-break: break-all; }
+.bg-d-sha .card-btn { flex: none; width: auto; display: inline-flex; padding: 2px 5px; }
+.bg-d-links { display: flex; flex-wrap: wrap; gap: 5px; }
+.bg-jump { width: auto; font: 500 11px var(--font-ui); padding: 3px 9px; border-radius: 7px; box-shadow: inset 0 0 0 1px var(--line-hi); background: var(--fill); }
+.bg-jump .mono, .bg-d-sha .mono { font-family: var(--font-mono); }
+.bg-d-body { margin: 0; white-space: pre-wrap; font: 11.5px/1.5 var(--font-ui); color: var(--text-2); }
+.bg-file { display: flex; align-items: center; gap: 6px; padding: 2px 0; font-size: 11.5px; }
+.bg-file-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); color: var(--text-2); direction: rtl; text-align: left; }
+.bg-file .ok { color: var(--ok); font-family: var(--font-mono); } .bg-file .bad { color: var(--bad); font-family: var(--font-mono); }

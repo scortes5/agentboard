@@ -3,7 +3,7 @@
 // whether they are pushed. Opened from the Tasks panel (chosen project) or a card's git pill.
 'use strict';
 /* global $, ab, esc, cfg, fmt, icon, tasks, gitCache, runtime, agentOf, composerDefaults, toast, openPopover, closePopover,
-   basename, focusCard, focusCardView, cardData, refreshGit */
+   basename, branchGraph, focusCard, focusCardView, cardData, refreshGit */
 
 const TASK_STATE = { pending: 'queued', running: 'running', review: 'to review', done: 'done', blocked: 'blocked' };
 const CHECKS_TEXT = { passing: 'checks passing', failing: 'checks failing', pending: 'checks running', none: 'no checks' };
@@ -130,6 +130,7 @@ class BranchOverview {
     const rest = branches.filter((b) => !live.includes(b));
     pop.innerHTML = `<div class="is-head"><b>Branches</b><span class="muted">${esc(proj)}</span><span class="spacer"></span>
         <span class="muted small">compared with <span class="mono">${esc(base)}</span></span><span class="badge">${branches.length}</span>
+        <button type="button" class="card-btn br-clean" data-graph title="Show every branch as colored lines: where they split, where they merge, and each commit">${icon('diagram', 12)} Graph</button>
         <button type="button" class="card-btn br-clean" data-cleanup title="Delete branches already merged and task worktrees no task uses; you pick which">${icon('trash', 12)} Clean Up</button></div>
       <input class="is-search" type="search" placeholder="Filter by name, commit or author" value="${esc(this.query)}" title="Filter the branches" />
       <div class="br-list"></div>
@@ -146,6 +147,7 @@ class BranchOverview {
     draw();
     pop.querySelector('.is-search').addEventListener('input', (e) => { this.query = e.target.value.trim(); draw(); });
     pop.addEventListener('click', async (e) => {
+      if (e.target.closest('[data-graph]')) { closePopover(); branchGraph.open(cwd); return; }
       if (e.target.closest('[data-cleanup]')) { this.cleanup(pop, cwd, anchor); return; }
       const name = e.target.closest('[data-b]')?.dataset.b;
       const card = e.target.closest('[data-card]')?.dataset.card;

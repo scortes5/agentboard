@@ -314,3 +314,14 @@ test('cleanup only removes merged branches and unused, clean task worktrees', as
   const left = String(git('branch', '--format=%(refname:short)')).split('\n').filter(Boolean).sort();
   assert.deepEqual(left, ['agentboard/busy', 'agentboard/dirty', 'feat/open', 'main']);
 });
+
+test('the branch graph keeps parents, local branches and tags', () => {
+  const { GitService } = require('../src/main/git/GitService');
+  const U = '\x1f';
+  const [a, b] = GitService.parseGraph([
+    ['m1', 'p1 p2', 'Ana', '1700000000', 'HEAD -> main, origin/main, tag: v1.0', 'Merge feat/x'].join(U),
+    ['p2', 'p1', 'Bo', '1699999000', 'feat/x, origin/feat/x', 'Add x'].join(U),
+  ].join('\n'), new Set(['main', 'feat/x']));
+  assert.deepEqual([a.parents, a.branches, a.tags, a.head, a.at], [['p1', 'p2'], ['main'], ['v1.0'], true, 1700000000000]);
+  assert.deepEqual([b.branches, b.head, b.subject], [['feat/x'], false, 'Add x']);
+});
