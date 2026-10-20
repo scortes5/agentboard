@@ -14,6 +14,13 @@ function migrateLegacy(c) {
   }
 }
 
+// Windows and Linux: the page's tooltips and key hints with Ctrl instead of the Mac symbols.
+function localizeShortcuts(root) {
+  for (const el of root.querySelectorAll('[title]')) el.title = keyLabel(el.title);
+  const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode: (n) => (/[⌘⇧⌥]/.test(n.nodeValue) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP) });
+  for (let n = walk.nextNode(); n; n = walk.nextNode()) n.nodeValue = keyLabel(n.nodeValue);
+}
+
 (async function init() {
   const res = await ab.loadConfig();
   // tasks.js and diagram.js load after this file
@@ -29,8 +36,7 @@ function migrateLegacy(c) {
   renderAgentButtons();
   ab.checkAgents().then((r) => { agentAvailable = r; renderAgentButtons(); });
 
-  // Windows shortcuts in the empty-board hint
-  if (!isMac()) $('#empty').innerHTML = $('#empty').innerHTML.replace(/⇧⌘/g, 'Ctrl+Shift+');
+  if (!isMac()) localizeShortcuts(document.body);
 
   applyAppearance();
   renderSpaces();

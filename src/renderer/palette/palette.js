@@ -82,8 +82,8 @@ function renderPalette() {
   $('#palList').innerHTML = palItems.map((it, i) => `<button type="button" class="pal-item ${i === palSel ? 'sel' : ''}" data-i="${i}">
     <span class="pal-icon" ${it.color ? `style="color:${esc(it.color)}"` : ''}>${icon(it.icon, 15)}</span>
     <span class="pal-label">${esc(it.label)}</span>
-    ${it.sub ? `<span class="pal-sub">${esc(it.sub)}</span>` : ''}
-    ${it.hint ? `<kbd>${esc(it.hint)}</kbd>` : ''}</button>`).join('') || '<div class="pal-empty">No matches.</div>';
+    ${it.sub ? `<span class="pal-sub">${esc(keyLabel(it.sub))}</span>` : ''}
+    ${it.hint ? `<kbd>${esc(keyLabel(it.hint))}</kbd>` : ''}</button>`).join('') || '<div class="pal-empty">No matches.</div>';
   $('#palList .sel')?.scrollIntoView({ block: 'nearest' });
 }
 

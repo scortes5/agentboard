@@ -4,6 +4,8 @@ All notable changes to AgentBoard. The format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-10-19
+
 ### Added
 - **Branches view**: a branch button in the Tasks panel (and *All branches…* in a card's branch menu) lists every branch of the project, the ones being worked on first, with the tasks and agent cards on each, its worktree, last commit, commits ahead of and behind the main branch, and whether it is pushed. Switch to a branch or copy its name from there.
 - **Automation history**: the automations list shows when each one last ran, and its panel shows the next scheduled run and the last runs with their result and duration.
@@ -17,6 +19,17 @@ All notable changes to AgentBoard. The format follows [Keep a Changelog](https:/
 - Automations: a *Command* step set to run in the previous task's folder uses the task that leads to it, not one from a parallel branch.
 - Automations: deleting a running automation stops it first; skipped steps are no longer passed to agents as context; a stopped run says so; a *Decision* answered "Sí" counts as yes.
 - The *Fix a GitHub issue* template accepts only an issue number.
+
+## [1.8.2] - 2026-10-19
+
+### Fixed
+- Windows and Linux: tooltips, the palette, the welcome guide and the empty board show shortcuts with Ctrl (Ctrl+Shift+T) instead of the Mac symbols (⇧⌘T).
+- Windows and Linux: the File/Edit/View menu bar no longer sits above the app's own top bar; press Alt to show it.
+
+## [1.8.1] - 2026-10-19
+
+### Fixed
+- A task now always runs in the project chosen when it was added. Before, it could run in the project you had open instead: when you opened another project while *Route* was splitting the text, when you wrote a task and then opened another project before adding it, or when a queued task had no folder.
 
 ## [1.8.0] - 2026-10-19
 
@@ -304,7 +317,10 @@ Includes the 0.2.0 changes, which were not released separately.
 ### Added
 - First release: a board of terminals for CLI agents on Mac and Windows.
 
-[Unreleased]: https://github.com/scortes5/agentboard/compare/v1.8.0...HEAD
+[Unreleased]: https://github.com/scortes5/agentboard/compare/v1.9.0...HEAD
+[1.9.0]: https://github.com/scortes5/agentboard/compare/v1.8.2...v1.9.0
+[1.8.2]: https://github.com/scortes5/agentboard/compare/v1.8.1...v1.8.2
+[1.8.1]: https://github.com/scortes5/agentboard/compare/v1.8.0...v1.8.1
 [1.8.0]: https://github.com/scortes5/agentboard/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/scortes5/agentboard/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/scortes5/agentboard/compare/v1.5.1...v1.6.0
