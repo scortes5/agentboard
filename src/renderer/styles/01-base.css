@@ -95,9 +95,13 @@ body.mac #topbar { padding-left: 80px; } /* macOS traffic lights */
 .lbl { font: 500 10.5px var(--font-mono); text-transform: uppercase; letter-spacing: .14em; color: var(--muted); margin-right: 2px; }
 
 /* ---------- Bottom dock ---------- */
+body { --board-l: 0px; --board-r: 0px; }
+body.sidebar-open { --board-l: var(--left-w); }
+body.tasks-open { --board-r: var(--right-w); }
 #dock {
-  position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 20;
-  display: flex; align-items: center; gap: 6px; padding: 7px; max-width: calc(100% - 300px);
+  /* centered on the board area the side bars leave visible, clear of the minimap on either side */
+  position: absolute; left: calc(var(--board-l) + (100% - var(--board-l) - var(--board-r)) / 2); bottom: 14px; transform: translateX(-50%); z-index: 20;
+  display: flex; align-items: center; gap: 6px; padding: 7px; max-width: calc(100% - var(--board-l) - var(--board-r) - 448px);
   border-radius: 16px;
 }
 .dock-group { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }

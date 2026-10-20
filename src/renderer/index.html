@@ -44,18 +44,18 @@
     </div>
 
     <div class="group">
-      <button id="tasksBtn" data-icon="tasks" title="Tasks: write your to-dos and they are spread across your subscriptions, in parallel (⇧⌘T)">Tasks <span id="tasksBadge" class="badge-n hidden"></span></button>
+      <button id="tasksBtn" data-icon="tasks" title="Tasks: write your to-dos and they are spread across your subscriptions, in parallel (⇧⌘T)"><span class="tb-label">Tasks</span> <span id="tasksBadge" class="badge-n hidden"></span></button>
       <button id="paletteBtn" class="icon" data-icon="search" title="Find an agent, task or project, or run an action (⇧⌘P)"></button>
-      <button id="flowsBtn" data-icon="flows" title="Automations: design step-by-step flows that your agents run (⇧⌘F)">Automations</button>
-      <button id="diagramBtn" data-icon="diagram" title="Diagram: what each agent is doing, by project and group (⇧⌘D)">Diagram</button>
+      <button id="flowsBtn" data-icon="flows" title="Automations: design step-by-step flows that your agents run (⇧⌘F)"><span class="tb-label">Automations</span></button>
+      <button id="diagramBtn" data-icon="diagram" title="Diagram: what each agent is doing, by project and group (⇧⌘D)"><span class="tb-label">Diagram</span></button>
     </div>
 
     <div class="group right">
-      <button id="approvalsBtn" data-icon="bell" title="Approvals: agents waiting for your permission, answered from one list">Approvals <span id="approvalsBadge" class="badge-n warn hidden"></span></button>
-      <button id="workBtn" data-icon="list" title="Work summaries: what each agent is doing and the files it changed per task">Work</button>
-      <button id="usageBtn" title="Usage and savings: activity per day, tokens and effectiveness (⇧⌘U)">Usage</button>
-      <button id="skillsBtn" title="Skills, your agents and the connection between agents">Skills and Agents</button>
-      <button id="accountsBtn" title="Subscriptions, CLIs and local models">Subscriptions</button>
+      <button id="approvalsBtn" data-icon="bell" title="Approvals: agents waiting for your permission, answered from one list"><span class="tb-label">Approvals</span> <span id="approvalsBadge" class="badge-n warn hidden"></span></button>
+      <button id="workBtn" data-icon="list" title="Work summaries: what each agent is doing and the files it changed per task"><span class="tb-label">Work</span></button>
+      <button id="usageBtn" data-icon="chart" title="Usage and savings: activity per day, tokens and effectiveness (⇧⌘U)"><span class="tb-label">Usage</span></button>
+      <button id="skillsBtn" data-icon="wand" title="Skills, your agents and the connection between agents"><span class="tb-label">Skills and Agents</span></button>
+      <button id="accountsBtn" data-icon="agent" title="Subscriptions, CLIs and local models"><span class="tb-label">Subscriptions</span></button>
       <button id="settingsBtn" class="icon" data-icon="gear" title="Settings: appearance, shortcuts, agents and more (⌘,)"></button>
     </div>
   </header>
@@ -410,7 +410,7 @@
     <h2 id="obTitle"></h2>
     <div id="obBody"></div>
     <div class="actions"><button type="button" id="obSkip" class="ghost" title="Close the guide; open it again from the palette (Welcome Guide)">Skip</button><span class="spacer"></span>
-      <button type="button" id="obBack" class="ghost">Back</button><button type="button" id="obNext" class="primary">Next</button></div>
+      <button type="button" id="obBack" class="ghost" title="Go back to the previous step">Back</button><button type="button" id="obNext" class="primary" title="Go to the next step" autofocus>Next</button></div>
   </dialog>
 
   <dialog id="askDialog" class="ask">

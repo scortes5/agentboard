@@ -159,6 +159,18 @@ button[data-icon] { display: inline-flex; align-items: center; white-space: nowr
 #topbar .group.right { flex: none; }
 #topbar { gap: 10px; }
 #topbar .group { gap: 5px; }
+/* Narrow windows: the toolbar sheds what it can spare instead of pushing Settings off-screen.
+   The computer name goes first, then button labels (each button keeps its icon and its title). */
+.machine { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; }
+@media (max-width: 1499px) { #topbar .machine { display: none; } }
+@media (max-width: 1365px) {
+  #topbar .group:not(.right) .tb-label, #approvalsBtn .tb-label, #workBtn .tb-label { display: none; }
+  #topbar .group:not(.right) button[data-icon] .ic, #approvalsBtn .ic, #workBtn .ic { margin-right: 0; }
+}
+@media (max-width: 1023px) {
+  #topbar .tb-label, #topbar .brand-name { display: none; }
+  #topbar button[data-icon] .ic { margin-right: 0; }
+}
 /* task composer in two rows: wide selects on top, actions below */
 .composer-row { flex-wrap: wrap !important; }
 .composer-row select { flex: 1 1 120px; max-width: none !important; }

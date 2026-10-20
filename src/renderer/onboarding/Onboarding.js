@@ -47,7 +47,9 @@ class Onboarding {
     $('#obDots').innerHTML = this.steps.map((s, n) => `<span class="${n === this.at ? 'on' : n < this.at ? 'done' : ''}" title="${esc(s.title)}"></span>`).join('');
     $('#obTitle').textContent = step.title;
     $('#obBack').disabled = this.at === 0;
-    $('#obNext').textContent = this.at === this.steps.length - 1 ? 'Finish' : 'Next';
+    const last = this.at === this.steps.length - 1;
+    $('#obNext').textContent = last ? 'Finish' : 'Next';
+    $('#obNext').title = last ? 'Close the guide and start using the board' : 'Go to the next step';
     const body = $('#obBody');
     body.innerHTML = '';
     body.dataset.step = step.id;
@@ -70,7 +72,7 @@ class Onboarding {
       <div class="ob-list">${list.map((a) => `<div class="ob-row" data-key="${esc(a.key)}">
         <span class="dot" style="background:${esc(a.color)}"></span><span class="meta"><b>${esc(a.label)}</b><small>${esc(a.plan)}</small></span>
         ${!a.installed ? `<button type="button" class="ghost" data-install title="${esc(a.install)}">Install</button>`
-          : a.loggedIn === false ? '<button type="button" class="ghost" data-login>Sign In</button>'
+          : a.loggedIn === false ? '<button type="button" class="ghost" data-login title="Open a terminal on the board to sign in to this agent">Sign In</button>'
             : '<span class="badge ok">Ready</span>'}</div>`).join('')}</div>`;
     el.onclick = (e) => {
       const a = list.find((x) => x.key === e.target.closest('.ob-row')?.dataset.key);
@@ -84,7 +86,7 @@ class Onboarding {
     const render = () => {
       el.innerHTML = `<p>A project is a folder with your code. Each one gets a tab, and its agents keep working while you look at another.</p>
         ${cfg.projects.length ? `<div class="ob-list">${cfg.projects.map((p) => `<div class="ob-row"><span class="meta"><b>${esc(p.name)}</b><small>${esc(p.path)}</small></span><span class="badge ok">Added</span></div>`).join('')}</div>` : ''}
-        <button type="button" class="primary" data-add>${cfg.projects.length ? 'Add Another Project…' : 'Choose a Folder…'}</button>`;
+        <button type="button" class="${cfg.projects.length ? '' : 'primary'}" data-add title="Pick a folder with your code; it becomes a project tab">${cfg.projects.length ? 'Add Another Project…' : 'Choose a Folder…'}</button>`;
     };
     render();
     el.onclick = async (e) => { if (e.target.closest('[data-add]') && await addProject()) render(); };
@@ -93,8 +95,8 @@ class Onboarding {
   async connect(el) {
     el.innerHTML = `<p>Two optional extras for the agents you have:</p>
       <div class="ob-list">
-        <div class="ob-row"><span class="meta"><b>Agent Connection</b><small>Agents see each other, send each other messages and open helpers you can see on the board.</small></span><button type="button" class="ghost" data-connect>Connect</button></div>
-        <div class="ob-row"><span class="meta"><b>Token-saving skills</b><small>Short instructions that make each subscription spend fewer tokens on tasks.</small></span><button type="button" class="ghost" data-pack>Install</button></div>
+        <div class="ob-row"><span class="meta"><b>Agent Connection</b><small>Agents see each other, send each other messages and open helpers you can see on the board.</small></span><button type="button" class="ghost" data-connect title="Register the agent connection with every installed agent CLI">Connect</button></div>
+        <div class="ob-row"><span class="meta"><b>Token-saving skills</b><small>Short instructions that make each subscription spend fewer tokens on tasks.</small></span><button type="button" class="ghost" data-pack title="Install the token-saving skills for every installed agent">Install</button></div>
       </div>`;
     el.onclick = async (e) => {
       if (e.target.closest('[data-connect]')) {
@@ -116,7 +118,7 @@ class Onboarding {
   rules(el) {
     el.innerHTML = `<p>Rules every agent follows, so you don't repeat them in each task. They go into each CLI's own instructions file; change them later in <b>Settings → Ground Rules</b>.</p>
       <textarea id="obRules" rows="8" spellcheck="false"></textarea>
-      <div class="row-end"><button type="button" class="primary" data-save>Save Rules</button></div>`;
+      <div class="row-end"><button type="button" class="primary" data-save title="Save these rules into each agent CLI's instructions file">Save Rules</button></div>`;
     $('#obRules').value = cfg.groundRules || SUGGESTED_RULES;
     el.onclick = async (e) => {
       if (!e.target.closest('[data-save]')) return;
@@ -130,7 +132,7 @@ class Onboarding {
   task(el) {
     el.innerHTML = `<p>Write to-dos in <b>Tasks</b> (${keyLabel('⇧⌘T')}), one per line. They are spread across your subscriptions and run in parallel, each in its own terminal; you see their progress live and review the changes before keeping them.</p>
       <p class="muted small"><code>@claude</code> picks who does it · <code>!</code> uses a cheaper model · <code>&gt;</code> waits for the line above</p>
-      <button type="button" class="primary" data-try>Try a Sample Task</button>`;
+      <button type="button" class="primary" data-try title="Close the guide and add a sample task to Tasks">Try a Sample Task</button>`;
     el.onclick = (e) => {
       if (!e.target.closest('[data-try]')) return;
       this.finish();
