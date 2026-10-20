@@ -54,7 +54,25 @@ class GitService {
       const m = c.match(/^(\d+)\s+(\d+)$/);
       if (m) { b.behindBase = +m[1]; b.aheadBase = +m[2]; }
     }));
-    return { top, base, current, branches, repoUrl: await this.repoUrl(top) };
+    const [remote, fetchedAt] = await Promise.all([this.remoteOnly(top, branches), this.fetchedAt(top)]);
+    return { top, base, current, branches, repoUrl: await this.repoUrl(top), remoteOnly: remote, fetchedAt };
+  }
+
+  // Branches on origin with no local branch tracking them (newest first).
+  async remoteOnly(top, branches) {
+    const tracked = new Set(branches.map((b) => b.upstream).filter(Boolean));
+    const local = new Set(branches.map((b) => b.name));
+    const out = await this.git.text(top, ['for-each-ref', 'refs/remotes/origin', '--sort=-committerdate', '--count=80',
+      '--format=%(refname:short)%09%(committerdate:unix)%09%(authorname)%09%(subject)']);
+    return out.split('\n').filter(Boolean).map((l) => {
+      const [ref, at, author, ...subject] = l.split('\t');
+      return { ref, name: ref.replace(/^origin\//, ''), at: (+at || 0) * 1000, author, subject: subject.join('\t') };
+    }).filter((r) => r.ref !== 'origin/HEAD' && r.ref !== 'origin' && !tracked.has(r.ref) && !local.has(r.name));
+  }
+
+  // When the project last fetched from its remote (0 if never).
+  async fetchedAt(top) {
+    try { return fs.statSync(path.resolve(top, await this.git.text(top, ['rev-parse', '--git-path', 'FETCH_HEAD']))).mtimeMs; } catch { return 0; }
   }
 
   // https://github.com/owner/repo for a GitHub origin, '' otherwise.
