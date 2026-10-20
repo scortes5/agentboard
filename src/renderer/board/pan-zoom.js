@@ -56,8 +56,11 @@ window.addEventListener('resize', scheduleFitAll);
 function openPopover(pop, anchor, width = 230) {
   const r = anchor.getBoundingClientRect();
   pop.style.left = clamp(r.right - width, 8, innerWidth - width - 8) + 'px';
-  pop.style.top = Math.min(r.bottom + 4, innerHeight - 40) + 'px';
+  const top = Math.min(r.bottom + 4, innerHeight - 40);
+  pop.style.top = top + 'px';
   document.body.appendChild(pop);
+  // never past the bottom of the window, whatever max-height the popover's own style asks for
+  pop.style.maxHeight = `min(${getComputedStyle(pop).maxHeight}, ${innerHeight - top - 12}px)`;
   const outside = (e) => {
     if (!pop.isConnected) return document.removeEventListener('pointerdown', outside, true);
     if (!pop.contains(e.target)) { pop.remove(); document.removeEventListener('pointerdown', outside, true); }

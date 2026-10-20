@@ -16,6 +16,9 @@ All notable changes to AgentBoard. The format follows [Keep a Changelog](https:/
 
 ### Changed
 - **Issues** has a cleaner layout: label colors, age, author, comments, assignees and milestone for each issue, a text filter, label filters, *Select all*, a button to read the issue's text and another to open it on GitHub.
+- Narrow windows: the toolbar no longer pushes *Settings* off-screen. Below 1500 px the computer name is hidden (it wrapped onto three lines), below 1366 px most toolbar buttons show only their icon, and below 1024 px all of them do. *Usage*, *Skills and Agents* and *Subscriptions* got icons.
+- The Tasks panel's *Summary*, *Issues* and *Clear* buttons are icons (with their descriptions on hover), so its toolbar fits on one line.
+- With the Tasks panel open on a narrow window, the dock's *Note* and *Group* show only their icon so every agent button stays visible.
 
 ### Fixed
 - Automations: a new daily schedule (for example the *Nightly tests* template created in the afternoon) no longer runs right away, and turning an automation back on no longer catches up on missed runs.
@@ -23,6 +26,11 @@ All notable changes to AgentBoard. The format follows [Keep a Changelog](https:/
 - Automations: a *Command* step set to run in the previous task's folder uses the task that leads to it, not one from a parallel branch.
 - Automations: deleting a running automation stops it first; skipped steps are no longer passed to agents as context; a stopped run says so; a *Decision* answered "Sí" counts as yes.
 - The *Fix a GitHub issue* template accepts only an issue number.
+- First launch: the welcome guide has proper margins again (its text and step dots touched the window's edges), keeps a steady height between steps, and starts with *Next* focused.
+- The empty board message and the bottom dock are centered on the part of the board the side bars leave visible, like new cards, instead of on the whole window. On narrow boards the minimap sits above the dock instead of overlapping it.
+- A card's name no longer shrinks to a few letters next to a long branch name; the branch name is shortened instead.
+- The Branches view: an agent card working on a branch shows as a small chip again instead of a broken box over the next branch, and popovers no longer run past the bottom of the window.
+- Switching the system between light and dark while the app is starting no longer throws an error.
 
 ## [1.8.2] - 2026-10-19
 

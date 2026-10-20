@@ -35,7 +35,6 @@
 }
 body.tasks-open #tasks { display: flex; }
 body.tasks-open #minimap { right: calc(var(--right-w) + 22px); }
-body.tasks-open #dock { max-width: calc(100% - 2 * var(--right-w)); }
 #tasks .side-head { align-items: center; gap: 8px; }
 #tasks .spacer, .task-filter .spacer, .composer-row .spacer { flex: 1; }
 .task-opts { display: flex; flex-wrap: wrap; gap: 6px 12px; padding: 0 14px 8px; }

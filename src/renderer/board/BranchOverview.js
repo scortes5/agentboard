@@ -64,7 +64,7 @@ class BranchOverview {
     const vsBase = b.name === ctx.base ? '' : `<span class="br-ab" title="Commits ahead of and behind ${esc(ctx.base)}"><b class="${b.aheadBase ? 'ok' : ''}">+${b.aheadBase}</b> <b class="${b.behindBase ? 'warn' : ''}">−${b.behindBase}</b></span>`;
     const work = [
       ...w.tasks.map((t) => `<span class="br-work task st-${esc(t.status)}" title="Task: ${esc(t.text.slice(0, 200))}">${icon('tasks', 11)} ${esc(t.text.slice(0, 48))}<em>${esc(TASK_STATE[t.status] || t.status)}</em></span>`),
-      ...w.cards.map((c) => `<button type="button" class="br-work card" data-card="${esc(c.id)}" title="Show this card on the board">${icon('terminal', 11)} ${esc(c.title || agentOf(c)?.label || 'Terminal')}</button>`),
+      ...w.cards.map((c) => `<button type="button" class="br-work br-card" data-card="${esc(c.id)}" title="Show this card on the board">${icon('terminal', 11)} ${esc(c.title || agentOf(c)?.label || 'Terminal')}</button>`),
     ].join('');
     const canSwitch = !isCurrent && !b.worktree;
     return `<div class="br-item${isCurrent ? ' current' : ''}" data-b="${esc(b.name)}">

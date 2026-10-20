@@ -15,7 +15,7 @@ async function refreshGit() {
     const g = results[c.cwd];
     if (!g) { rt.gitEl.classList.add('hidden'); continue; }
     rt.gitEl.classList.remove('hidden');
-    rt.gitEl.innerHTML = `${icon('branch', 12)} ${esc(g.branch)}`
+    rt.gitEl.innerHTML = `${icon('branch', 12)} <span class="br">${esc(g.branch)}</span>`
       + (g.changes ? ` <span class="dirty">${g.changes} change${g.changes === 1 ? '' : 's'}</span>` : '')
       + (g.ahead ? ` <span class="ab">↑${g.ahead}</span>` : '')
       + (g.behind ? ` <span class="ab">↓${g.behind}</span>` : '');

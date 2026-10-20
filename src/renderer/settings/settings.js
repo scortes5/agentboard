@@ -93,7 +93,7 @@ function applyAppearance(u = ui()) {
   applyViewport();
 }
 // the system switched light/dark (or we did, via nativeTheme): re-apply what is on screen
-darkMQ.addEventListener('change', () => applyAppearance(lastUi || ui()));
+darkMQ.addEventListener('change', () => { if (cfg) applyAppearance(lastUi || ui()); }); // cfg is null until the board loads
 
 // ---------- Settings ----------
 let shortcutDefs = [];

@@ -14,6 +14,8 @@
 #world { position: absolute; left: 0; top: 0; width: 0; height: 0; }
 
 .empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; pointer-events: none; color: var(--text-2); }
+/* Centered on the part of the board the side bars, toolbar and dock leave visible (see visibleRect). */
+#empty { top: 52px; bottom: 66px; left: var(--board-l); right: var(--board-r); padding: 0 24px; }
 .empty h2 { color: var(--text); font-weight: 600; font-size: 30px; letter-spacing: -0.045em; margin: 10px 0 8px; }
 .empty p { line-height: 1.9; margin: 4px; }
 
@@ -41,6 +43,18 @@ body.sidebar-open #sidebar { display: flex; }
 
 /* ---------- Minimap ---------- */
 #minimap { position: absolute; right: 12px; bottom: 14px; z-index: 18; width: 200px; height: 130px; cursor: crosshair; }
+/* Narrow boards: the minimap moves up a row so the dock can use the full width. */
+@media (max-width: 1399px) {
+  #dock { max-width: calc(100% - var(--board-l) - var(--board-r) - 32px); }
+  #minimap { bottom: 72px; }
+}
+/* ...and when it is still tight, Note and Group show only their icon so the agent buttons fit. */
+@media (max-width: 1023px) { #dock .tb-label { display: none; } #dock .chip .ic { margin-right: 0; } }
+@media (max-width: 1365px) { body.tasks-open #dock .tb-label { display: none; } body.tasks-open #dock .chip .ic { margin-right: 0; } }
+@media (max-width: 1799px) {
+  body.tasks-open #dock { max-width: calc(100% - var(--board-l) - var(--board-r) - 32px); }
+  body.tasks-open #minimap { bottom: 72px; }
+}
 
 /* ---------- Cards ---------- */
 .card {
@@ -71,7 +85,12 @@ body.sidebar-open #sidebar { display: flex; }
 .status.dead { background: var(--bad); }
 @keyframes pulse { 50% { opacity: .35; } }
 .title { font-weight: 600; outline: none; white-space: nowrap; min-width: 30px; letter-spacing: -0.015em; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; }
-.card-head > button, .gitpill { flex: none; }
+.card-head > button { flex: none; }
+/* A narrow card keeps its name readable: the branch name shortens first, then the project. */
+.card-head .title { flex: none; max-width: 40%; }
+.gitpill { flex: 0 1 auto; min-width: 0; overflow: hidden; }
+.gitpill > * { flex: none; }
+.gitpill > .br { flex: 0 1 auto; min-width: 3ch; overflow: hidden; text-overflow: ellipsis; }
 .title[contenteditable="true"] { background: var(--fill); padding: 0 5px; border-radius: 5px; }
 .proj { color: var(--muted); font: 10.5px var(--font-mono); text-transform: uppercase; letter-spacing: .1em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 0 3 auto; }
 .spacer { flex: 1; }
