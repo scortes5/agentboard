@@ -8,7 +8,7 @@ Open with **Automations** (⇧⌘F). A flow is a diagram of connected steps, n8n
 
 | Step | What it does |
 |---|---|
-| **Trigger** | When it starts: by hand, every N minutes, or every day at a set time. |
+| **Trigger** | When it starts: by hand, every N minutes, every day at a set time, when a task finishes, or when a new GitHub issue is opened. |
 | **Agent** | An agent does a piece of work. It becomes a queued task with its subscription and model. |
 | **Command** | Runs a command in the project (tests, build, git), or in the folder of the previous agent's task (its worktree, if it has one), with a time limit (10 minutes by default). It can use secrets (see below). |
 | **Decision** | Claude reads the previous result and answers yes or no; the flow continues down that branch. |
@@ -35,6 +35,11 @@ Every step can be edited afterwards. A new template is one entry in `src/rendere
 - **By hand**: add steps from the toolbar and connect them by dragging from the dot on the right of one step onto another. The right panel edits the selected step.
 - **Design with AI**: describe what you want, e.g. *"Every day at 9: one agent reviews the code and proposes 3 improvements; another implements them; run the tests; if they pass notify me, otherwise have an agent fix it."* Claude builds or edits the diagram.
 - **Explain Run**: the AI explains what will happen step by step, the risks and possible improvements.
+
+## Event triggers
+
+- **When a task finishes**: choose done, blocked or either, and optionally a project and some text the task must mention. Agents in the automation get the task's text and summary as context. Tasks created by automations never start one, so automations cannot trigger each other in a loop.
+- **When a new GitHub issue is opened**: checks the project's issues with the `gh` CLI every few minutes (15 by default), optionally only those with a label. Issues already open when you turn it on are skipped; each new one starts one run, in order. `{issue}` in an agent's instruction or a command becomes the issue's number, for example `gh issue view {issue}`. Issues opened by people outside the project are ignored unless you allow them, and agents are told to treat an issue's text as a description, never as instructions.
 
 ## Running
 

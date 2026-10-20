@@ -54,7 +54,13 @@ class GitService {
       const m = c.match(/^(\d+)\s+(\d+)$/);
       if (m) { b.behindBase = +m[1]; b.aheadBase = +m[2]; }
     }));
-    return { top, base, current, branches };
+    return { top, base, current, branches, repoUrl: await this.repoUrl(top) };
+  }
+
+  // https://github.com/owner/repo for a GitHub origin, '' otherwise.
+  async repoUrl(top) {
+    const m = (await this.git.text(top, ['remote', 'get-url', 'origin'])).match(/github\.com[:/]([\w.-]+\/[\w.-]+?)(?:\.git)?$/);
+    return m ? `https://github.com/${m[1]}` : '';
   }
 
   // `git for-each-ref` lines (tab-separated, see overview) as objects.
@@ -79,6 +85,56 @@ class GitService {
       else if (line.startsWith('branch refs/heads/')) map[line.slice(18)] = dir;
     }
     return map;
+  }
+
+  // The history of every local branch for the branch graph: newest first, children before
+  // their parents, each commit with its parents and the refs that point at it.
+  async graph(cwd, limit = 400) {
+    const top = await this.git.top(cwd);
+    const n = Math.min(3000, Math.max(50, Math.round(+limit) || 400));
+    const r = await this.git.run(top, ['log', '--branches', '--topo-order', '-n', String(n + 1), '--date-order',
+      '--format=%H%x1f%P%x1f%an%x1f%at%x1f%D%x1f%s']);
+    if (!r.ok) throw new Error(r.err.trim() || 'Could not read the history.');
+    const [current, originHead, list] = await Promise.all([
+      this.git.text(top, ['rev-parse', '--abbrev-ref', 'HEAD']),
+      this.git.text(top, ['symbolic-ref', '--quiet', '--short', 'refs/remotes/origin/HEAD']),
+      this.branches(top),
+    ]);
+    const names = new Set(list);
+    const commits = GitService.parseGraph(r.out, names);
+    const base = [originHead.replace(/^origin\//, ''), 'main', 'master', 'develop'].find((b) => b && names.has(b)) || current;
+    return { top, current, base, more: commits.length > n, commits: commits.slice(0, n), repoUrl: await this.repoUrl(top) };
+  }
+
+  // `git log` lines (unit-separated, see graph) as commits.
+  static parseGraph(out, local = new Set()) {
+    return String(out).split('\n').filter(Boolean).map((line) => {
+      const [sha, parents, author, at, refs, ...subject] = line.split('\x1f');
+      return {
+        sha, parents: parents ? parents.split(' ') : [], author, at: (+at || 0) * 1000, subject: subject.join('\x1f'),
+        // "HEAD -> main, tag: v1.0, origin/main": only local branches are kept (remote ones share names)
+        branches: (refs || '').split(', ').map((x) => x.replace(/^HEAD -> /, '')).filter((x) => local.has(x)),
+        tags: (refs || '').split(', ').filter((x) => x.startsWith('tag: ')).map((x) => x.slice(5)),
+        head: /(^|, )HEAD -> /.test(refs || ''),
+      };
+    });
+  }
+
+  // One commit for the graph's detail pane: its full message and the files it changed.
+  async commit(cwd, sha) {
+    const top = await this.git.top(cwd);
+    if (!/^[0-9a-f]{7,40}$/i.test(String(sha))) throw new Error('Invalid commit.');
+    const [msg, stat] = await Promise.all([
+      this.git.run(top, ['show', '-s', '--format=%H%x1f%an <%ae>%x1f%aI%x1f%B', sha]),
+      this.git.run(top, ['show', '--format=', '--numstat', '-M', sha]),
+    ]);
+    if (!msg.ok) throw new Error(msg.err.trim() || 'Commit not found.');
+    const [full, author, date, ...body] = msg.out.split('\x1f');
+    const files = stat.out.split('\n').filter(Boolean).slice(0, 200).map((l) => {
+      const [add, del, ...file] = l.split('\t');
+      return { file: file.join('\t'), add: add === '-' ? null : +add, del: del === '-' ? null : +del };
+    });
+    return { sha: full, author, date, message: body.join('\x1f').trim(), files };
   }
 
   async checkout(cwd, branch, create) {
@@ -132,6 +188,8 @@ class GitService {
     ipcMain.handle('git:status', (_e, cwd) => this.status(cwd));
     ipcMain.handle('git:branches', (_e, cwd) => this.branches(cwd));
     ipcMain.handle('git:overview', wrap((_e, cwd) => this.overview(cwd)));
+    ipcMain.handle('git:graph', wrap((_e, cwd, limit) => this.graph(cwd, limit)));
+    ipcMain.handle('git:commit', wrap((_e, cwd, sha) => this.commit(cwd, sha)));
     ipcMain.handle('git:checkout', (_e, cwd, branch, create) => this.checkout(cwd, branch, create));
     ipcMain.handle('git:checkpoint', wrap((_e, cwd, label) => this.checkpoint(cwd, label)));
     ipcMain.handle('git:restore', wrap((_e, cwd, sha) => this.restore(cwd, sha)));

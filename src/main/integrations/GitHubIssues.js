@@ -28,9 +28,11 @@ class GitHubIssues {
   async pulls(cwd) {
     if (!cwd || !fs.existsSync(cwd)) throw new Error('Choose a project first.');
     if (!(await this.shellEnv.which('gh'))) throw new Error('Install the GitHub CLI (gh) and run "gh auth login" to see pull requests.');
-    const out = await new Promise((resolve, reject) => execFile('gh', ['pr', 'list', '--state', 'all', '--limit', '60',
-      '--json', 'number,title,headRefName,state,isDraft,url,statusCheckRollup'],
-    { cwd, timeout: 30_000, maxBuffer: 16 * 1024 * 1024 }, (err, stdout, stderr) => (err ? reject(new Error(String(stderr || err.message).trim().split('\n').pop())) : resolve(stdout))));
+    const list = (fields) => new Promise((resolve, reject) => execFile('gh', ['pr', 'list', '--state', 'all', '--limit', '60', '--json', fields],
+      { cwd, timeout: 30_000, maxBuffer: 16 * 1024 * 1024 }, (err, stdout, stderr) => (err ? reject(new Error(String(stderr || err.message).trim().split('\n').pop())) : resolve(stdout))));
+    const fields = 'number,title,headRefName,state,isDraft,url,statusCheckRollup';
+    // the issues a PR closes need a recent gh; older ones list the PRs without them
+    const out = await list(`${fields},closingIssuesReferences`).catch(() => list(fields));
     return GitHubIssues.parsePulls(out);
   }
 
@@ -54,6 +56,7 @@ class GitHubIssues {
       const pr = {
         number: p.number, title: String(p.title || ''), branch: p.headRefName, url: p.url,
         state: p.isDraft && p.state === 'OPEN' ? 'draft' : String(p.state || '').toLowerCase(), checks: GitHubIssues.checksOf(p.statusCheckRollup),
+        closes: (p.closingIssuesReferences || []).map((i) => i.number).filter(Number.isInteger),
       };
       const cur = byBranch[pr.branch];
       // gh lists the newest first: keep that one unless an older one is still open

@@ -24,6 +24,7 @@ const { Updater } = require('./updates/Updater');
 const { RemoteServer } = require('./remote/RemoteServer');
 const { WebhookNotifier } = require('./integrations/WebhookNotifier');
 const { GitHubIssues } = require('./integrations/GitHubIssues');
+const { BranchCleanup } = require('./git/BranchCleanup');
 const { SecretVault } = require('./secrets/SecretVault');
 const { CommandRunner } = require('./flows/CommandRunner');
 const { AuditLog } = require('./security/AuditLog');
@@ -65,6 +66,7 @@ const audit = new AuditLog({ dataDir });
 const vault = new SecretVault({ dataDir, crypto: safeStorage, audit });
 const runner = new GitRunner();
 const gitService = new GitService({ runner });
+const github = new GitHubIssues({ shellEnv });
 const claudeAccounts = new ClaudeAccounts({ config });
 // Restarting to install stops the agents: ask first, like quitting.
 const confirmRestart = () => { if (!application.confirmQuit()) return false; application.quitting = true; return true; };
@@ -92,7 +94,8 @@ application = new App({
     new SkillLibrary({ config }), new SkillPack({ claudeAccounts }), new UsageService({ dataDir, claudeAccounts }),
     desktopNotifications, new WorkLog({ file: path.join(dataDir, 'work-log.json'), runner }),
     new TaskPlanner({ shellEnv }), new CommandRunner({ shellEnv, vault, audit }), vault, audit,
-    new RemoteServer({ config, send, audit, tls: new TlsIdentity({ dataDir }) }), new WebhookNotifier({ vault }), new GitHubIssues({ shellEnv }),
+    new RemoteServer({ config, send, audit, tls: new TlsIdentity({ dataDir }) }), new WebhookNotifier({ vault }), github,
+    new BranchCleanup({ runner, gitService, github, audit }),
   ],
 });
 application.start();

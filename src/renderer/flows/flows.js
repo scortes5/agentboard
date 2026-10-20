@@ -2,11 +2,11 @@
 // agents run. Each "Agent" node becomes a queue task (new session, with a short summary
 // of the previous steps = few tokens); independent branches run in parallel.
 'use strict';
-/* global ab, cfg, fmt, SecretsSettings, $, esc, uid, basename, clamp, toast, save, addTask, taskById, subscriptions, agentKeyFrom, projectFrom,
+/* global ab, cfg, fmt, SecretsSettings, ISSUE_CAUTION, $, esc, uid, basename, clamp, toast, save, addTask, taskById, subscriptions, agentKeyFrom, projectFrom,
    openTasks, tickTasks, diagramOpen, toggleDiagram, cardData, focusCardView, focusCard, icon */
 
 const NODE_TYPES = {
-  trigger:   { icon: 'bolt', label: 'Trigger', color: '#ffd60a', hint: 'When it starts: by hand, every N minutes or at a time of day.' },
+  trigger:   { icon: 'bolt', label: 'Trigger', color: '#ffd60a', hint: 'When it starts: by hand, on a schedule, when a task finishes or when a new GitHub issue is opened.' },
   agent:     { icon: 'agent', label: 'Agent', color: '#0a84ff', hint: 'An agent does a piece of work (it becomes a queue task).' },
   command:   { icon: 'terminal', label: 'Command', color: '#64d2ff', hint: 'A shell command in the project (tests, build, scripts).' },
   condition: { icon: 'decision', label: 'Decision', color: '#ff9f0a', hint: 'AI answers YES or NO about the previous steps and the flow follows that branch.' },
@@ -45,7 +45,12 @@ const BRANCH_LABEL = { yes: 'Yes', no: 'No', error: 'On error' };
 
 function nodeSummary(n) {
   const c = n.config || {};
-  if (n.type === 'trigger') return c.mode === 'every' ? `every ${c.every || 60} min` : c.mode === 'daily' ? `every day at ${c.at || '09:00'}` : 'by hand (Run button)';
+  if (n.type === 'trigger') {
+    const proj = c.project ? ` in ${projectFrom(c.project)?.name || basename(c.project)}` : '';
+    if (c.mode === 'task') return `when a task ${c.on === 'any' ? 'finishes' : c.on === 'blocked' ? 'is blocked' : 'is done'}${proj}${c.match ? ` and mentions "${c.match}"` : ''}`;
+    if (c.mode === 'issue') return `when a new issue${c.label ? ` labeled ${c.label}` : ''} is opened${proj} (checked every ${issueEvery(c)} min)`;
+    return c.mode === 'every' ? `every ${c.every || 60} min` : c.mode === 'daily' ? `every day at ${c.at || '09:00'}` : 'by hand (Run button)';
+  }
   if (n.type === 'agent') {
     const a = c.agent && c.agent !== 'auto' ? (cfg.agents[c.agent]?.label || 'missing agent') : 'auto';
     return `${a}${c.mode && c.mode !== 'normal' ? ' · ' + c.mode : ''} — ${(c.prompt || 'no instruction').slice(0, 70)}`;
@@ -56,10 +61,15 @@ function nodeSummary(n) {
   return (c.text || '').slice(0, 90);
 }
 
-// When a scheduled automation runs next (null when it only runs by hand or is off).
+const TRIGGER_MODES = [['manual', 'By hand'], ['every', 'Every N minutes'], ['daily', 'Every day at a time'], ['task', 'When a task finishes'], ['issue', 'When a new GitHub issue is opened']];
+const issueEvery = (c) => Math.max(5, +c.every || 15);
+
+// When a scheduled automation runs next, or checks for new issues (null when it only runs by
+// hand, on task events, or is off).
 function nextRunAt(f, now = Date.now()) {
   const c = f.nodes.find((n) => n.type === 'trigger')?.config;
-  if (f.enabled === false || !c || c.mode === 'manual') return null;
+  if (f.enabled === false || !c || c.mode === 'manual' || c.mode === 'task') return null;
+  if (c.mode === 'issue') return (f.lastScheduled || now) + issueEvery(c) * 60_000;
   if (c.mode === 'every') return (f.lastScheduled || now) + Math.max(5, +c.every || 60) * 60_000;
   const [h, m] = String(c.at || '09:00').split(':').map(Number);
   const due = new Date(now); due.setHours(h || 0, m || 0, 0, 0);
@@ -174,7 +184,7 @@ function drawFlowEdges(temp) {
 }
 
 // ---------- Inspector ----------
-const projectOptions = (sel) => `<option value="">Current project</option>` + cfg.projects.map((p) => `<option value="${esc(p.path)}" ${p.path === sel ? 'selected' : ''}>${esc(p.name)}</option>`).join('');
+const projectOptions = (sel, none = 'Current project') => `<option value="">${esc(none)}</option>` + cfg.projects.map((p) => `<option value="${esc(p.path)}" ${p.path === sel ? 'selected' : ''}>${esc(p.name)}</option>`).join('');
 
 function renderInspector() {
   const box = $('#flInspector');
@@ -210,10 +220,23 @@ function renderInspector() {
   const field = (k, label, html) => `<label class="fl-field"><span>${label}</span>${html}</label>`;
   let body = field('title', 'Name', `<input data-k="title" value="${esc(n.title || '')}"/>`);
   if (n.type === 'trigger') {
-    body += field('mode', 'When', `<select data-c="mode">${[['manual', 'By hand'], ['every', 'Every N minutes'], ['daily', 'Every day at a time']].map(([v, l]) => `<option value="${v}" ${c.mode === v ? 'selected' : ''}>${l}</option>`).join('')}</select>`);
+    body += field('mode', 'When', `<select data-c="mode">${TRIGGER_MODES.map(([v, l]) => `<option value="${v}" ${c.mode === v ? 'selected' : ''}>${l}</option>`).join('')}</select>`);
     if (c.mode === 'every') body += field('every', 'Minutes', `<input type="number" min="5" data-c="every" value="${esc(c.every || 60)}"/>`);
     if (c.mode === 'daily') body += field('at', 'Time', `<input type="time" data-c="at" value="${esc(c.at || '09:00')}"/>`);
-    body += `<p class="set-note">Scheduled automations run while AgentBoard is open (also in the background).</p>`;
+    if (c.mode === 'task') {
+      body += field('on', 'Which tasks', `<select data-c="on">${[['done', 'Done'], ['blocked', 'Blocked'], ['any', 'Done or blocked']].map(([v, l]) => `<option value="${v}" ${(c.on || 'done') === v ? 'selected' : ''}>${l}</option>`).join('')}</select>`);
+      body += field('project', 'Project', `<select data-c="project">${projectOptions(c.project, 'Any project')}</select>`);
+      body += field('match', 'Only tasks that mention (optional)', `<input data-c="match" value="${esc(c.match || '')}" placeholder="e.g. backend"/>`);
+      body += `<p class="set-note">Agents receive the task's text and summary as context. Tasks created by automations never start one, so automations cannot trigger each other in a loop.</p>`;
+    }
+    if (c.mode === 'issue') {
+      body += field('project', 'Project', `<select data-c="project">${projectOptions(c.project)}</select>`);
+      body += field('label', 'Only issues labeled (optional)', `<input data-c="label" value="${esc(c.label || '')}" placeholder="e.g. bug"/>`);
+      body += field('every', 'Check every (minutes)', `<input type="number" min="5" data-c="every" value="${esc(issueEvery(c))}"/>`);
+      body += `<label class="fl-field check"><input type="checkbox" data-c="outside" ${c.outside ? 'checked' : ''}/> <span>Also issues opened by people outside the project (their text could try to give the agent instructions)</span></label>`;
+      body += `<p class="set-note">Needs the GitHub CLI (gh). Issues already open when you turn this on are skipped; each new one starts one run, and <code>{issue}</code> in an agent's instruction or a command becomes its number.${f.issueError ? `<br/>Last check failed: ${esc(f.issueError)}` : ''}</p>`;
+    }
+    if (c.mode !== 'manual') body += `<p class="set-note">Scheduled and event automations run while AgentBoard is open (also in the background).</p>`;
   } else if (n.type === 'agent') {
     body += field('prompt', 'Instruction for the agent', `<textarea data-c="prompt" rows="6" placeholder="What to do, in which files, and how to tell it is done">${esc(c.prompt || '')}</textarea>`);
     body += field('agent', 'Subscription', `<select data-c="agent"><option value="auto">Auto (least busy)</option>${subscriptions().map(([k, a]) => `<option value="${esc(k)}" ${c.agent === k ? 'selected' : ''}>${esc(a.label)}</option>`).join('')}</select>`);
@@ -398,7 +421,7 @@ function contextFor(f, run, nodeId) {
   return ancestorsOf(f, nodeId).map((id) => {
     const n = f.nodes.find((x) => x.id === id);
     const r = run.results[id];
-    return n && r && !r.skip && n.type !== 'trigger' ? `- ${n.title || NODE_TYPES[n.type].label}: ${(r.text || '').replace(/\s+/g, ' ').slice(0, 300)}` : '';
+    return n && r && !r.skip && (n.type !== 'trigger' || r.event) ? `- ${n.title || NODE_TYPES[n.type].label}: ${(r.text || '').replace(/\s+/g, ' ').slice(0, 300)}` : '';
   }).filter(Boolean).join('\n');
 }
 
@@ -432,10 +455,14 @@ function lastTaskFolder(f, run, nodeId) {
   return done[0] ? done[0].workdir || done[0].cwd : null;
 }
 
+// {issue} in an instruction or a command: the number of the issue that started the run. Only
+// digits are ever put in, so it is safe inside a shell command.
+const withVars = (text, run) => String(text).replace(/\{issue\}/g, Number.isInteger(run.vars?.issue) ? String(run.vars.issue) : '{issue}');
+
 async function execNode(f, run, n) {
   const c = n.config || {};
   const ctx = contextFor(f, run, n.id);
-  if (n.type === 'trigger') return { ok: true, text: run.reason };
+  if (n.type === 'trigger') return { ok: true, text: run.event || run.reason, event: !!run.event };
   if (n.type === 'notify') {
     const msg = c.message || n.title || 'Automation';
     try { new Notification(f.name, { body: msg }); } catch {}
@@ -446,7 +473,7 @@ async function execNode(f, run, n) {
     if (!c.cmd) return { ok: false, text: 'No command.' };
     const folder = (c.inTaskFolder && lastTaskFolder(f, run, n.id)) || c.project || cfg.selectedProject;
     if (!folder) return { ok: false, text: 'No project: choose a folder for this step or select a project.' };
-    const r = await ab.flowExec(c.cmd, folder, SecretsSettings.parse(c.secrets), +c.timeout || 10);
+    const r = await ab.flowExec(withVars(c.cmd, run), folder, SecretsSettings.parse(c.secrets), +c.timeout || 10);
     if (!r.ok) return { ok: false, text: r.error };
     const tail = r.value.out.split('\n').slice(-6).join('\n');
     return { ok: r.value.code === 0, text: `${r.value.code === 0 ? 'OK' : `exit code ${r.value.code}`}\n${tail}` };
@@ -459,7 +486,7 @@ async function execNode(f, run, n) {
   }
   if (n.type === 'agent') {
     if (!c.prompt) return { ok: false, text: 'No instruction.' };
-    const text = `${c.prompt}${ctx ? `\n\nContext (previous steps of "${f.name}"):\n${ctx}` : ''}`;
+    const text = `${withVars(c.prompt, run)}${ctx ? `\n\nContext (previous steps of "${f.name}"):\n${ctx}` : ''}`;
     const t = addTask({
       text, agent: c.agent || 'auto', cwd: c.project || cfg.selectedProject, group: c.group || '',
       light: c.mode === 'light', heavy: c.mode === 'heavy',
@@ -472,11 +499,13 @@ async function execNode(f, run, n) {
   return { ok: true, text: '' };
 }
 
-async function runFlow(f, reason = 'by hand') {
+// `event`: what started it, for event triggers ({ text, vars }); its text is the trigger's
+// result, so agents get it as context.
+async function runFlow(f, reason = 'by hand', event = null) {
   if (activeRuns.has(f.id)) return;
   const nodes = f.nodes.filter((n) => n.type !== 'note');
   const edges = f.edges.map((e, i) => ({ ...e, i })).filter((e) => nodes.some((n) => n.id === e.from) && nodes.some((n) => n.id === e.to));
-  const run = { id: uid(), reason, status: {}, results: {}, edge: {}, log: [], taskNode: {}, startedAt: Date.now() };
+  const run = { id: uid(), reason, event: event?.text || '', vars: event?.vars || {}, status: {}, results: {}, edge: {}, log: [], taskNode: {}, startedAt: Date.now() };
   activeRuns.set(f.id, run);
   const log = (m) => { run.log.push(`${fmt.clock(Date.now())} ${m}`); if (flowSel === f.id) refreshFlow(); else renderFlowList(); };
   log(`Start (${reason})`);
@@ -534,6 +563,10 @@ async function runFlow(f, reason = 'by hand') {
   if (!document.hasFocus()) { try { new Notification(`${f.name}: ${outcome}`, { body: run.log.slice(-1)[0] || '' }); } catch {} }
   toast(`Automation "${esc(f.name)}" ${outcome}`, 4500);
   if (flowsOpen()) renderFlow(); else renderFlowList();
+  // events that arrived while it ran: the next one now
+  const next = flowEvents.get(f.id)?.shift();
+  if (next) runFlow(f, next.reason, next.event);
+  else if (moreIssues.delete(f.id)) f.lastScheduled = 0; // more new issues: check again on the next tick
 }
 
 function stopFlow(f) {
@@ -545,6 +578,52 @@ function stopFlow(f) {
   save();
 }
 
+// ---------- Event triggers ----------
+const flowEvents = new Map(); // flowId -> events that arrived while it was running (in memory)
+const issuePolls = new Set();  // flows checking for issues right now
+const moreIssues = new Set();  // flows with more new issues waiting for their turn
+const triggerOf = (f) => f.nodes.find((n) => n.type === 'trigger')?.config || null;
+
+// Called when a task ends (tasks.js). Tasks started by automations are ignored, so one
+// automation can never start another, or itself, in a loop.
+function onTaskFinished(t, status) {
+  if (t.flowRun) return;
+  for (const f of flows()) {
+    const c = triggerOf(f);
+    if (f.enabled === false || c?.mode !== 'task') continue;
+    if ((c.on || 'done') !== 'any' && (c.on || 'done') !== status) continue;
+    if (c.project && t.cwd !== c.project) continue;
+    if (c.match && !t.text.toLowerCase().includes(String(c.match).toLowerCase())) continue;
+    const event = { text: `Task ${status}: "${t.text.slice(0, 200)}"${t.summary ? ` (${t.summary.replace(/\s+/g, ' ').slice(0, 300)})` : ''}${t.branch ? `, on branch ${t.branch}` : ''}` };
+    const reason = `task ${status}`;
+    if (!activeRuns.has(f.id)) { runFlow(f, reason, event); continue; }
+    const q = flowEvents.get(f.id) || [];
+    if (q.length < 10) { q.push({ reason, event }); flowEvents.set(f.id, q); }
+  }
+}
+
+// New issues for an "issue" trigger: the ones open when it was turned on are only remembered.
+async function pollIssues(f, c) {
+  if (issuePolls.has(f.id)) return;
+  issuePolls.add(f.id);
+  try {
+    const r = await ab.githubIssues(c.project || cfg.selectedProject);
+    if (!r.ok) { f.issueError = r.error; return; }
+    f.issueError = '';
+    const fits = r.value.filter((i) => (i.trusted || c.outside) && (!c.label || i.labels.some((l) => l.toLowerCase() === String(c.label).toLowerCase())));
+    if (!Array.isArray(f.seenIssues)) { f.seenIssues = fits.map((i) => i.number); save(); return; }
+    const seen = new Set(f.seenIssues);
+    const fresh = fits.filter((i) => !seen.has(i.number)).sort((a, b) => a.number - b.number);
+    if (!fresh.length || activeRuns.has(f.id) || f.enabled === false) return;
+    const i = fresh[0];
+    f.seenIssues = [...f.seenIssues, i.number].slice(-500);
+    if (fresh.length > 1) moreIssues.add(f.id); else moreIssues.delete(f.id);
+    save();
+    const caution = typeof ISSUE_CAUTION === 'string' ? ` ${ISSUE_CAUTION}` : '';
+    runFlow(f, `issue #${i.number}`, { text: `New GitHub issue #${i.number}: "${i.title.slice(0, 200)}"${i.labels.length ? ` (labels: ${i.labels.join(', ')})` : ''}. Read it with \`gh issue view ${i.number}\`.${caution}`, vars: { issue: i.number } });
+  } finally { issuePolls.delete(f.id); }
+}
+
 // Schedules: every 30 s, check which automations are due.
 function checkSchedules() {
   const now = new Date();
@@ -552,9 +631,12 @@ function checkSchedules() {
     if (f.enabled === false || activeRuns.has(f.id)) continue;
     const trig = f.nodes.find((n) => n.type === 'trigger');
     const c = trig?.config;
-    if (!c || c.mode === 'manual') continue;
+    if (!c || c.mode === 'manual' || c.mode === 'task') continue;
     const last = f.lastScheduled || 0;
-    if (c.mode === 'every') {
+    if (c.mode === 'issue') {
+      // the first check only remembers the issues already open
+      if (!Array.isArray(f.seenIssues) || Date.now() - last >= issueEvery(c) * 60_000) { f.lastScheduled = Date.now(); save(); pollIssues(f, c); }
+    } else if (c.mode === 'every') {
       const every = Math.max(5, +c.every || 60) * 60_000;
       if (!last) { f.lastScheduled = Date.now(); save(); continue; } // start counting from now
       if (Date.now() - last >= every) { f.lastScheduled = Date.now(); save(); runFlow(f, `every ${c.every} min`); }
@@ -623,7 +705,7 @@ async function designWithAI() {
     'Design an automation for AgentBoard (an app that coordinates coding agents such as Claude Code running in terminals).',
     'Reply ONLY with valid JSON, no extra text, in this shape:',
     '{"name":"…","nodes":[{"id":"n1","type":"trigger|agent|command|condition|notify|note","title":"…","config":{}}],"edges":[{"from":"n1","to":"n2","branch":"yes|no"}]}',
-    'config per type: trigger {"mode":"manual|every|daily","every":60,"at":"09:00"}; agent {"prompt":"self-contained, concrete instruction","agent":"auto","mode":"normal|light|heavy","timeout":60}; command {"cmd":"shell command","timeout":10}; condition {"question":"yes/no question about the previous result"}; notify {"message":"…"}; note {"text":"…"}.',
+    'config per type: trigger {"mode":"manual|every|daily|task|issue","every":60,"at":"09:00"} (task: runs when a task finishes, with "on":"done|blocked|any" and optional "match"; issue: runs once per new GitHub issue, with optional "label", and {issue} in later instructions or commands becomes its number); agent {"prompt":"self-contained, concrete instruction","agent":"auto","mode":"normal|light|heavy","timeout":60}; command {"cmd":"shell command","timeout":10}; condition {"question":"yes/no question about the previous result"}; notify {"message":"…"}; note {"text":"…"}.',
     '"branch" is "yes" or "no" on connections leaving a condition, and "error" on a connection leaving an agent or command that should run only if that step fails (for example an agent that fixes failing tests). Start with a single trigger.',
     'Use agents for work that needs thinking or code edits, commands for deterministic steps (tests, build, git), "light" for simple steps to save tokens and "heavy" only when it is hard. Run independent steps in parallel. At most 12 nodes.',
     'Write titles and instructions in the same language as the request.',
