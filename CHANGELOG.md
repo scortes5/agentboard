@@ -4,6 +4,11 @@ All notable changes to AgentBoard. The format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-10-20
+
+### Added
+- **Branches follow GitHub**: every 15 minutes AgentBoard fetches each project and fast-forwards the local branches that are only behind GitHub and are not checked out, so no working folder changes by itself (turn it off with *Auto* in the Branches view). **Pull All** does it now and also updates checked-out branches without uncommitted changes. **Push** lists the branches with commits GitHub does not have (selected) and those that only exist on this computer (not selected) and pushes the ones you pick. Branches only on GitHub are listed with **Track** to create a local branch that follows them. Nothing is ever forced: branches with commits on both sides are left alone and reported, and git never waits for a password.
+
 ## [1.10.0] - 2026-10-20
 
 ### Added
@@ -337,7 +342,8 @@ Includes the 0.2.0 changes, which were not released separately.
 ### Added
 - First release: a board of terminals for CLI agents on Mac and Windows.
 
-[Unreleased]: https://github.com/scortes5/agentboard/compare/v1.10.0...HEAD
+[Unreleased]: https://github.com/scortes5/agentboard/compare/v1.11.0...HEAD
+[1.11.0]: https://github.com/scortes5/agentboard/compare/v1.10.0...v1.11.0
 [1.10.0]: https://github.com/scortes5/agentboard/compare/v1.9.0...v1.10.0
 [1.9.0]: https://github.com/scortes5/agentboard/compare/v1.8.2...v1.9.0
 [1.8.2]: https://github.com/scortes5/agentboard/compare/v1.8.1...v1.8.2
