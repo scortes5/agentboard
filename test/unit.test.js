@@ -176,6 +176,17 @@ test('the branch overview reads refs and worktrees', () => {
     { main: '/r', 'agentboard/t': '/r/.agentboard/worktrees/t' });
 });
 
+test('pull requests are summed up per branch with their checks', () => {
+  const { GitHubIssues } = require('../src/main/integrations/GitHubIssues');
+  const prs = GitHubIssues.parsePulls(JSON.stringify([
+    { number: 9, title: 'New', headRefName: 'feat/a', state: 'CLOSED', isDraft: false, url: 'u9', statusCheckRollup: [] },
+    { number: 7, title: 'Old', headRefName: 'feat/a', state: 'OPEN', isDraft: true, url: 'u7', statusCheckRollup: [{ conclusion: 'SUCCESS' }, { status: 'IN_PROGRESS', conclusion: '' }] },
+    { number: 5, title: 'B', headRefName: 'fix/b', state: 'MERGED', isDraft: false, url: 'u5', statusCheckRollup: [{ conclusion: 'FAILURE' }, { state: 'SUCCESS' }] },
+  ]));
+  assert.deepEqual([prs['feat/a'].number, prs['feat/a'].state, prs['feat/a'].checks.state], [7, 'draft', 'pending']);
+  assert.deepEqual([prs['fix/b'].state, prs['fix/b'].checks.failed, prs['fix/b'].checks.passed], ['merged', 1, 1]);
+});
+
 test('issue label colors are kept only when they are plain hex', () => {
   const { GitHubIssues } = require('../src/main/integrations/GitHubIssues');
   const [i] = GitHubIssues.parse(JSON.stringify([

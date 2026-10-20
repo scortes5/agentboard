@@ -23,6 +23,45 @@ class GitHubIssues {
     return GitHubIssues.parse(out);
   }
 
+  // The project's recent pull requests, one per branch (an open one wins over closed ones),
+  // with the result of their checks, for the Branches view.
+  async pulls(cwd) {
+    if (!cwd || !fs.existsSync(cwd)) throw new Error('Choose a project first.');
+    if (!(await this.shellEnv.which('gh'))) throw new Error('Install the GitHub CLI (gh) and run "gh auth login" to see pull requests.');
+    const out = await new Promise((resolve, reject) => execFile('gh', ['pr', 'list', '--state', 'all', '--limit', '60',
+      '--json', 'number,title,headRefName,state,isDraft,url,statusCheckRollup'],
+    { cwd, timeout: 30_000, maxBuffer: 16 * 1024 * 1024 }, (err, stdout, stderr) => (err ? reject(new Error(String(stderr || err.message).trim().split('\n').pop())) : resolve(stdout))));
+    return GitHubIssues.parsePulls(out);
+  }
+
+  // Check runs report a conclusion, commit statuses a state; anything unfinished is pending.
+  static checksOf(rollup) {
+    const res = { passed: 0, failed: 0, pending: 0 };
+    for (const c of rollup || []) {
+      const v = String(c.conclusion || c.state || '').toUpperCase();
+      if (['SUCCESS', 'NEUTRAL', 'SKIPPED'].includes(v)) res.passed++;
+      else if (['FAILURE', 'ERROR', 'TIMED_OUT', 'CANCELLED', 'ACTION_REQUIRED', 'STARTUP_FAILURE'].includes(v)) res.failed++;
+      else res.pending++;
+    }
+    res.total = res.passed + res.failed + res.pending;
+    res.state = !res.total ? 'none' : res.failed ? 'failing' : res.pending ? 'pending' : 'passing';
+    return res;
+  }
+
+  static parsePulls(json) {
+    const byBranch = {};
+    for (const p of JSON.parse(json)) {
+      const pr = {
+        number: p.number, title: String(p.title || ''), branch: p.headRefName, url: p.url,
+        state: p.isDraft && p.state === 'OPEN' ? 'draft' : String(p.state || '').toLowerCase(), checks: GitHubIssues.checksOf(p.statusCheckRollup),
+      };
+      const cur = byBranch[pr.branch];
+      // gh lists the newest first: keep that one unless an older one is still open
+      if (!cur || (cur.state !== 'open' && cur.state !== 'draft' && (pr.state === 'open' || pr.state === 'draft'))) byBranch[pr.branch] = pr;
+    }
+    return byBranch;
+  }
+
   static parse(json) {
     return JSON.parse(json).filter((i) => !i.pull_request).map((i) => ({
       number: i.number, title: i.title, url: i.html_url, body: String(i.body || '').slice(0, 4000),
@@ -37,6 +76,7 @@ class GitHubIssues {
 
   register(ipcMain) {
     ipcMain.handle('github:issues', wrap((_e, cwd) => this.list(cwd)));
+    ipcMain.handle('github:pulls', wrap((_e, cwd) => this.pulls(cwd)));
   }
 }
 

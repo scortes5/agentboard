@@ -6,6 +6,7 @@
    basename, focusCard, focusCardView, cardData, refreshGit */
 
 const TASK_STATE = { pending: 'queued', running: 'running', review: 'to review', done: 'done', blocked: 'blocked' };
+const CHECKS_TEXT = { passing: 'checks passing', failing: 'checks failing', pending: 'checks running', none: 'no checks' };
 
 class BranchOverview {
   constructor() {
@@ -33,11 +34,24 @@ class BranchOverview {
   }
 
   // Branches with something going on first, then the rest by their last commit.
-  static active(b, w, base) {
-    return b.name !== base && (w.tasks.some((t) => t.status !== 'done') || w.cards.length > 0 || !!b.worktree || b.aheadBase > 0);
+  static active(b, w, base, pr) {
+    // commits ahead of the base only mean work in progress until the branch's pull request is merged or closed
+    const shipped = pr?.state === 'merged' || pr?.state === 'closed';
+    return b.name !== base && (w.tasks.some((t) => t.status !== 'done') || w.cards.length > 0 || !!b.worktree
+      || (b.aheadBase > 0 && !shipped) || pr?.state === 'open' || pr?.state === 'draft');
   }
 
-  static row(b, w, ctx) {
+  // The branch's pull request and its checks, linking to GitHub.
+  static prChip(pr) {
+    if (!pr || !/^https:\/\/github\.com\//.test(pr.url || '')) return '';
+    const c = pr.checks || {};
+    const tone = pr.state === 'merged' ? 'ok' : pr.state === 'closed' ? 'muted' : c.state === 'failing' ? 'bad' : c.state === 'pending' ? 'warn' : c.state === 'passing' ? 'ok' : '';
+    const checks = pr.state === 'open' || pr.state === 'draft'
+      ? ` · ${CHECKS_TEXT[c.state] || ''}${c.state === 'failing' ? ` (${c.failed}/${c.total})` : ''}` : '';
+    return `<a class="br-pr ${tone}" href="${esc(pr.url)}" target="_blank" title="Open pull request #${pr.number} on GitHub: ${esc(pr.title)}">${icon('external', 10)} PR #${pr.number} ${esc(pr.state)}${esc(checks)}</a>`;
+  }
+
+  static row(b, w, ctx, pr) {
     const isCurrent = b.name === ctx.current;
     const chips = [
       isCurrent ? '<span class="br-chip accent" title="Checked out in the project folder">current</span>' : '',
@@ -55,6 +69,7 @@ class BranchOverview {
     const canSwitch = !isCurrent && !b.worktree;
     return `<div class="br-item${isCurrent ? ' current' : ''}" data-b="${esc(b.name)}">
       <div class="br-top">${icon('branch', 13)}<span class="br-name" title="${esc(b.name)}">${esc(b.name)}</span>${chips}<span class="spacer"></span>${vsBase}</div>
+      ${pr ? `<div class="br-prs">${BranchOverview.prChip(pr)}</div>` : ''}
       <div class="br-commit"><span class="mono">${esc(b.sha)}</span> <span class="br-subject" title="${esc(b.subject)}">${esc(b.subject || '(no message)')}</span></div>
       <div class="br-meta"><span>${esc(b.author)}</span><span class="sep">·</span><span title="${esc(new Date(b.at).toLocaleString())}">${esc(fmt.ago(b.at))}</span>
         <span class="spacer"></span>
@@ -70,24 +85,27 @@ class BranchOverview {
     pop.className = 'popover branches';
     pop.innerHTML = '<div class="hint">Reading branches…</div>';
     openPopover(pop, anchor, 500);
-    const r = await ab.gitOverview(cwd);
+    // pull requests are optional: without gh (or offline) the view still shows the branches
+    const [r, pulls] = await Promise.all([ab.gitOverview(cwd), ab.githubPulls(cwd)]);
     if (!pop.isConnected) return;
     if (!r.ok) { pop.innerHTML = `<div class="hint">${esc(r.error)}</div>`; return; }
+    const prs = pulls.ok ? pulls.value : {};
     const { top, base, current, branches } = r.value;
     const proj = cfg.projects.find((p) => p.path === cwd || p.path === top)?.name || basename(top);
     const work = BranchOverview.work(top, branches);
     const ctx = { top, base, current };
-    const live = branches.filter((b) => BranchOverview.active(b, work[b.name], base));
+    const live = branches.filter((b) => BranchOverview.active(b, work[b.name], base, prs[b.name]));
     const rest = branches.filter((b) => !live.includes(b));
     pop.innerHTML = `<div class="is-head"><b>Branches</b><span class="muted">${esc(proj)}</span><span class="spacer"></span>
         <span class="muted small">compared with <span class="mono">${esc(base)}</span></span><span class="badge">${branches.length}</span></div>
       <input class="is-search" type="search" placeholder="Filter by name, commit or author" value="${esc(this.query)}" title="Filter the branches" />
-      <div class="br-list"></div>`;
+      <div class="br-list"></div>
+      ${pulls.ok ? '' : `<div class="br-foot muted small" title="${esc(pulls.error)}">Pull requests are not shown: ${esc(pulls.error)}</div>`}`;
     const box = pop.querySelector('.br-list');
     const draw = () => {
       const q = this.query.toLowerCase();
       const hit = (b) => !q || b.name.toLowerCase().includes(q) || b.subject.toLowerCase().includes(q) || b.author.toLowerCase().includes(q);
-      const section = (title, hint, list) => (list.length ? `<div class="br-section" title="${esc(hint)}">${esc(title)} <span>${list.length}</span></div>${list.map((b) => BranchOverview.row(b, work[b.name], ctx)).join('')}` : '');
+      const section = (title, hint, list) => (list.length ? `<div class="br-section" title="${esc(hint)}">${esc(title)} <span>${list.length}</span></div>${list.map((b) => BranchOverview.row(b, work[b.name], ctx, prs[b.name])).join('')}` : '');
       box.innerHTML = section('In progress', 'Branches with a task, an agent card, a worktree or commits not yet in the base branch', live.filter(hit))
         + section('Other branches', 'Everything else, most recent commit first', rest.filter(hit))
         || '<div class="hint">No branch matches this filter.</div>';

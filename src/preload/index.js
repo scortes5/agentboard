@@ -95,6 +95,7 @@ contextBridge.exposeInMainWorld('ab', {
   auditExport: () => ipcRenderer.invoke('audit:export'),
   postWebhook: (url, text) => ipcRenderer.invoke('webhook:post', url, text),
   githubIssues: (cwd) => ipcRenderer.invoke('github:issues', cwd),
+  githubPulls: (cwd) => ipcRenderer.invoke('github:pulls', cwd),
   onMenu: (cb) => ipcRenderer.on('menu', (_e, action) => cb(action)),
 
   // Clipboard

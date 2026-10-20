@@ -72,3 +72,11 @@
 .br-work.st-running em { color: var(--accent); } .br-work.st-review em, .br-work.st-blocked em { color: var(--warn); } .br-work.st-done em { color: var(--ok); }
 .popover button.br-work { width: auto; display: inline-flex; font: 11px var(--font-ui); padding: 2px 8px; background: var(--fill); }
 .popover button.br-work:hover { background: var(--fill-hi); color: var(--text); }
+.br-prs { display: flex; flex-wrap: wrap; gap: 4px; padding-left: 19px; }
+.br-pr { display: inline-flex; align-items: center; gap: 4px; font: 500 10.5px var(--font-ui); padding: 1px 8px; border-radius: 20px; color: var(--text-2); text-decoration: none; box-shadow: inset 0 0 0 1px var(--line-hi); }
+.br-pr:hover { background: var(--fill-hi); }
+.br-pr.ok { color: var(--ok); box-shadow: inset 0 0 0 1px rgba(var(--ok-rgb), .4); }
+.br-pr.warn { color: var(--warn); box-shadow: inset 0 0 0 1px rgba(var(--warn-rgb), .4); }
+.br-pr.bad { color: var(--bad); box-shadow: inset 0 0 0 1px rgba(var(--bad-rgb), .45); }
+.br-pr.muted { color: var(--muted); }
+.br-foot { padding: 8px 14px; border-top: 1px solid var(--line); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
