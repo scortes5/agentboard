@@ -18,6 +18,15 @@ const fmt = {
     const m = Math.max(1, Math.round(ms / 60000));
     return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min`;
   },
+  // How long ago: "just now", "5 min ago", "3 h ago", "2 days ago", then the date.
+  ago: (ts) => {
+    const m = Math.round((Date.now() - ts) / 60000);
+    if (m < 1) return 'just now';
+    if (m < 60) return `${m} min ago`;
+    if (m < 1440) return `${Math.round(m / 60)} h ago`;
+    const d = Math.round(m / 1440);
+    return d < 30 ? `${d} day${d === 1 ? '' : 's'} ago` : new Date(ts).toLocaleDateString();
+  },
   // "15:30"
   clock: (ts) => new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
 };

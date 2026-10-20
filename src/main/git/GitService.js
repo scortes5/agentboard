@@ -30,6 +30,57 @@ class GitService {
     return out ? out.split('\n').map((s) => s.trim()).filter(Boolean) : [];
   }
 
+  // Every local branch of the project's repository, most recently committed first: its last
+  // commit, how far it is from the main branch and its upstream, and the worktree it is
+  // checked out in (task worktrees included), so you can see where work is happening.
+  async overview(cwd) {
+    const top = await this.git.top(cwd);
+    const [refs, trees, current, originHead] = await Promise.all([
+      this.git.run(top, ['for-each-ref', 'refs/heads', '--sort=-committerdate', '--count=60',
+        '--format=%(refname:short)%09%(committerdate:unix)%09%(authorname)%09%(upstream:short)%09%(upstream:track,nobracket)%09%(objectname:short)%09%(subject)']),
+      this.git.run(top, ['worktree', 'list', '--porcelain']),
+      this.git.text(top, ['rev-parse', '--abbrev-ref', 'HEAD']),
+      this.git.text(top, ['symbolic-ref', '--quiet', '--short', 'refs/remotes/origin/HEAD']),
+    ]);
+    if (!refs.ok) throw new Error(refs.err.trim() || 'Could not read the branches.');
+    const branches = GitService.parseRefs(refs.out);
+    const worktrees = GitService.parseWorktrees(trees.out);
+    const names = new Set(branches.map((b) => b.name));
+    const base = [originHead.replace(/^origin\//, ''), 'main', 'master', 'develop'].find((b) => b && names.has(b)) || current;
+    await Promise.all(branches.map(async (b) => {
+      b.worktree = worktrees[b.name] || '';
+      if (b.name === base) return;
+      const c = await this.git.text(top, ['rev-list', '--left-right', '--count', `${base}...${b.name}`]);
+      const m = c.match(/^(\d+)\s+(\d+)$/);
+      if (m) { b.behindBase = +m[1]; b.aheadBase = +m[2]; }
+    }));
+    return { top, base, current, branches };
+  }
+
+  // `git for-each-ref` lines (tab-separated, see overview) as objects.
+  static parseRefs(out) {
+    return String(out).split('\n').filter(Boolean).map((line) => {
+      const [name, at, author, upstream, track, sha, ...subject] = line.split('\t');
+      const ahead = /ahead (\d+)/.exec(track || ''), behind = /behind (\d+)/.exec(track || '');
+      return {
+        name, at: (+at || 0) * 1000, author: author || '', sha: sha || '', subject: subject.join('\t'),
+        upstream: upstream || '', gone: /gone/.test(track || ''), ahead: ahead ? +ahead[1] : 0, behind: behind ? +behind[1] : 0,
+        aheadBase: 0, behindBase: 0,
+      };
+    });
+  }
+
+  // `git worktree list --porcelain` as branch name -> folder.
+  static parseWorktrees(out) {
+    const map = {};
+    let dir = '';
+    for (const line of String(out).split('\n')) {
+      if (line.startsWith('worktree ')) dir = line.slice(9);
+      else if (line.startsWith('branch refs/heads/')) map[line.slice(18)] = dir;
+    }
+    return map;
+  }
+
   async checkout(cwd, branch, create) {
     return (await this.git.quick(cwd, create ? ['checkout', '-b', branch] : ['checkout', branch])) != null;
   }
@@ -80,6 +131,7 @@ class GitService {
   register(ipcMain) {
     ipcMain.handle('git:status', (_e, cwd) => this.status(cwd));
     ipcMain.handle('git:branches', (_e, cwd) => this.branches(cwd));
+    ipcMain.handle('git:overview', wrap((_e, cwd) => this.overview(cwd)));
     ipcMain.handle('git:checkout', (_e, cwd, branch, create) => this.checkout(cwd, branch, create));
     ipcMain.handle('git:checkpoint', wrap((_e, cwd, label) => this.checkpoint(cwd, label)));
     ipcMain.handle('git:restore', wrap((_e, cwd, sha) => this.restore(cwd, sha)));

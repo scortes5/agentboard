@@ -42,6 +42,8 @@ Every step can be edited afterwards. A new template is one entry in `src/rendere
 - Independent branches run **in parallel**.
 - Each agent step receives only a **one-line summary** of the previous steps, not their full history — this keeps token use low.
 - Scheduled flows run while AgentBoard is open, including in the background.
+- A new or changed schedule waits for its next time: a daily flow created after its hour first runs the next day, and turning a flow back on does not catch up on the runs it missed.
+- The list shows when each automation last ran; its panel shows the next scheduled run and the last runs with their result and duration.
 
 ## Secrets
 

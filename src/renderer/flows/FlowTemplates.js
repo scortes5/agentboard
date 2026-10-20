@@ -12,7 +12,7 @@ const FLOW_TEMPLATES = [
   {
     id: 'fix-issue', name: 'Fix a GitHub issue → tests → pull request',
     description: 'An agent fixes the issue on its own branch with a test; if the checks pass, another opens the PR with "Closes #n".',
-    ask: [{ key: 'issue', title: 'Which issue?', hint: 'The number of the GitHub issue to fix in the current project.', placeholder: '42' }],
+    ask: [{ key: 'issue', title: 'Which issue?', hint: 'The number of the GitHub issue to fix in the current project.', placeholder: '42', pattern: /^\d{1,7}$/, invalid: 'An issue number is digits only, like 42.' }],
     build: ({ issue, project, check }) => ({
       name: `Fix issue #${issue}`,
       nodes: [
@@ -115,7 +115,10 @@ class FlowTemplates {
     for (const q of t.ask || []) {
       const v = await askText(q.title, q.hint, q.placeholder);
       if (!v) return null;
-      values[q.key] = v.replace(/^#/, '');
+      // the answer goes into prompts and branch names: only what the question expects
+      const value = v.replace(/^#/, '').trim();
+      if (q.pattern && !q.pattern.test(value)) { toast(esc(q.invalid || 'That answer is not valid.'), 5000); return null; }
+      values[q.key] = value;
     }
     const flow = flowFromSpec(t.build(values));
     if (flow) toast(`<b>${esc(flow.name)}</b> created${values.project ? ` for ${esc(values.project)}` : ''}. Review the steps, then press Run.`, 5000);
