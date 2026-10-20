@@ -64,6 +64,9 @@ body.tasks-open #minimap { right: calc(var(--right-w) + 22px); }
 .tchip.light { color: var(--ok); }
 .tsum { margin-top: 5px; font-size: 12px; color: var(--text-2); }
 .tsum.warn { color: var(--warn); }
+.tres { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; margin-bottom: 0; }
+.tres dt { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .03em; padding-top: 1px; }
+.tres dd { margin: 0; overflow-wrap: anywhere; }
 .tacts { display: flex; gap: 2px; }
 .tacts button { background: transparent; box-shadow: none; padding: 2px 6px; color: var(--muted); }
 .tacts button:hover { color: var(--text); background: var(--fill-hi); }

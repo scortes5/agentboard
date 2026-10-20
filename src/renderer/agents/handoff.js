@@ -14,7 +14,12 @@ function terminalTail(c, n = 40, screen = false) {
   const b = term.buffer.active;
   const end = b.baseY + b.cursorY;
   const lines = [];
-  for (let i = Math.max(0, end - n * 3); i <= end; i++) lines.push(b.getLine(i)?.translateToString(true) ?? '');
+  for (let i = Math.max(0, end - n * 3); i <= end; i++) {
+    const line = b.getLine(i);
+    const text = line?.translateToString(true) ?? '';
+    // a row the terminal wrapped continues the previous one: keep them as one line
+    if (line?.isWrapped && lines.length) lines[lines.length - 1] += text; else lines.push(text);
+  }
   return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim().split('\n').slice(-n).join('\n');
 }
 

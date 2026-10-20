@@ -128,7 +128,9 @@ function taskPrompt(t, subagents = false) {
     + issuePrompt(t.issue)
     + groundRules.forTask(t)
     + (t.groupBranch ? `(You work on branch ${t.branch}, shared with the other agents of group "${t.group}". Commit your own changes as you go with short, clear messages, staging only the files you changed. Do not push, switch branches or rewrite history.)\n` : '')
-    + '(Only this, keep it short; use the agentboard-task skill if you have it. When finished, call complete_task if available and end with the line «DONE: …» or «BLOCKED: …».)'
+    + '(Only this, keep it short; use the agentboard-task skill if you have it. When finished, call complete_task if available and end with ONE line in this format: '
+    + '«DONE: <what you did> | files: <main files changed> | checked: <how you verified it, or "not checked"> | pending: <what is left, or "nothing">» '
+    + 'or «BLOCKED: <what stops you> | needs: <what you need to continue>».)'
     + `\n${NO_LOOPS}`
     + (subagents && !t.light
       ? `\n(If the task has parts that can be done at the same time, split it: open up to ${max} helpers with the AgentBoard tool start_agent — light=true for simple parts, each with a self-contained message — so they work in parallel on the user's board next to you. Follow them with read_agent_output, check and combine their work, then write your own DONE line. Do not split small tasks.)`
@@ -203,16 +205,48 @@ function dispatchQueued(onlyFlows = false) {
 }
 
 // Look for «DONE: …» / «BLOCKED: …» at the end of the terminal (HECHO/BLOQUEADO from older
-// prompts still count). The echo of our own instruction says «DONE: …» and is skipped by the "…".
+// prompts still count). The echo of our own instruction («DONE: <what you did> | …») is skipped
+// by its "<" or "…". The CLIs wrap a long line onto indented rows: those are joined back.
 // ignore: markers already handled (e.g. a DONE whose checks failed and was sent back).
+const MARKER_MAX = 600;
 function findMarker(c, ignore = []) {
-  const lines = terminalTail(c, 30).split('\n').reverse();
-  for (const line of lines) {
-    const m = line.match(/(?:^|[\s●⏺•>*✦│])(DONE|BLOCKED|HECHO|BLOQUEADO):\s*(.+?)\s*$/);
-    if (!m || m[2].startsWith('…') || m[2].length < 3 || ignore.includes(m[2].slice(0, 300))) continue;
-    return { status: /^(DONE|HECHO)$/.test(m[1]) ? 'done' : 'blocked', text: m[2].slice(0, 300) };
+  const lines = terminalTail(c, 40).split('\n');
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const m = lines[i].match(/(?:^|[\s●⏺•>*✦│])(DONE|BLOCKED|HECHO|BLOQUEADO):\s*(.+?)\s*$/);
+    if (!m || /^[…<]/.test(m[2]) || m[2].length < 3) continue;
+    let text = m[2];
+    for (let j = i + 1; j < lines.length; j++) {
+      const next = lines[j].trim();
+      if (!next || NOISE_RE.test(next) || /^[─━│┃╭╰>❯›⏺●]/.test(next)) break;
+      text += ' ' + next;
+    }
+    text = text.replace(/\s+/g, ' ').slice(0, MARKER_MAX);
+    if (ignore.includes(text) || ignore.includes(m[2].slice(0, 300))) continue;
+    return { status: /^(DONE|HECHO)$/.test(m[1]) ? 'done' : 'blocked', text };
   }
   return null;
+}
+
+// «did X | files: a, b | checked: npm test | pending: nothing» → { did, files, checked, pending, needs }
+// (older one-line summaries come back as { did }).
+function parseResult(summary) {
+  const out = {};
+  String(summary || '').split(/\s+\|\s+/).forEach((part, i) => {
+    const m = part.match(/^(files|checked|pending|needs)\s*:\s*(.*)$/i);
+    if (m) out[m[1].toLowerCase()] = m[2].trim();
+    else if (i === 0) out.did = part.trim();
+    else out.did = `${out.did || ''} | ${part}`.trim();
+  });
+  return out;
+}
+
+// The result of a task as labeled rows; the files git saw changed win over what the agent listed.
+function resultHtml(t) {
+  const r = parseResult(t.summary);
+  const files = t.files?.length ? `${t.fileCount || t.files.length} changed: ${t.files.slice(0, 6).join(', ')}${(t.fileCount || 0) > 6 ? '…' : ''}` : r.files;
+  const rows = [['Result', r.did], ['Files', files], ['Checked', r.checked], ['Pending', r.pending], ['Needs', r.needs]].filter(([, v]) => v);
+  if (rows.length <= 1) return `<div class="tsum">${esc(t.summary)}</div>`;
+  return `<dl class="tsum tres">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('')}</dl>`;
 }
 
 // "Claude usage limit reached… resets 3pm", "You've hit your usage limit… try again in 2 hours"
@@ -263,7 +297,13 @@ function finishTask(t, status, summary) {
   if (changed) {
     notifyDesktop(status === 'done' ? 'completed' : 'blocked', t);
     ab.workFinish({ id: t.id, text: t.text, agent: t.assigned, status, summary: t.summary, cwd: t.runDir || t.workdir || t.cwd, startedAt: t.startedAt, finishedAt: t.finishedAt })
-      .then((r) => { if (!r.ok) console.warn('Work summary:', r.error); });
+      .then((r) => {
+        if (!r.ok) return console.warn('Work summary:', r.error);
+        // what git saw change, for the task's result (more reliable than the agent's own list)
+        t.files = r.value.files.filter((f) => !f.preexisting).map((f) => f.path).slice(0, 12);
+        t.fileCount = r.value.fileCount;
+        save(); renderTasks();
+      });
   }
   taskPipeline.afterFinish(t);
   if (changed) onTaskFinished(t, status); // automations that start when a task ends
@@ -431,7 +471,7 @@ function renderTasks() {
       <div class="tmain">
         <div class="ttext" title="Double-click to edit">${esc(t.text)}</div>
         <div class="tmeta">${meta}</div>
-        ${t.summary ? `<div class="tsum">${esc(t.summary)}</div>` : ''}
+        ${t.summary ? resultHtml(t) : ''}
         ${['running', 'review', 'verifying'].includes(t.status) ? `<div class="tlive" data-live="${esc(t.id)}"></div>` : ''}
         ${t.needsTrust ? '<div class="tsum warn">It asks whether you trust the folder. <button class="inline" data-a="trust" title="Answer that you trust this folder so the task continues">Trust and Continue</button></div>'
           : t.status === 'review' ? '<div class="tsum warn">The agent is waiting: check whether it finished or asked you something.</div>' : ''}

@@ -120,6 +120,17 @@ body.flows-open #dock, body.flows-open #minimap, body.flows-open #sidebar, body.
 .fl-field textarea { resize: vertical; line-height: 1.45; }
 .fl-field textarea.mono { font: 12px var(--font-mono); }
 .fl-plan { font-size: 12.5px; line-height: 1.55; color: var(--text-2); background: var(--fill); border-radius: 8px; padding: 10px 12px; white-space: normal; }
+.fl-node-res.live { color: var(--text); box-shadow: inset 2px 0 0 var(--accent); max-height: 2.8em; }
+.fl-live { display: flex; align-items: center; gap: 6px; font: 11.5px/1.4 var(--font-mono); }
+.fl-sum { width: 100%; border-collapse: collapse; font-size: 12px; margin: 6px 0; }
+.fl-sum td { padding: 3px 4px; vertical-align: top; color: var(--text); }
+.fl-sum td:first-child { display: flex; align-items: center; gap: 6px; }
+.fl-sum .fl-sum-res td { padding-top: 0; color: var(--text-2); font: 11px/1.35 var(--font-mono); overflow-wrap: anywhere; display: table-cell; }
+.fl-sum tr.st-fail td:first-child { color: var(--bad, #e5534b); }
+.fl-logbox summary { cursor: pointer; font-size: 12px; color: var(--text-2); margin: 8px 0 4px; }
+.fl-lessons { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+.fl-lessons li { display: flex; align-items: flex-start; gap: 6px; background: var(--fill); border-radius: 6px; padding: 5px 4px 5px 8px; }
+.fl-lessons li span { flex: 1; overflow-wrap: anywhere; }
 .fl-runs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; font-size: 11.5px; }
 .fl-runs li { display: grid; grid-template-columns: 8px auto 1fr auto; align-items: center; gap: 8px; color: var(--text-2); }
 .fl-runs li > :nth-child(3) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
