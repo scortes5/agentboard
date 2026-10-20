@@ -2,7 +2,7 @@
 // Each task runs in a new agent session (clean context = fewer tokens), several at
 // once, and marks itself when the agent prints "DONE:" or calls complete_task.
 'use strict';
-/* global ab, cfg, $, esc, uid, basename, clamp, isMac, runtime, cardData, agentOf, newCard, focusCardView, focusCard, closeCard, closePopover, openPopover,
+/* global ab, cfg, onTaskFinished, $, esc, uid, basename, clamp, isMac, runtime, cardData, agentOf, newCard, focusCardView, focusCard, closeCard, closePopover, openPopover,
    ensureGroup, slotIn, looseSpot, terminalTail, toast, save, agentAvailable, visibleRect, applyViewport, drawMinimap, projectOfPath, icon,
    diagramOpen, toggleDiagram, STATUS_LABEL, openSkills, approvalsInbox, reviewDialog, taskPipeline, fmt, costTracker, limitsNotice */
 
@@ -254,6 +254,7 @@ function finishTask(t, status, summary) {
       .then((r) => { if (!r.ok) console.warn('Work summary:', r.error); });
   }
   taskPipeline.afterFinish(t);
+  if (changed) onTaskFinished(t, status); // automations that start when a task ends
   save(); renderTasks(); // the pipeline may finish it after the tick that saw the marker has drawn
 }
 
