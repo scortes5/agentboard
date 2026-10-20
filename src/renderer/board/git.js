@@ -15,7 +15,7 @@ async function refreshGit() {
     const g = results[c.cwd];
     if (!g) { rt.gitEl.classList.add('hidden'); continue; }
     rt.gitEl.classList.remove('hidden');
-    rt.gitEl.innerHTML = `${icon('branch', 12)} ${esc(g.branch)}`
+    rt.gitEl.innerHTML = `${icon('branch', 12)} <span class="br">${esc(g.branch)}</span>`
       + (g.changes ? ` <span class="dirty">${g.changes} change${g.changes === 1 ? '' : 's'}</span>` : '')
       + (g.ahead ? ` <span class="ab">↑${g.ahead}</span>` : '')
       + (g.behind ? ` <span class="ab">↓${g.behind}</span>` : '');
@@ -31,13 +31,15 @@ async function branchMenu(c, anchor) {
   pop.className = 'popover';
   pop.innerHTML = branches.map((b) =>
     `<button data-b="${esc(b)}" class="${b === status?.branch ? 'current' : ''}">${esc(b)}${b === status?.branch ? ' (current)' : ''}</button>`).join('')
-    + '<hr/><input id="newBranch" placeholder="New branch… (Enter)" style="width:100%;background:var(--card);border:1px solid var(--border);border-radius:5px;padding:5px 8px;color:var(--text);font:12px var(--font-mono)"/>';
+    + '<hr/><button data-overview title="See every branch of this project, with the tasks and cards working on each">All branches…</button>'
+    + '<input id="newBranch" placeholder="New branch… (Enter)" style="width:100%;background:var(--card);border:1px solid var(--border);border-radius:5px;padding:5px 8px;color:var(--text);font:12px var(--font-mono)"/>';
   const r = anchor.getBoundingClientRect();
   pop.style.left = Math.min(r.left, innerWidth - 230) + 'px';
   pop.style.top = r.bottom + 4 + 'px';
   document.body.appendChild(pop);
 
   pop.addEventListener('click', async (e) => {
+    if (e.target.closest('[data-overview]')) { branchOverview.open(c.cwd, anchor); return; }
     const b = e.target.closest('[data-b]')?.dataset.b;
     if (!b) return;
     closePopover();
@@ -54,6 +56,7 @@ async function branchMenu(c, anchor) {
     refreshGit();
   });
   setTimeout(() => document.addEventListener('pointerdown', outside, true));
-  function outside(e) { if (!pop.contains(e.target)) { closePopover(); document.removeEventListener('pointerdown', outside, true); } }
+  // only this menu: "All branches…" may have opened another popover in its place
+  function outside(e) { if (!pop.contains(e.target)) { pop.remove(); document.removeEventListener('pointerdown', outside, true); } }
 }
 function closePopover() { document.querySelectorAll('.popover').forEach((p) => p.remove()); }

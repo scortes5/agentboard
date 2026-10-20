@@ -2,7 +2,7 @@
 // agents run. Each "Agent" node becomes a queue task (new session, with a short summary
 // of the previous steps = few tokens); independent branches run in parallel.
 'use strict';
-/* global ab, cfg, $, esc, uid, basename, clamp, toast, save, addTask, taskById, subscriptions, agentKeyFrom, projectFrom,
+/* global ab, cfg, fmt, SecretsSettings, $, esc, uid, basename, clamp, toast, save, addTask, taskById, subscriptions, agentKeyFrom, projectFrom,
    openTasks, tickTasks, diagramOpen, toggleDiagram, cardData, focusCardView, focusCard, icon */
 
 const NODE_TYPES = {
@@ -21,7 +21,9 @@ let flowSel = null;          // id of the open flow
 let nodeSel = null;          // id of the selected node
 let edgeSel = null;          // index of the selected connection
 let flowPlan = {};           // flowId -> "Explain Run" text
+let flowDragging = false;    // a node or a connection is being dragged: redraws would drop it
 const activeRuns = new Map(); // flowId -> run
+const RUN_HISTORY = 8;       // runs kept per automation (time, result, duration only)
 
 const flows = () => cfg.flows || (cfg.flows = []);
 const curFlow = () => flows().find((f) => f.id === flowSel);
@@ -37,6 +39,10 @@ function newFlow(name = 'New Automation') {
   return f;
 }
 
+// Steps that can fail on their own have a second output: what to do if they do.
+const canFail = (n) => n.type === 'agent' || n.type === 'command';
+const BRANCH_LABEL = { yes: 'Yes', no: 'No', error: 'On error' };
+
 function nodeSummary(n) {
   const c = n.config || {};
   if (n.type === 'trigger') return c.mode === 'every' ? `every ${c.every || 60} min` : c.mode === 'daily' ? `every day at ${c.at || '09:00'}` : 'by hand (Run button)';
@@ -50,19 +56,46 @@ function nodeSummary(n) {
   return (c.text || '').slice(0, 90);
 }
 
+// When a scheduled automation runs next (null when it only runs by hand or is off).
+function nextRunAt(f, now = Date.now()) {
+  const c = f.nodes.find((n) => n.type === 'trigger')?.config;
+  if (f.enabled === false || !c || c.mode === 'manual') return null;
+  if (c.mode === 'every') return (f.lastScheduled || now) + Math.max(5, +c.every || 60) * 60_000;
+  const [h, m] = String(c.at || '09:00').split(':').map(Number);
+  const due = new Date(now); due.setHours(h || 0, m || 0, 0, 0);
+  if ((f.lastScheduled || now) >= due.getTime()) due.setDate(due.getDate() + 1);
+  return due.getTime();
+}
+
+const whenText = (ts) => {
+  const d = new Date(ts), today = new Date();
+  const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
+  const day = d.toDateString() === today.toDateString() ? 'today' : d.toDateString() === tomorrow.toDateString() ? 'tomorrow' : d.toLocaleDateString();
+  return `${day} ${fmt.clock(ts)}`;
+};
+
 // ---------- Drawing ----------
 function renderFlowList() {
   $('#flList').innerHTML = flows().map((f) => {
     const run = activeRuns.get(f.id);
     const trig = f.nodes.find((n) => n.type === 'trigger');
-    const sched = trig && trig.config?.mode !== 'manual' && f.enabled !== false;
-    return `<button type="button" class="fl-item ${f.id === flowSel ? 'active' : ''}" data-flow="${esc(f.id)}" title="Open ${esc(f.name)}${f.lastRun ? ` · last run ${new Date(f.lastRun.at).toLocaleString()}` : ''}">
+    const next = trig && nextRunAt(f);
+    const state = run ? 'Running now' : f.lastRun ? `Last run ${whenText(f.lastRun.at)}${f.lastRun.ok ? '' : ' · with errors'}` : 'Never run';
+    return `<button type="button" class="fl-item ${f.id === flowSel ? 'active' : ''}${f.enabled === false ? ' off' : ''}" data-flow="${esc(f.id)}" title="Open ${esc(f.name)}">
       <span class="fl-dot ${run ? 'running' : f.lastRun ? (f.lastRun.ok ? 'ok' : 'fail') : ''}"></span>
-      <span class="fl-item-name">${esc(f.name)}</span>${sched ? `<span class="fl-sched" title="Scheduled: runs on its own according to its trigger">${icon('clock', 13)}</span>` : ''}</button>`;
+      <span class="fl-item-text"><span class="fl-item-name">${esc(f.name)}</span><span class="fl-item-sub">${esc(state)}</span></span>${next ? `<span class="fl-sched" title="Scheduled: next run ${esc(whenText(next))}">${icon('clock', 13)}</span>` : ''}</button>`;
   }).join('') || '<div class="side-empty">No automations yet. Start a blank one, or describe what you want and use Design with AI.</div>';
 }
 
-function renderFlow() {
+// Periodic and log-driven redraws: never in the middle of a drag, and without rebuilding the
+// inspector while you type in it (that would drop the focus and the text being written).
+function refreshFlow() {
+  if (!flowsOpen()) return renderFlowList();
+  if (flowDragging) return renderFlowList();
+  renderFlow({ keepInspector: $('#flInspector').contains(document.activeElement) });
+}
+
+function renderFlow({ keepInspector = false } = {}) {
   renderFlowList();
   const f = curFlow();
   $('#flEmpty').classList.toggle('hidden', !!f);
@@ -81,7 +114,9 @@ function renderFlow() {
       : `${n.type !== 'trigger' ? '<span class="port in" data-port="in"></span>' : ''}
          ${n.type === 'condition'
            ? '<span class="port out yes" data-port="out" data-branch="yes" title="Yes: drag to connect"></span><span class="port out no" data-port="out" data-branch="no" title="No: drag to connect"></span>'
-           : '<span class="port out" data-port="out" title="Drag to connect"></span>'}`;
+           : canFail(n)
+             ? '<span class="port out main" data-port="out" title="When it succeeds: drag to connect"></span><span class="port out err" data-port="out" data-branch="error" title="If it fails: drag to connect the step that handles the error"></span>'
+             : '<span class="port out" data-port="out" title="Drag to connect"></span>'}`;
     return `<div class="fl-node t-${n.type} ${n.id === nodeSel ? 'sel' : ''} st-${st}" data-node="${esc(n.id)}" style="left:${n.x}px;top:${n.y}px;--ncolor:${T.color}">
       <div class="fl-node-head"><span class="fl-icon">${icon(T.icon, 13)}</span><span class="fl-type">${T.label}</span>${st ? `<span class="fl-st st-${st}">${STEP_STATUS[st] || ''}</span>` : ''}</div>
       <div class="fl-node-title">${esc(n.title || T.label)}</div>
@@ -94,7 +129,7 @@ function renderFlow() {
   const maxY = Math.max(900, ...f.nodes.map((n) => n.y + 260));
   box.style.width = maxX + 'px'; box.style.height = maxY + 'px';
   drawFlowEdges();
-  renderInspector();
+  if (!keepInspector) renderInspector();
 }
 
 function portPos(nodeId, kind, branch) {
@@ -103,7 +138,8 @@ function portPos(nodeId, kind, branch) {
   const n = curFlow().nodes.find((x) => x.id === nodeId);
   const h = el.offsetHeight;
   if (kind === 'in') return { x: n.x, y: n.y + h / 2 };
-  const y = n.type === 'condition' ? n.y + h * (branch === 'no' ? 0.72 : 0.38) : n.y + h / 2;
+  const twoWay = n.type === 'condition' || canFail(n);
+  const y = twoWay ? n.y + h * (branch === 'no' || branch === 'error' ? 0.72 : 0.38) : n.y + h / 2;
   return { x: n.x + NODE_W, y };
 }
 
@@ -130,7 +166,7 @@ function drawFlowEdges(temp) {
     const a = portPos(e.from, 'out', e.branch), b = portPos(e.to, 'in');
     if (!a || !b) return '';
     const live = run && run.edge?.[i] === 'active';
-    const label = e.branch ? `<text x="${a.x + 14}" y="${a.y - 6}" class="fl-branch">${e.branch === 'no' ? 'No' : 'Yes'}</text>` : '';
+    const label = e.branch ? `<text x="${a.x + 14}" y="${e.branch === 'error' ? a.y + 15 : a.y - 6}" class="fl-branch ${e.branch === 'error' ? 'err' : ''}">${BRANCH_LABEL[e.branch] || 'Yes'}</text>` : '';
     return `<path d="${curve(a, b)}" class="fl-edge-hit" data-edge="${i}"/><path d="${curve(a, b)}" class="fl-edge ${i === edgeSel ? 'sel' : ''} ${live ? 'live' : ''} ${run?.edge?.[i] === 'dead' ? 'dead' : ''}" marker-end="url(#flArrow)"/>${label}`;
   });
   if (temp) parts.push(`<path d="${curve(temp.a, temp.b)}" class="fl-edge temp"/>`);
@@ -148,7 +184,7 @@ function renderInspector() {
   if (edgeSel != null && f.edges[edgeSel]) {
     const e = f.edges[edgeSel];
     const a = f.nodes.find((x) => x.id === e.from), b = f.nodes.find((x) => x.id === e.to);
-    box.innerHTML = `<h3>Connection</h3><p class="set-note">${esc(a?.title || '')} → ${esc(b?.title || '')}${e.branch ? ` (${e.branch === 'no' ? 'No' : 'Yes'} branch)` : ''}</p>
+    box.innerHTML = `<h3>Connection</h3><p class="set-note">${esc(a?.title || '')} → ${esc(b?.title || '')}${e.branch === 'error' ? ' (if it fails)' : e.branch ? ` (${BRANCH_LABEL[e.branch]} branch)` : ''}</p>
       <button type="button" data-x="del-edge" title="Delete this connection (⌫)">Remove Connection</button>`;
     return;
   }
@@ -156,10 +192,14 @@ function renderInspector() {
     const run = activeRuns.get(f.id);
     const trig = f.nodes.find((x) => x.type === 'trigger');
     const last = f.lastRun;
+    const next = nextRunAt(f);
+    const history = (f.runs || []).slice().reverse();
     box.innerHTML = `<h3>Automation</h3>
       <label class="set-row check" title="When off, the schedule is ignored; you can still run it by hand"><span>Enabled (follows its schedule)</span><input type="checkbox" class="switch-input" data-f="enabled" ${f.enabled !== false ? 'checked' : ''}/></label>
       <p class="set-note">${trig ? `Starts ${esc(nodeSummary(trig))}.` : 'Add a Trigger to say when it starts.'}
-        ${last ? `<br/>Last run: ${new Date(last.at).toLocaleString()} — ${last.ok ? 'no errors' : 'with errors'}.` : ''}</p>
+        ${next ? `<br/>Next run: ${esc(whenText(next))}.` : ''}
+        ${last ? `<br/>Last run: ${esc(whenText(last.at))} — ${last.stopped ? 'stopped' : last.ok ? 'no errors' : 'with errors'}.` : ''}</p>
+      ${history.length > 1 ? `<h3>Recent runs</h3><ul class="fl-runs">${history.map((h) => `<li><span class="fl-dot ${h.stopped ? '' : h.ok ? 'ok' : 'fail'}"></span><span>${esc(whenText(h.at))}</span><span class="muted">${esc(h.reason || '')}</span><span class="muted">${h.ms != null ? esc(fmt.elapsed(h.ms)) : ''}</span></li>`).join('')}</ul>` : ''}
       ${run ? `<h3>Running</h3><ol class="fl-log">${run.log.slice(-12).map((l) => `<li>${esc(l)}</li>`).join('')}</ol>` : last?.log ? `<h3>Log</h3><ol class="fl-log">${last.log.slice(-12).map((l) => `<li>${esc(l)}</li>`).join('')}</ol>` : ''}
       ${flowPlan[f.id] ? `<h3>How it runs (AI analysis)</h3><div class="fl-plan">${mdLite(flowPlan[f.id])}</div>` : `<p class="set-note">Select a node to edit it. Drag from the dot on the right of a node to another node to connect them. <kbd>⌫</kbd> deletes the selection.</p>`}
       <div class="row-end"><button type="button" data-x="dup-flow" title="Create a copy of this automation">Duplicate</button><button type="button" data-x="del-flow" title="Delete this automation">Delete Automation</button></div>`;
@@ -180,13 +220,15 @@ function renderInspector() {
     body += field('mode', 'Model', `<select data-c="mode">${MODES.map(([v, l]) => `<option value="${v}" ${(c.mode || 'normal') === v ? 'selected' : ''}>${l}</option>`).join('')}</select>`);
     body += field('project', 'Project', `<select data-c="project">${projectOptions(c.project)}</select>`);
     body += field('group', 'Board group (optional)', `<input data-c="group" value="${esc(c.group || '')}" placeholder="e.g. backend"/>`);
-    body += `<p class="set-note">It receives a one-line summary of each previous step, not their full history.</p>`;
+    body += field('timeout', 'Give up after (minutes, 0 = wait as long as it takes)', `<input type="number" min="0" max="1440" data-c="timeout" value="${esc(c.timeout ?? 0)}"/>`);
+    body += `<p class="set-note">It receives a one-line summary of each previous step, not their full history. If the task is blocked or runs past the limit, the step fails: connect the red dot to handle that, otherwise the run stops here. The task itself is left for you to review.</p>`;
   } else if (n.type === 'command') {
     body += field('cmd', 'Command', `<textarea data-c="cmd" rows="3" class="mono" placeholder="npm test">${esc(c.cmd || '')}</textarea>`);
     body += field('project', 'Folder', `<select data-c="project">${projectOptions(c.project)}</select>`);
     body += `<label class="fl-field check"><input type="checkbox" data-c="inTaskFolder" ${c.inTaskFolder ? 'checked' : ''}/> <span>Run in the folder of the previous agent's task (its worktree, if it has one)</span></label>`;
     body += field('secrets', 'Secrets it can use (optional)', `<input data-c="secrets" class="mono" value="${esc(c.secrets || '')}" placeholder="APP_USER, APP_PASSWORD"/>`);
-    body += `<p class="set-note">If it exits with an error, the following steps do not run. Secrets (Settings → Secrets) arrive as environment variables, and their values are hidden in the output.</p>`;
+    body += field('timeout', 'Time limit (minutes)', `<input type="number" min="1" max="180" data-c="timeout" value="${esc(c.timeout || 10)}"/>`);
+    body += `<p class="set-note">If it exits with an error or runs past the limit, the run follows the red dot (if it fails); with nothing connected there, it stops. Secrets (Settings → Secrets) arrive as environment variables, and their values are hidden in the output.</p>`;
   } else if (n.type === 'condition') {
     body += field('question', 'Yes/no question', `<textarea data-c="question" rows="3" placeholder="Did all the tests pass?">${esc(c.question || '')}</textarea>`);
     body += `<p class="set-note">Claude (haiku) reads the results of the previous steps and answers YES or NO. Connect the green dot (Yes) and the red one (No).</p>`;
@@ -216,7 +258,7 @@ function addNode(type) {
   const n = {
     id: uid(), type, title: NODE_TYPES[type].label,
     x: canvas.scrollLeft + 120 + (f.nodes.length % 4) * 40, y: canvas.scrollTop + 100 + (f.nodes.length % 5) * 60,
-    config: type === 'trigger' ? { mode: 'manual', every: 60, at: '09:00' } : type === 'agent' ? { agent: 'auto', mode: 'normal' } : {},
+    config: type === 'trigger' ? { mode: 'manual', every: 60, at: '09:00' } : type === 'agent' ? { agent: 'auto', mode: 'normal', timeout: 60 } : type === 'command' ? { timeout: 10 } : {},
   };
   // when a node is selected, connect the new one to it and place it on its right
   const prev = f.nodes.find((x) => x.id === nodeSel);
@@ -255,8 +297,10 @@ function wireFlowCanvas() {
       // drag a new connection
       const branch = port.dataset.branch;
       const a = portPos(n.id, 'out', branch);
+      flowDragging = true;
       const move = (ev) => drawFlowEdges({ a, b: { x: ev.clientX - origin.left, y: ev.clientY - origin.top } });
       const up = (ev) => {
+        flowDragging = false;
         window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up);
         const target = document.elementFromPoint(ev.clientX, ev.clientY)?.closest('.fl-node');
         const to = target && f.nodes.find((x) => x.id === target.dataset.node);
@@ -273,6 +317,7 @@ function wireFlowCanvas() {
     nodeSel = n.id; edgeSel = null;
     const start = { x: e.clientX, y: e.clientY, nx: n.x, ny: n.y };
     let moved = false;
+    flowDragging = true;
     const move = (ev) => {
       moved = true;
       n.x = Math.max(0, Math.round((start.nx + ev.clientX - start.x) / 10) * 10);
@@ -281,6 +326,7 @@ function wireFlowCanvas() {
       drawFlowEdges();
     };
     const up = () => {
+      flowDragging = false;
       window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up);
       if (moved) save();
       renderFlow();
@@ -294,26 +340,32 @@ function wireFlowCanvas() {
   });
   $('#flInspector').addEventListener('input', (e) => {
     const f = curFlow(); const n = f?.nodes.find((x) => x.id === nodeSel);
-    if (e.target.dataset.f === 'enabled') { f.enabled = e.target.checked; save(); renderFlowList(); return; }
+    if (e.target.dataset.f === 'enabled') {
+      // turning it back on counts from now, instead of catching up on the runs it missed
+      f.enabled = e.target.checked; if (f.enabled) f.lastScheduled = Date.now();
+      save(); renderFlowList(); renderInspector(); return;
+    }
     if (!n) return;
     if (e.target.dataset.k) n[e.target.dataset.k] = e.target.value;
     if (e.target.dataset.c) n.config[e.target.dataset.c] = e.target.type === 'number' ? +e.target.value : e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+    if (n.type === 'trigger') f.lastScheduled = Date.now(); // a new schedule starts counting now
     save();
     const el = $(`#flNodes [data-node="${CSS.escape(n.id)}"]`);
     if (el) { $('.fl-node-title', el).textContent = n.title || NODE_TYPES[n.type].label; $('.fl-node-sum', el).textContent = nodeSummary(n); }
+    if (n.type === 'trigger') renderFlowList();
     if (e.target.tagName === 'SELECT') renderInspector();
   });
   $('#flInspector').addEventListener('click', (e) => {
     const x = e.target.closest('[data-x]')?.dataset.x;
     const f = curFlow();
     if (x === 'del-node' || x === 'del-edge') deleteSelection();
-    if (x === 'del-flow' && confirm(`Delete "${f.name}"?`)) { cfg.flows = flows().filter((q) => q !== f); flowSel = flows()[0]?.id || null; save(); renderFlow(); }
+    if (x === 'del-flow' && confirm(`Delete "${f.name}"?${activeRuns.has(f.id) ? ' It is running: it will be stopped first.' : ''}`)) { stopFlow(f); cfg.flows = flows().filter((q) => q !== f); flowSel = flows()[0]?.id || null; save(); renderFlow(); }
     if (x === 'dup-flow') {
       const copy = JSON.parse(JSON.stringify(f));
       const ids = new Map(copy.nodes.map((n) => [n.id, uid()]));
       copy.nodes.forEach((n) => { n.id = ids.get(n.id); });
       copy.edges.forEach((ed) => { ed.from = ids.get(ed.from); ed.to = ids.get(ed.to); });
-      Object.assign(copy, { id: uid(), name: `${f.name} (copy)`, lastRun: null });
+      Object.assign(copy, { id: uid(), name: `${f.name} (copy)`, lastRun: null, runs: [], lastScheduled: Date.now() });
       flows().push(copy); flowSel = copy.id; save(); renderFlow();
     }
   });
@@ -325,40 +377,58 @@ function wireFlowCanvas() {
 }
 
 // ---------- Running ----------
-function contextFor(f, run, nodeId) {
-  // one-line summaries of the finished steps leading to this node
+// The steps that lead to a node, nearest ones last (the order they ran in).
+function ancestorsOf(f, nodeId) {
   const seen = new Set();
-  const lines = [];
+  const order = [];
   const walk = (id) => {
     for (const e of f.edges.filter((x) => x.to === id)) {
       if (seen.has(e.from)) continue;
       seen.add(e.from);
       walk(e.from);
-      const n = f.nodes.find((x) => x.id === e.from);
-      const r = run.results[e.from];
-      if (n && r && n.type !== 'trigger') lines.push(`- ${n.title || NODE_TYPES[n.type].label}: ${(r.text || '').replace(/\s+/g, ' ').slice(0, 300)}`);
+      order.push(e.from);
     }
   };
   walk(nodeId);
-  return lines.join('\n');
+  return order;
 }
 
-function waitForTask(id, run) {
+// One-line summaries of the finished steps leading to this node (skipped ones say nothing).
+function contextFor(f, run, nodeId) {
+  return ancestorsOf(f, nodeId).map((id) => {
+    const n = f.nodes.find((x) => x.id === id);
+    const r = run.results[id];
+    return n && r && !r.skip && n.type !== 'trigger' ? `- ${n.title || NODE_TYPES[n.type].label}: ${(r.text || '').replace(/\s+/g, ' ').slice(0, 300)}` : '';
+  }).filter(Boolean).join('\n');
+}
+
+// The task's result, or a failure once it runs past `minutes` (0 = no limit). A task that
+// waits for review counts as still working; the task itself is never stopped here.
+function waitForTask(id, run, minutes = 0) {
+  const limit = Math.max(0, +minutes || 0) * 60_000;
+  const started = Date.now();
   return new Promise((resolve) => {
     const iv = setInterval(() => {
       const t = taskById(id);
       if (run.stopped) { clearInterval(iv); return resolve({ ok: false, text: 'Stopped.' }); }
       if (!t) { clearInterval(iv); return resolve({ ok: false, text: 'The task was deleted.' }); }
+      if (limit && Date.now() - started > limit && t.status !== 'done' && t.status !== 'blocked') {
+        clearInterval(iv);
+        return resolve({ ok: false, text: `No result after ${minutes} min (the task is ${t.status}; it was left for you to check). ${t.summary || ''}`.trim() });
+      }
       if (t.status === 'done' || t.status === 'blocked') { clearInterval(iv); resolve({ ok: t.status === 'done', text: t.summary || t.status }); }
       run.status[run.taskNode[id]] = t.status === 'review' ? 'wait' : 'running';
     }, 1000);
   });
 }
 
-// The folder of the last agent task this run finished: its own worktree when "Worktree per
-// task" is on, so a check or a git command right after it sees what the agent changed.
-function lastTaskFolder(run) {
-  const done = Object.keys(run.taskNode).map(taskById).filter((t) => t && t.status === 'done').sort((a, b) => (b.finishedAt || 0) - (a.finishedAt || 0));
+// The folder of the last agent task that led to this step: its own worktree when "Worktree per
+// task" is on, so a check or a git command right after it sees what the agent changed. Only
+// steps upstream count, so a parallel branch never lends its folder to this one.
+function lastTaskFolder(f, run, nodeId) {
+  const upstream = new Set(ancestorsOf(f, nodeId));
+  const done = Object.keys(run.taskNode).filter((id) => upstream.has(run.taskNode[id])).map(taskById)
+    .filter((t) => t && t.status === 'done').sort((a, b) => (b.finishedAt || 0) - (a.finishedAt || 0));
   return done[0] ? done[0].workdir || done[0].cwd : null;
 }
 
@@ -374,8 +444,9 @@ async function execNode(f, run, n) {
   }
   if (n.type === 'command') {
     if (!c.cmd) return { ok: false, text: 'No command.' };
-    const folder = (c.inTaskFolder && lastTaskFolder(run)) || c.project || cfg.selectedProject;
-    const r = await ab.flowExec(c.cmd, folder, SecretsSettings.parse(c.secrets));
+    const folder = (c.inTaskFolder && lastTaskFolder(f, run, n.id)) || c.project || cfg.selectedProject;
+    if (!folder) return { ok: false, text: 'No project: choose a folder for this step or select a project.' };
+    const r = await ab.flowExec(c.cmd, folder, SecretsSettings.parse(c.secrets), +c.timeout || 10);
     if (!r.ok) return { ok: false, text: r.error };
     const tail = r.value.out.split('\n').slice(-6).join('\n');
     return { ok: r.value.code === 0, text: `${r.value.code === 0 ? 'OK' : `exit code ${r.value.code}`}\n${tail}` };
@@ -383,7 +454,7 @@ async function execNode(f, run, n) {
   if (n.type === 'condition') {
     const r = await ab.aiAsk(`Answer only "YES" or "NO", nothing else.\nQuestion: ${c.question || n.title}\nResults of the previous steps:\n${ctx || '(none)'}`, 'haiku');
     if (!r.ok) return { ok: false, text: r.error };
-    const yes = /^\W*(yes|s[ií])\b/i.test(r.value);
+    const yes = /^\W*(yes|s[ií])(?![a-z])/i.test(r.value.trim());
     return { ok: true, branch: yes ? 'yes' : 'no', text: yes ? 'Yes' : 'No' };
   }
   if (n.type === 'agent') {
@@ -396,7 +467,7 @@ async function execNode(f, run, n) {
     t.flowRun = run.id;
     run.taskNode[t.id] = n.id;
     save(); tickTasks();
-    return waitForTask(t.id, run);
+    return waitForTask(t.id, run, c.timeout);
   }
   return { ok: true, text: '' };
 }
@@ -407,7 +478,7 @@ async function runFlow(f, reason = 'by hand') {
   const edges = f.edges.map((e, i) => ({ ...e, i })).filter((e) => nodes.some((n) => n.id === e.from) && nodes.some((n) => n.id === e.to));
   const run = { id: uid(), reason, status: {}, results: {}, edge: {}, log: [], taskNode: {}, startedAt: Date.now() };
   activeRuns.set(f.id, run);
-  const log = (m) => { run.log.push(`${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} ${m}`); if (flowsOpen() && flowSel === f.id) renderFlow(); else renderFlowList(); };
+  const log = (m) => { run.log.push(`${fmt.clock(Date.now())} ${m}`); if (flowSel === f.id) refreshFlow(); else renderFlowList(); };
   log(`Start (${reason})`);
   let failed = false;
 
@@ -419,10 +490,13 @@ async function runFlow(f, reason = 'by hand') {
     run.results[n.id] = res;
     run.status[n.id] = res.skip ? 'skip' : res.ok ? 'ok' : 'fail';
     finished.add(n.id);
-    if (!res.ok && !res.skip) { failed = true; log(`Error in ${n.title}: ${res.text.split('\n')[0]}`); }
+    // a failure with an error path connected is handled there, so the run can still succeed
+    const handled = !res.ok && !res.skip && edges.some((x) => x.from === n.id && x.branch === 'error');
+    if (handled) log(`Failed: ${n.title} (${res.text.split('\n')[0]}); following its error path`);
+    else if (!res.ok && !res.skip) { failed = true; log(`Error in ${n.title}: ${res.text.split('\n')[0]}`); }
     else if (!res.skip) log(`Done: ${n.title}${res.branch ? ` (${res.text})` : ''}`);
     for (const e of edges.filter((x) => x.from === n.id)) {
-      const active = !res.skip && res.ok && (!res.branch || (e.branch || 'yes') === res.branch);
+      const active = !res.skip && (e.branch === 'error' ? !res.ok : res.ok && (!res.branch || (e.branch || 'yes') === res.branch));
       run.edge[e.i] = active ? 'active' : 'dead';
     }
     // nodes whose inputs are all resolved can run (or are skipped if none arrived active)
@@ -450,12 +524,15 @@ async function runFlow(f, reason = 'by hand') {
   // wait until nothing is left running
   while (pending.length) await pending.shift();
 
-  f.lastRun = { at: Date.now(), ok: !failed && !run.stopped, results: run.results, log: run.log.slice(-30) };
+  const outcome = run.stopped ? 'was stopped' : failed ? 'finished with errors' : 'finished';
   log(run.stopped ? 'Stopped.' : failed ? 'Finished with errors.' : 'Finished successfully.');
+  const at = Date.now();
+  f.lastRun = { at, ok: !failed && !run.stopped, stopped: !!run.stopped, results: run.results, log: run.log.slice(-30) };
+  f.runs = [...(f.runs || []), { at, ok: f.lastRun.ok, stopped: f.lastRun.stopped, reason, ms: at - run.startedAt }].slice(-RUN_HISTORY);
   activeRuns.delete(f.id);
   save();
-  if (!document.hasFocus()) { try { new Notification(`${f.name}: ${failed ? 'finished with errors' : 'finished'}`, { body: run.log.slice(-1)[0] || '' }); } catch {} }
-  toast(`Automation "${esc(f.name)}" ${failed ? 'finished with errors' : 'finished'}`, 4500);
+  if (!document.hasFocus()) { try { new Notification(`${f.name}: ${outcome}`, { body: run.log.slice(-1)[0] || '' }); } catch {} }
+  toast(`Automation "${esc(f.name)}" ${outcome}`, 4500);
   if (flowsOpen()) renderFlow(); else renderFlowList();
 }
 
@@ -482,6 +559,8 @@ function checkSchedules() {
       if (!last) { f.lastScheduled = Date.now(); save(); continue; } // start counting from now
       if (Date.now() - last >= every) { f.lastScheduled = Date.now(); save(); runFlow(f, `every ${c.every} min`); }
     } else if (c.mode === 'daily') {
+      // a new or just-changed daily schedule waits for its next time instead of running right away
+      if (!last) { f.lastScheduled = Date.now(); save(); continue; }
       const [h, m] = String(c.at || '09:00').split(':').map(Number);
       const due = new Date(now); due.setHours(h, m || 0, 0, 0);
       if (now >= due && last < due.getTime()) { f.lastScheduled = Date.now(); save(); runFlow(f, `daily ${c.at}`); }
@@ -544,8 +623,8 @@ async function designWithAI() {
     'Design an automation for AgentBoard (an app that coordinates coding agents such as Claude Code running in terminals).',
     'Reply ONLY with valid JSON, no extra text, in this shape:',
     '{"name":"…","nodes":[{"id":"n1","type":"trigger|agent|command|condition|notify|note","title":"…","config":{}}],"edges":[{"from":"n1","to":"n2","branch":"yes|no"}]}',
-    'config per type: trigger {"mode":"manual|every|daily","every":60,"at":"09:00"}; agent {"prompt":"self-contained, concrete instruction","agent":"auto","mode":"normal|light|heavy"}; command {"cmd":"shell command"}; condition {"question":"yes/no question about the previous result"}; notify {"message":"…"}; note {"text":"…"}.',
-    '"branch" only on connections leaving a condition. Start with a single trigger.',
+    'config per type: trigger {"mode":"manual|every|daily","every":60,"at":"09:00"}; agent {"prompt":"self-contained, concrete instruction","agent":"auto","mode":"normal|light|heavy","timeout":60}; command {"cmd":"shell command","timeout":10}; condition {"question":"yes/no question about the previous result"}; notify {"message":"…"}; note {"text":"…"}.',
+    '"branch" is "yes" or "no" on connections leaving a condition, and "error" on a connection leaving an agent or command that should run only if that step fails (for example an agent that fixes failing tests). Start with a single trigger.',
     'Use agents for work that needs thinking or code edits, commands for deterministic steps (tests, build, git), "light" for simple steps to save tokens and "heavy" only when it is hard. Run independent steps in parallel. At most 12 nodes.',
     'Write titles and instructions in the same language as the request.',
     `Available subscriptions: ${agents}. Projects: ${cfg.projects.map((p) => p.name).join(', ') || '(none)'}.`,
@@ -573,7 +652,7 @@ function flowFromSpec(spec, target = null) {
     return { id, type: n.type, title: String(n.title || NODE_TYPES[n.type].label).slice(0, 60), config, x: 0, y: 0 };
   });
   const edges = (spec.edges || []).filter((e) => ids.has(e.from) && ids.has(e.to))
-    .map((e) => ({ from: ids.get(e.from), to: ids.get(e.to), ...(e.branch === 'no' || e.branch === 'yes' ? { branch: e.branch } : {}) }));
+    .map((e) => ({ from: ids.get(e.from), to: ids.get(e.to), ...(BRANCH_LABEL[e.branch] ? { branch: e.branch } : {}) }));
   if (!nodes.length) return null;
   layoutNodes(nodes, edges);
   target = target || newFlow();
@@ -591,7 +670,7 @@ async function explainWithAI() {
   btn.disabled = true; btn.lastChild.textContent = 'Analyzing…';
   const r = await ab.aiAsk([
     'You are an expert in automation with coding agents. Explain in English, briefly (at most 18 lines) and concretely:',
-    '1) what this automation will do step by step when AgentBoard runs it ("agent" nodes become tasks for Claude/Codex/Gemini in new sessions with a summary of the previous steps; "command" runs in the shell; "condition" is decided by an AI with YES/NO);',
+    '1) what this automation will do step by step when AgentBoard runs it ("agent" nodes become tasks for Claude/Codex/Gemini in new sessions with a summary of the previous steps; "command" runs in the shell; "condition" is decided by an AI with YES/NO; a connection with branch "error" runs only if its step fails, and a step that fails with no error connection stops the run);',
     '2) what is missing or may fail (permissions, vague instructions, unconnected steps, dangerous commands);',
     '3) how to improve it or save tokens (light mode, parallel steps, commands instead of agents for deterministic work).',
     'Use a numbered list and **bold** headings.',
@@ -636,5 +715,5 @@ function initFlows() {
   $('#flClose').onclick = () => toggleFlows(false);
   $('#flowsBtn').onclick = () => toggleFlows();
   setInterval(checkSchedules, 30_000);
-  setInterval(() => { if (flowsOpen() && activeRuns.size) renderFlow(); }, 2000);
+  setInterval(() => { if (flowsOpen() && activeRuns.size) refreshFlow(); }, 2000);
 }

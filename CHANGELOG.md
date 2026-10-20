@@ -4,6 +4,45 @@ All notable changes to AgentBoard. The format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-10-19
+
+### Added
+- **"On error" paths in automations**: *Agent* and *Command* steps have a second, red output for what to do if they fail, for example an agent that fixes the failing tests. A failure handled this way no longer stops the run.
+- **Time limits for automation steps**: an *Agent* step can give up after a number of minutes (60 for new steps, no limit for existing ones), so a task left waiting for review no longer hangs the run; the task itself is left for you. A *Command* step's limit (10 minutes before) can now be set from 1 to 180 minutes.
+- **Pull requests in the Branches view**: each branch shows its pull request (open, draft, merged or closed) and, while it is open, whether its checks pass, fail or are running. Click it to open the PR on GitHub. Needs the `gh` CLI; without it, branches still show.
+- **Fix this issue**: a button on each issue in *Issues* creates the *Fix a GitHub issue* automation for it, ready to run.
+- **Branches view**: a branch button in the Tasks panel (and *All branches…* in a card's branch menu) lists every branch of the project, the ones being worked on first, with the tasks and agent cards on each, its worktree, last commit, commits ahead of and behind the main branch, and whether it is pushed. Switch to a branch or copy its name from there.
+- **Automation history**: the automations list shows when each one last ran, and its panel shows the next scheduled run and the last runs with their result and duration.
+
+### Changed
+- **Issues** has a cleaner layout: label colors, age, author, comments, assignees and milestone for each issue, a text filter, label filters, *Select all*, a button to read the issue's text and another to open it on GitHub.
+- Narrow windows: the toolbar no longer pushes *Settings* off-screen. Below 1500 px the computer name is hidden (it wrapped onto three lines), below 1366 px most toolbar buttons show only their icon, and below 1024 px all of them do. *Usage*, *Skills and Agents* and *Subscriptions* got icons.
+- The Tasks panel's *Summary*, *Issues* and *Clear* buttons are icons (with their descriptions on hover), so its toolbar fits on one line.
+- With the Tasks panel open on a narrow window, the dock's *Note* and *Group* show only their icon so every agent button stays visible.
+
+### Fixed
+- Automations: a new daily schedule (for example the *Nightly tests* template created in the afternoon) no longer runs right away, and turning an automation back on no longer catches up on missed runs.
+- Automations: what you type in the side panel, and nodes you drag, are no longer lost when a running automation refreshes the diagram.
+- Automations: a *Command* step set to run in the previous task's folder uses the task that leads to it, not one from a parallel branch.
+- Automations: deleting a running automation stops it first; skipped steps are no longer passed to agents as context; a stopped run says so; a *Decision* answered "Sí" counts as yes.
+- The *Fix a GitHub issue* template accepts only an issue number.
+- First launch: the welcome guide has proper margins again (its text and step dots touched the window's edges), keeps a steady height between steps, and starts with *Next* focused.
+- The empty board message and the bottom dock are centered on the part of the board the side bars leave visible, like new cards, instead of on the whole window. On narrow boards the minimap sits above the dock instead of overlapping it.
+- A card's name no longer shrinks to a few letters next to a long branch name; the branch name is shortened instead.
+- The Branches view: an agent card working on a branch shows as a small chip again instead of a broken box over the next branch, and popovers no longer run past the bottom of the window.
+- Switching the system between light and dark while the app is starting no longer throws an error.
+
+## [1.8.2] - 2026-10-19
+
+### Fixed
+- Windows and Linux: tooltips, the palette, the welcome guide and the empty board show shortcuts with Ctrl (Ctrl+Shift+T) instead of the Mac symbols (⇧⌘T).
+- Windows and Linux: the File/Edit/View menu bar no longer sits above the app's own top bar; press Alt to show it.
+
+## [1.8.1] - 2026-10-19
+
+### Fixed
+- A task now always runs in the project chosen when it was added. Before, it could run in the project you had open instead: when you opened another project while *Route* was splitting the text, when you wrote a task and then opened another project before adding it, or when a queued task had no folder.
+
 ## [1.8.0] - 2026-10-19
 
 ### Added
@@ -290,7 +329,10 @@ Includes the 0.2.0 changes, which were not released separately.
 ### Added
 - First release: a board of terminals for CLI agents on Mac and Windows.
 
-[Unreleased]: https://github.com/scortes5/agentboard/compare/v1.8.0...HEAD
+[Unreleased]: https://github.com/scortes5/agentboard/compare/v1.9.0...HEAD
+[1.9.0]: https://github.com/scortes5/agentboard/compare/v1.8.2...v1.9.0
+[1.8.2]: https://github.com/scortes5/agentboard/compare/v1.8.1...v1.8.2
+[1.8.1]: https://github.com/scortes5/agentboard/compare/v1.8.0...v1.8.1
 [1.8.0]: https://github.com/scortes5/agentboard/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/scortes5/agentboard/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/scortes5/agentboard/compare/v1.5.1...v1.6.0

@@ -12,7 +12,7 @@ const FLOW_TEMPLATES = [
   {
     id: 'fix-issue', name: 'Fix a GitHub issue → tests → pull request',
     description: 'An agent fixes the issue on its own branch with a test; if the checks pass, another opens the PR with "Closes #n".',
-    ask: [{ key: 'issue', title: 'Which issue?', hint: 'The number of the GitHub issue to fix in the current project.', placeholder: '42' }],
+    ask: [{ key: 'issue', title: 'Which issue?', hint: 'The number of the GitHub issue to fix in the current project.', placeholder: '42', pattern: /^\d{1,7}$/, invalid: 'An issue number is digits only, like 42.' }],
     build: ({ issue, project, check }) => ({
       name: `Fix issue #${issue}`,
       nodes: [
@@ -102,20 +102,24 @@ class FlowTemplates {
 
   add(t) { this.list.push(t); return t; }
 
-  // What the templates fill in from the current project.
-  static context() {
-    const p = cfg.projects.find((x) => x.path === cfg.selectedProject) || cfg.projects[0];
+  // What the templates fill in from a project (the current one by default).
+  static context(path = cfg.selectedProject) {
+    const p = cfg.projects.find((x) => x.path === path) || cfg.projects[0];
     return { project: p?.name || '', check: (p?.verify || cfg.verifyCmd || '').trim() || 'npm test' };
   }
 
-  async create(id) {
+  // `given`: answers already known (e.g. the issue picked in the Issues list) and the project path.
+  async create(id, given = {}) {
     const t = this.list.find((x) => x.id === id);
     if (!t) return null;
-    const values = FlowTemplates.context();
+    const values = FlowTemplates.context(given.path);
     for (const q of t.ask || []) {
-      const v = await askText(q.title, q.hint, q.placeholder);
+      const v = given[q.key] != null ? String(given[q.key]) : await askText(q.title, q.hint, q.placeholder);
       if (!v) return null;
-      values[q.key] = v.replace(/^#/, '');
+      // the answer goes into prompts and branch names: only what the question expects
+      const value = v.replace(/^#/, '').trim();
+      if (q.pattern && !q.pattern.test(value)) { toast(esc(q.invalid || 'That answer is not valid.'), 5000); return null; }
+      values[q.key] = value;
     }
     const flow = flowFromSpec(t.build(values));
     if (flow) toast(`<b>${esc(flow.name)}</b> created${values.project ? ` for ${esc(values.project)}` : ''}. Review the steps, then press Run.`, 5000);

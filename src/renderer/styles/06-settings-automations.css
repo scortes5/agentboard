@@ -23,8 +23,9 @@ dialog.settings-sheet form { display: grid; grid-template-columns: 200px 1fr; gr
 .set-group { background: var(--fill); border-radius: 10px; box-shadow: inset 0 0 0 .5px var(--line); margin-bottom: 14px; }
 .set-row { display: flex !important; flex-direction: row !important; align-items: center; justify-content: space-between; gap: 16px; padding: 9px 14px; color: var(--text) !important; font-size: 13px !important; min-height: 40px; }
 .set-row + .set-row { box-shadow: 0 -.5px 0 var(--line); }
-.set-row input:not([type=checkbox]):not([type=color]):not([type=range]) { width: 260px; max-width: 55%; }
-.set-row input[type=number] { width: 80px; }
+/* text fields share one width (a long label wraps instead of squeezing its field); numbers stay short */
+.set-row input:not([type=checkbox]):not([type=color]):not([type=range]):not([type=number]) { width: 260px; max-width: 55%; flex: none; }
+.set-row input[type=number] { width: 80px; flex: none; }
 .set-row .range { display: flex; align-items: center; gap: 10px; }
 .set-row output { font: 12px var(--font-mono); color: var(--muted); min-width: 44px; text-align: right; }
 .set-note { color: var(--muted); font-size: 12px; line-height: 1.5; margin: 4px 2px 12px; }
@@ -54,7 +55,10 @@ body.flows-open #dock, body.flows-open #minimap, body.flows-open #sidebar, body.
 #flList { overflow: auto; padding: 0 8px 12px; display: flex; flex-direction: column; gap: 2px; }
 .fl-item { display: flex; align-items: center; gap: 8px; text-align: left; background: transparent; box-shadow: none; padding: 6px 9px; border-radius: 6px; }
 .fl-item.active { background: rgba(var(--accent-rgb), .2); }
-.fl-item-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fl-item-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.fl-item-name { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fl-item-sub { font-size: 10.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fl-item.off .fl-item-name { color: var(--text-2); }
 .fl-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(var(--fg-rgb), .2); flex: none; }
 .fl-dot.ok { background: var(--ok); } .fl-dot.fail { background: var(--bad); }
 .fl-dot.running { background: var(--accent); animation: pulse 1s ease-in-out infinite; }
@@ -79,6 +83,7 @@ body.flows-open #dock, body.flows-open #minimap, body.flows-open #sidebar, body.
 .fl-edge-hit { fill: none; stroke: transparent; stroke-width: 14; cursor: pointer; }
 .fl-arrow { fill: rgba(var(--fg-rgb), .45); }
 .fl-branch { fill: var(--muted); font: 600 10.5px var(--font-ui); }
+.fl-branch.err { fill: var(--bad); }
 @keyframes flow { to { stroke-dashoffset: -11; } }
 .fl-node { position: absolute; width: 220px; z-index: 1; background: var(--surface); border-radius: 12px; cursor: grab; user-select: none;
   box-shadow: 0 0 0 .5px var(--line-hi), 0 8px 24px -10px rgba(0,0,0,.45); }
@@ -103,6 +108,9 @@ body.flows-open #dock, body.flows-open #minimap, body.flows-open #sidebar, body.
 .port.out:hover { background: var(--ncolor); }
 .port.out.yes { top: 38%; box-shadow: 0 0 0 2px var(--ok); }
 .port.out.no { top: 72%; box-shadow: 0 0 0 2px var(--bad); }
+.port.out.main { top: 38%; }
+.port.out.err { top: 72%; box-shadow: 0 0 0 2px var(--bad); }
+.port.out.err:hover { background: var(--bad); }
 .fl-inspector { background: var(--glass); box-shadow: -.5px 0 0 var(--line-hi); overflow: auto; padding: 14px 16px 18px; }
 .fl-inspector h3 { margin: 4px 0 6px; font: 600 13px var(--font-ui); color: var(--text); }
 .fl-field { display: flex; flex-direction: column; gap: 5px; margin: 10px 0; font: 600 11px var(--font-ui); color: var(--muted); }
@@ -112,11 +120,17 @@ body.flows-open #dock, body.flows-open #minimap, body.flows-open #sidebar, body.
 .fl-field textarea { resize: vertical; line-height: 1.45; }
 .fl-field textarea.mono { font: 12px var(--font-mono); }
 .fl-plan { font-size: 12.5px; line-height: 1.55; color: var(--text-2); background: var(--fill); border-radius: 8px; padding: 10px 12px; white-space: normal; }
+.fl-runs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; font-size: 11.5px; }
+.fl-runs li { display: grid; grid-template-columns: 8px auto 1fr auto; align-items: center; gap: 8px; color: var(--text-2); }
+.fl-runs li > :nth-child(3) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fl-log { margin: 0; padding-left: 18px; font-size: 12px; color: var(--text-2); line-height: 1.6; }
 .fl-inspector .set-row { padding: 6px 0; min-height: 0; box-shadow: none !important; }
 .fl-back { margin: auto 10px 12px; background: transparent; box-shadow: none; color: var(--text-2); text-align: left; }
 #flList { flex: 1; }
 #flEmpty.hidden { display: none; }
+/* No automation open: the empty state takes the inspector's column too, so it sits centered. */
+#flows:has(#flEmpty:not(.hidden)) { grid-template-columns: 220px 1fr; }
+#flows:has(#flEmpty:not(.hidden)) #flInspector { display: none; }
 
 .set-nav button:focus:not(:focus-visible) { outline: none; }
 .set-nav button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
@@ -153,6 +167,18 @@ button[data-icon] { display: inline-flex; align-items: center; white-space: nowr
 #topbar .group.right { flex: none; }
 #topbar { gap: 10px; }
 #topbar .group { gap: 5px; }
+/* Narrow windows: the toolbar sheds what it can spare instead of pushing Settings off-screen.
+   The computer name goes first, then button labels (each button keeps its icon and its title). */
+.machine { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; }
+@media (max-width: 1499px) { #topbar .machine { display: none; } }
+@media (max-width: 1365px) {
+  #topbar .group:not(.right) .tb-label, #approvalsBtn .tb-label, #workBtn .tb-label { display: none; }
+  #topbar .group:not(.right) button[data-icon] .ic, #approvalsBtn .ic, #workBtn .ic { margin-right: 0; }
+}
+@media (max-width: 1023px) {
+  #topbar .tb-label, #topbar .brand-name { display: none; }
+  #topbar button[data-icon] .ic { margin-right: 0; }
+}
 /* task composer in two rows: wide selects on top, actions below */
 .composer-row { flex-wrap: wrap !important; }
 .composer-row select { flex: 1 1 120px; max-width: none !important; }

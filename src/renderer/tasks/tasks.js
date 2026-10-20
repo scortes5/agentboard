@@ -141,7 +141,8 @@ async function startTask(t, key) {
   taskRt.set(t.id, { lastBusy: Date.now(), dispatching: true });
   save(); renderTasks();
 
-  let cwd = t.cwd || cfg.selectedProject || null;
+  // The project chosen when the task was added, never the one open now (null = home folder).
+  let cwd = t.cwd || null;
   const wantWorktree = t.worktree ?? cfg.taskWorktrees;
   if (wantWorktree && cwd) {
     const r = await ab.gitWorktree(cwd, t.text.split(/\s+/).slice(0, 5).join(' '));
@@ -155,7 +156,7 @@ async function startTask(t, key) {
   }
   // Snapshot for the work summary, so it shows only this task's changes.
   if (cwd) await ab.workBegin(t.id, cwd);
-  const g = t.group ? ensureGroup(t.group, projectOfPath(t.cwd || cfg.selectedProject || '')) : null;
+  const g = t.group ? ensureGroup(t.group, projectOfPath(t.cwd || '')) : null;
   const pos = g ? slotIn(g) : looseSpot();
   const title = t.text.length > 34 ? t.text.slice(0, 32).trim() + '…' : t.text;
   await refreshBridgeStatus();
@@ -342,8 +343,10 @@ function renderTaskOptions() {
     + subscriptions().map(([k, a]) => `<option value="${esc(k)}">${esc(a.label)}</option>`).join('');
   sel.value = [...sel.options].some((o) => o.value === prevAgent) ? prevAgent : 'auto';
   const ps = $('#taskProject');
+  // A draft keeps the project it was written for when you open another one.
+  const draftProject = $('#taskInput').value.trim() && cfg.projects.some((p) => p.path === ps.value) ? ps.value : null;
   ps.innerHTML = cfg.projects.map((p) => `<option value="${esc(p.path)}">${esc(p.name)}</option>`).join('') || '<option value="">Home folder</option>';
-  ps.value = cfg.selectedProject || cfg.projects[0]?.path || '';
+  ps.value = draftProject || cfg.selectedProject || cfg.projects[0]?.path || '';
 }
 
 function chip(text, cls = '', style = '') { return `<span class="tchip ${cls}" ${style ? `style="${style}"` : ''}>${text}</span>`; }
@@ -610,24 +613,25 @@ async function addFromComposer() {
   if (!canRoute()) return addLines(text);
   const btn = $('#taskAdd');
   if (btn.disabled) return;
+  // Read the project now: routing takes a few seconds and you may open another project meanwhile.
+  const defaults = composerDefaults();
   btn.disabled = true; btn.textContent = 'Routing…';
   const r = await ab.planTasks(text, planOptions());
   btn.disabled = false; btn.textContent = 'Add';
   if (input.value.trim() === text) input.value = '';
   if (!r.ok || !r.value.length) {
     toast(`Could not route with haiku (${esc(r.error || 'empty answer')}); added the lines as they are.`, 6000);
-    return addLines(text);
+    return addLines(text, defaults);
   }
-  addPlanned(r.value, composerDefaults());
+  addPlanned(r.value, defaults);
   toast(`haiku routed it into ${r.value.length} task${r.value.length === 1 ? '' : 's'}${cfg.taskAuto ? ' running in parallel' : ' — turn on "Run queue" to start them'}`);
   tickTasks();
 }
 
-function addLines(text) {
+function addLines(text, d = composerDefaults()) {
   const input = $('#taskInput');
   const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
   if (!lines.length) return;
-  const d = composerDefaults();
   // a line with only #group / @agent and no text applies to the following lines;
   // a line starting with ">" waits for the task on the line before it
   let carry = {};

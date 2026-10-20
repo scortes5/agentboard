@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('ab', {
   // Git
   gitStatus: (cwd) => ipcRenderer.invoke('git:status', cwd),
   gitBranches: (cwd) => ipcRenderer.invoke('git:branches', cwd),
+  gitOverview: (cwd) => ipcRenderer.invoke('git:overview', cwd),
   gitCheckout: (cwd, branch, create) => ipcRenderer.invoke('git:checkout', cwd, branch, create),
 
   // Native notifications for task automations and finished agents
@@ -60,7 +61,7 @@ contextBridge.exposeInMainWorld('ab', {
   setBadge: (n) => ipcRenderer.send('app:badge', n),
   shortcutsList: () => ipcRenderer.invoke('shortcuts:list'),
   aiAsk: (prompt, model) => ipcRenderer.invoke('ai:ask', prompt, model),
-  flowExec: (cmd, cwd, secrets) => ipcRenderer.invoke('flow:exec', cmd, cwd, secrets),
+  flowExec: (cmd, cwd, secrets, minutes) => ipcRenderer.invoke('flow:exec', cmd, cwd, secrets, minutes),
   // Secrets: names only; values never come back to the window
   secretsList: () => ipcRenderer.invoke('secrets:list'),
   secretsSet: (name, value) => ipcRenderer.invoke('secrets:set', name, value),
@@ -94,6 +95,7 @@ contextBridge.exposeInMainWorld('ab', {
   auditExport: () => ipcRenderer.invoke('audit:export'),
   postWebhook: (url, text) => ipcRenderer.invoke('webhook:post', url, text),
   githubIssues: (cwd) => ipcRenderer.invoke('github:issues', cwd),
+  githubPulls: (cwd) => ipcRenderer.invoke('github:pulls', cwd),
   onMenu: (cb) => ipcRenderer.on('menu', (_e, action) => cb(action)),
 
   // Clipboard
