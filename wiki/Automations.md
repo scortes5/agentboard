@@ -10,7 +10,7 @@ Open with **Automations** (⇧⌘F). A flow is a diagram of connected steps, n8n
 |---|---|
 | **Trigger** | When it starts: by hand, every N minutes, or every day at a set time. |
 | **Agent** | An agent does a piece of work. It becomes a queued task with its subscription and model. |
-| **Command** | Runs a command in the project (tests, build, git), or in the folder of the previous agent's task (its worktree, if it has one). If it fails, what follows does not run. It can use secrets (see below). |
+| **Command** | Runs a command in the project (tests, build, git), or in the folder of the previous agent's task (its worktree, if it has one), with a time limit (10 minutes by default). It can use secrets (see below). |
 | **Decision** | Claude reads the previous result and answers yes or no; the flow continues down that branch. |
 | **Notify** | Sends a desktop notification. |
 | **Concept** | An idea written on the diagram; it does not run. |
@@ -37,6 +37,9 @@ Every step can be edited afterwards. A new template is one entry in `src/rendere
 - **Explain Run**: the AI explains what will happen step by step, the risks and possible improvements.
 
 ## Running
+
+- **If a step fails**: *Agent* and *Command* steps have two outputs. The top one continues when the step succeeds; the red one (*On error*) runs only if it fails, for example an agent that fixes the failing tests. A step that fails with nothing connected to its red output stops the run.
+- **Time limits**: an *Agent* step can give up after a number of minutes (*Give up after*; 0 waits as long as it takes). The step then fails, and the task is left as it is for you to review.
 
 - **Run** executes now; each step lights up while it runs.
 - Independent branches run **in parallel**.

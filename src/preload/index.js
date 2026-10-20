@@ -61,7 +61,7 @@ contextBridge.exposeInMainWorld('ab', {
   setBadge: (n) => ipcRenderer.send('app:badge', n),
   shortcutsList: () => ipcRenderer.invoke('shortcuts:list'),
   aiAsk: (prompt, model) => ipcRenderer.invoke('ai:ask', prompt, model),
-  flowExec: (cmd, cwd, secrets) => ipcRenderer.invoke('flow:exec', cmd, cwd, secrets),
+  flowExec: (cmd, cwd, secrets, minutes) => ipcRenderer.invoke('flow:exec', cmd, cwd, secrets, minutes),
   // Secrets: names only; values never come back to the window
   secretsList: () => ipcRenderer.invoke('secrets:list'),
   secretsSet: (name, value) => ipcRenderer.invoke('secrets:set', name, value),

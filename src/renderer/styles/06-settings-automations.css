@@ -82,6 +82,7 @@ body.flows-open #dock, body.flows-open #minimap, body.flows-open #sidebar, body.
 .fl-edge-hit { fill: none; stroke: transparent; stroke-width: 14; cursor: pointer; }
 .fl-arrow { fill: rgba(var(--fg-rgb), .45); }
 .fl-branch { fill: var(--muted); font: 600 10.5px var(--font-ui); }
+.fl-branch.err { fill: var(--bad); }
 @keyframes flow { to { stroke-dashoffset: -11; } }
 .fl-node { position: absolute; width: 220px; z-index: 1; background: var(--surface); border-radius: 12px; cursor: grab; user-select: none;
   box-shadow: 0 0 0 .5px var(--line-hi), 0 8px 24px -10px rgba(0,0,0,.45); }
@@ -106,6 +107,9 @@ body.flows-open #dock, body.flows-open #minimap, body.flows-open #sidebar, body.
 .port.out:hover { background: var(--ncolor); }
 .port.out.yes { top: 38%; box-shadow: 0 0 0 2px var(--ok); }
 .port.out.no { top: 72%; box-shadow: 0 0 0 2px var(--bad); }
+.port.out.main { top: 38%; }
+.port.out.err { top: 72%; box-shadow: 0 0 0 2px var(--bad); }
+.port.out.err:hover { background: var(--bad); }
 .fl-inspector { background: var(--glass); box-shadow: -.5px 0 0 var(--line-hi); overflow: auto; padding: 14px 16px 18px; }
 .fl-inspector h3 { margin: 4px 0 6px; font: 600 13px var(--font-ui); color: var(--text); }
 .fl-field { display: flex; flex-direction: column; gap: 5px; margin: 10px 0; font: 600 11px var(--font-ui); color: var(--muted); }

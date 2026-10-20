@@ -39,6 +39,10 @@ function newFlow(name = 'New Automation') {
   return f;
 }
 
+// Steps that can fail on their own have a second output: what to do if they do.
+const canFail = (n) => n.type === 'agent' || n.type === 'command';
+const BRANCH_LABEL = { yes: 'Yes', no: 'No', error: 'On error' };
+
 function nodeSummary(n) {
   const c = n.config || {};
   if (n.type === 'trigger') return c.mode === 'every' ? `every ${c.every || 60} min` : c.mode === 'daily' ? `every day at ${c.at || '09:00'}` : 'by hand (Run button)';
@@ -110,7 +114,9 @@ function renderFlow({ keepInspector = false } = {}) {
       : `${n.type !== 'trigger' ? '<span class="port in" data-port="in"></span>' : ''}
          ${n.type === 'condition'
            ? '<span class="port out yes" data-port="out" data-branch="yes" title="Yes: drag to connect"></span><span class="port out no" data-port="out" data-branch="no" title="No: drag to connect"></span>'
-           : '<span class="port out" data-port="out" title="Drag to connect"></span>'}`;
+           : canFail(n)
+             ? '<span class="port out main" data-port="out" title="When it succeeds: drag to connect"></span><span class="port out err" data-port="out" data-branch="error" title="If it fails: drag to connect the step that handles the error"></span>'
+             : '<span class="port out" data-port="out" title="Drag to connect"></span>'}`;
     return `<div class="fl-node t-${n.type} ${n.id === nodeSel ? 'sel' : ''} st-${st}" data-node="${esc(n.id)}" style="left:${n.x}px;top:${n.y}px;--ncolor:${T.color}">
       <div class="fl-node-head"><span class="fl-icon">${icon(T.icon, 13)}</span><span class="fl-type">${T.label}</span>${st ? `<span class="fl-st st-${st}">${STEP_STATUS[st] || ''}</span>` : ''}</div>
       <div class="fl-node-title">${esc(n.title || T.label)}</div>
@@ -132,7 +138,8 @@ function portPos(nodeId, kind, branch) {
   const n = curFlow().nodes.find((x) => x.id === nodeId);
   const h = el.offsetHeight;
   if (kind === 'in') return { x: n.x, y: n.y + h / 2 };
-  const y = n.type === 'condition' ? n.y + h * (branch === 'no' ? 0.72 : 0.38) : n.y + h / 2;
+  const twoWay = n.type === 'condition' || canFail(n);
+  const y = twoWay ? n.y + h * (branch === 'no' || branch === 'error' ? 0.72 : 0.38) : n.y + h / 2;
   return { x: n.x + NODE_W, y };
 }
 
@@ -159,7 +166,7 @@ function drawFlowEdges(temp) {
     const a = portPos(e.from, 'out', e.branch), b = portPos(e.to, 'in');
     if (!a || !b) return '';
     const live = run && run.edge?.[i] === 'active';
-    const label = e.branch ? `<text x="${a.x + 14}" y="${a.y - 6}" class="fl-branch">${e.branch === 'no' ? 'No' : 'Yes'}</text>` : '';
+    const label = e.branch ? `<text x="${a.x + 14}" y="${e.branch === 'error' ? a.y + 15 : a.y - 6}" class="fl-branch ${e.branch === 'error' ? 'err' : ''}">${BRANCH_LABEL[e.branch] || 'Yes'}</text>` : '';
     return `<path d="${curve(a, b)}" class="fl-edge-hit" data-edge="${i}"/><path d="${curve(a, b)}" class="fl-edge ${i === edgeSel ? 'sel' : ''} ${live ? 'live' : ''} ${run?.edge?.[i] === 'dead' ? 'dead' : ''}" marker-end="url(#flArrow)"/>${label}`;
   });
   if (temp) parts.push(`<path d="${curve(temp.a, temp.b)}" class="fl-edge temp"/>`);
@@ -177,7 +184,7 @@ function renderInspector() {
   if (edgeSel != null && f.edges[edgeSel]) {
     const e = f.edges[edgeSel];
     const a = f.nodes.find((x) => x.id === e.from), b = f.nodes.find((x) => x.id === e.to);
-    box.innerHTML = `<h3>Connection</h3><p class="set-note">${esc(a?.title || '')} → ${esc(b?.title || '')}${e.branch ? ` (${e.branch === 'no' ? 'No' : 'Yes'} branch)` : ''}</p>
+    box.innerHTML = `<h3>Connection</h3><p class="set-note">${esc(a?.title || '')} → ${esc(b?.title || '')}${e.branch === 'error' ? ' (if it fails)' : e.branch ? ` (${BRANCH_LABEL[e.branch]} branch)` : ''}</p>
       <button type="button" data-x="del-edge" title="Delete this connection (⌫)">Remove Connection</button>`;
     return;
   }
@@ -213,13 +220,15 @@ function renderInspector() {
     body += field('mode', 'Model', `<select data-c="mode">${MODES.map(([v, l]) => `<option value="${v}" ${(c.mode || 'normal') === v ? 'selected' : ''}>${l}</option>`).join('')}</select>`);
     body += field('project', 'Project', `<select data-c="project">${projectOptions(c.project)}</select>`);
     body += field('group', 'Board group (optional)', `<input data-c="group" value="${esc(c.group || '')}" placeholder="e.g. backend"/>`);
-    body += `<p class="set-note">It receives a one-line summary of each previous step, not their full history.</p>`;
+    body += field('timeout', 'Give up after (minutes, 0 = wait as long as it takes)', `<input type="number" min="0" max="1440" data-c="timeout" value="${esc(c.timeout ?? 0)}"/>`);
+    body += `<p class="set-note">It receives a one-line summary of each previous step, not their full history. If the task is blocked or runs past the limit, the step fails: connect the red dot to handle that, otherwise the run stops here. The task itself is left for you to review.</p>`;
   } else if (n.type === 'command') {
     body += field('cmd', 'Command', `<textarea data-c="cmd" rows="3" class="mono" placeholder="npm test">${esc(c.cmd || '')}</textarea>`);
     body += field('project', 'Folder', `<select data-c="project">${projectOptions(c.project)}</select>`);
     body += `<label class="fl-field check"><input type="checkbox" data-c="inTaskFolder" ${c.inTaskFolder ? 'checked' : ''}/> <span>Run in the folder of the previous agent's task (its worktree, if it has one)</span></label>`;
     body += field('secrets', 'Secrets it can use (optional)', `<input data-c="secrets" class="mono" value="${esc(c.secrets || '')}" placeholder="APP_USER, APP_PASSWORD"/>`);
-    body += `<p class="set-note">If it exits with an error, the following steps do not run. Secrets (Settings → Secrets) arrive as environment variables, and their values are hidden in the output.</p>`;
+    body += field('timeout', 'Time limit (minutes)', `<input type="number" min="1" max="180" data-c="timeout" value="${esc(c.timeout || 10)}"/>`);
+    body += `<p class="set-note">If it exits with an error or runs past the limit, the run follows the red dot (if it fails); with nothing connected there, it stops. Secrets (Settings → Secrets) arrive as environment variables, and their values are hidden in the output.</p>`;
   } else if (n.type === 'condition') {
     body += field('question', 'Yes/no question', `<textarea data-c="question" rows="3" placeholder="Did all the tests pass?">${esc(c.question || '')}</textarea>`);
     body += `<p class="set-note">Claude (haiku) reads the results of the previous steps and answers YES or NO. Connect the green dot (Yes) and the red one (No).</p>`;
@@ -249,7 +258,7 @@ function addNode(type) {
   const n = {
     id: uid(), type, title: NODE_TYPES[type].label,
     x: canvas.scrollLeft + 120 + (f.nodes.length % 4) * 40, y: canvas.scrollTop + 100 + (f.nodes.length % 5) * 60,
-    config: type === 'trigger' ? { mode: 'manual', every: 60, at: '09:00' } : type === 'agent' ? { agent: 'auto', mode: 'normal' } : {},
+    config: type === 'trigger' ? { mode: 'manual', every: 60, at: '09:00' } : type === 'agent' ? { agent: 'auto', mode: 'normal', timeout: 60 } : type === 'command' ? { timeout: 10 } : {},
   };
   // when a node is selected, connect the new one to it and place it on its right
   const prev = f.nodes.find((x) => x.id === nodeSel);
@@ -393,12 +402,20 @@ function contextFor(f, run, nodeId) {
   }).filter(Boolean).join('\n');
 }
 
-function waitForTask(id, run) {
+// The task's result, or a failure once it runs past `minutes` (0 = no limit). A task that
+// waits for review counts as still working; the task itself is never stopped here.
+function waitForTask(id, run, minutes = 0) {
+  const limit = Math.max(0, +minutes || 0) * 60_000;
+  const started = Date.now();
   return new Promise((resolve) => {
     const iv = setInterval(() => {
       const t = taskById(id);
       if (run.stopped) { clearInterval(iv); return resolve({ ok: false, text: 'Stopped.' }); }
       if (!t) { clearInterval(iv); return resolve({ ok: false, text: 'The task was deleted.' }); }
+      if (limit && Date.now() - started > limit && t.status !== 'done' && t.status !== 'blocked') {
+        clearInterval(iv);
+        return resolve({ ok: false, text: `No result after ${minutes} min (the task is ${t.status}; it was left for you to check). ${t.summary || ''}`.trim() });
+      }
       if (t.status === 'done' || t.status === 'blocked') { clearInterval(iv); resolve({ ok: t.status === 'done', text: t.summary || t.status }); }
       run.status[run.taskNode[id]] = t.status === 'review' ? 'wait' : 'running';
     }, 1000);
@@ -429,7 +446,7 @@ async function execNode(f, run, n) {
     if (!c.cmd) return { ok: false, text: 'No command.' };
     const folder = (c.inTaskFolder && lastTaskFolder(f, run, n.id)) || c.project || cfg.selectedProject;
     if (!folder) return { ok: false, text: 'No project: choose a folder for this step or select a project.' };
-    const r = await ab.flowExec(c.cmd, folder, SecretsSettings.parse(c.secrets));
+    const r = await ab.flowExec(c.cmd, folder, SecretsSettings.parse(c.secrets), +c.timeout || 10);
     if (!r.ok) return { ok: false, text: r.error };
     const tail = r.value.out.split('\n').slice(-6).join('\n');
     return { ok: r.value.code === 0, text: `${r.value.code === 0 ? 'OK' : `exit code ${r.value.code}`}\n${tail}` };
@@ -450,7 +467,7 @@ async function execNode(f, run, n) {
     t.flowRun = run.id;
     run.taskNode[t.id] = n.id;
     save(); tickTasks();
-    return waitForTask(t.id, run);
+    return waitForTask(t.id, run, c.timeout);
   }
   return { ok: true, text: '' };
 }
@@ -473,10 +490,13 @@ async function runFlow(f, reason = 'by hand') {
     run.results[n.id] = res;
     run.status[n.id] = res.skip ? 'skip' : res.ok ? 'ok' : 'fail';
     finished.add(n.id);
-    if (!res.ok && !res.skip) { failed = true; log(`Error in ${n.title}: ${res.text.split('\n')[0]}`); }
+    // a failure with an error path connected is handled there, so the run can still succeed
+    const handled = !res.ok && !res.skip && edges.some((x) => x.from === n.id && x.branch === 'error');
+    if (handled) log(`Failed: ${n.title} (${res.text.split('\n')[0]}); following its error path`);
+    else if (!res.ok && !res.skip) { failed = true; log(`Error in ${n.title}: ${res.text.split('\n')[0]}`); }
     else if (!res.skip) log(`Done: ${n.title}${res.branch ? ` (${res.text})` : ''}`);
     for (const e of edges.filter((x) => x.from === n.id)) {
-      const active = !res.skip && res.ok && (!res.branch || (e.branch || 'yes') === res.branch);
+      const active = !res.skip && (e.branch === 'error' ? !res.ok : res.ok && (!res.branch || (e.branch || 'yes') === res.branch));
       run.edge[e.i] = active ? 'active' : 'dead';
     }
     // nodes whose inputs are all resolved can run (or are skipped if none arrived active)
@@ -603,8 +623,8 @@ async function designWithAI() {
     'Design an automation for AgentBoard (an app that coordinates coding agents such as Claude Code running in terminals).',
     'Reply ONLY with valid JSON, no extra text, in this shape:',
     '{"name":"…","nodes":[{"id":"n1","type":"trigger|agent|command|condition|notify|note","title":"…","config":{}}],"edges":[{"from":"n1","to":"n2","branch":"yes|no"}]}',
-    'config per type: trigger {"mode":"manual|every|daily","every":60,"at":"09:00"}; agent {"prompt":"self-contained, concrete instruction","agent":"auto","mode":"normal|light|heavy"}; command {"cmd":"shell command"}; condition {"question":"yes/no question about the previous result"}; notify {"message":"…"}; note {"text":"…"}.',
-    '"branch" only on connections leaving a condition. Start with a single trigger.',
+    'config per type: trigger {"mode":"manual|every|daily","every":60,"at":"09:00"}; agent {"prompt":"self-contained, concrete instruction","agent":"auto","mode":"normal|light|heavy","timeout":60}; command {"cmd":"shell command","timeout":10}; condition {"question":"yes/no question about the previous result"}; notify {"message":"…"}; note {"text":"…"}.',
+    '"branch" is "yes" or "no" on connections leaving a condition, and "error" on a connection leaving an agent or command that should run only if that step fails (for example an agent that fixes failing tests). Start with a single trigger.',
     'Use agents for work that needs thinking or code edits, commands for deterministic steps (tests, build, git), "light" for simple steps to save tokens and "heavy" only when it is hard. Run independent steps in parallel. At most 12 nodes.',
     'Write titles and instructions in the same language as the request.',
     `Available subscriptions: ${agents}. Projects: ${cfg.projects.map((p) => p.name).join(', ') || '(none)'}.`,
@@ -632,7 +652,7 @@ function flowFromSpec(spec, target = null) {
     return { id, type: n.type, title: String(n.title || NODE_TYPES[n.type].label).slice(0, 60), config, x: 0, y: 0 };
   });
   const edges = (spec.edges || []).filter((e) => ids.has(e.from) && ids.has(e.to))
-    .map((e) => ({ from: ids.get(e.from), to: ids.get(e.to), ...(e.branch === 'no' || e.branch === 'yes' ? { branch: e.branch } : {}) }));
+    .map((e) => ({ from: ids.get(e.from), to: ids.get(e.to), ...(BRANCH_LABEL[e.branch] ? { branch: e.branch } : {}) }));
   if (!nodes.length) return null;
   layoutNodes(nodes, edges);
   target = target || newFlow();
@@ -650,7 +670,7 @@ async function explainWithAI() {
   btn.disabled = true; btn.lastChild.textContent = 'Analyzing…';
   const r = await ab.aiAsk([
     'You are an expert in automation with coding agents. Explain in English, briefly (at most 18 lines) and concretely:',
-    '1) what this automation will do step by step when AgentBoard runs it ("agent" nodes become tasks for Claude/Codex/Gemini in new sessions with a summary of the previous steps; "command" runs in the shell; "condition" is decided by an AI with YES/NO);',
+    '1) what this automation will do step by step when AgentBoard runs it ("agent" nodes become tasks for Claude/Codex/Gemini in new sessions with a summary of the previous steps; "command" runs in the shell; "condition" is decided by an AI with YES/NO; a connection with branch "error" runs only if its step fails, and a step that fails with no error connection stops the run);',
     '2) what is missing or may fail (permissions, vague instructions, unconnected steps, dangerous commands);',
     '3) how to improve it or save tokens (light mode, parallel steps, commands instead of agents for deterministic work).',
     'Use a numbered list and **bold** headings.',
