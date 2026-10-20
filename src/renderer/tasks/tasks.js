@@ -329,6 +329,8 @@ function tickTasks() {
   const now = Date.now();
   for (const t of tasks()) {
     if (t.status !== 'running' && t.status !== 'review') continue;
+    // still being set up (worktree, checkpoint…): it has no card yet, which is not "closed"
+    if (taskRt.get(t.id)?.dispatching) continue;
     const c = t.cardId && cardData(t.cardId);
     const rt = c && runtime.get(c.id);
     if (!c || !rt) {

@@ -139,10 +139,15 @@ function newSessionId() {
 }
 const usesPowerShell = () => platform === 'win32' && (!cfg.shell || /pwsh|powershell/i.test(cfg.shell));
 const usesCmd = () => platform === 'win32' && /(^|\\)cmd(\.exe)?(\s|$)/i.test(cfg.shell || '');
+// PowerShell also ends a single-quoted string at the typographic quotes U+2018–U+201B, so each
+// is doubled too: task text can come from GitHub issues, the phone page or other agents.
 function shellQuote(s) {
-  if (usesPowerShell()) return "'" + s.replace(/'/g, "''") + "'";
+  if (usesPowerShell()) return "'" + s.replace(/['‘-‛]/g, '$&$&') + "'";
   return "'" + s.replace(/'/g, "'\\''") + "'";
 }
+// Control characters in a task (Ctrl-C, ESC, end of bracketed paste…) could cancel or escape the
+// typed line, so they are dropped; tabs and line breaks stay.
+const cleanPrompt = (s) => s.replace(/[\x00-\x08\x0b-\x1f\x7f]/g, '');
 function orElse(a, b) { return usesPowerShell() ? `${a}; if (-not $?) { ${b} }` : `${a} || ${b}`; }
 // How an agent receives its first task: as an argument (independent of when the
 // TUI finishes starting) or pasted into the terminal (unknown CLIs, cmd.exe).
@@ -161,7 +166,7 @@ function commandFor(c, resume) {
   else if (resume && cfg.resumeOnOpen) parts.push(a.resumeArgs);
   const mode = promptMode(a);
   if (c.prompt && !c.promptSent && mode !== 'paste') {
-    parts.push((mode === 'arg' ? '' : mode + ' ') + shellQuote(c.prompt.replace(/\s*\n\s*/g, ' ').trim()));
+    parts.push((mode === 'arg' ? '' : mode + ' ') + shellQuote(cleanPrompt(c.prompt).replace(/\s*\n\s*/g, ' ').trim()));
   }
   const cmd = parts.filter(Boolean).join(' ');
   // if the saved session no longer exists (nothing was ever typed), open a new one with the same id
@@ -188,7 +193,7 @@ async function startPty(c, resume) {
     c.promptSent = true; dirty = true;
     if (promptMode(agentOf(c)) === 'paste') {
       await waitReady(c.id);
-      await ab.ptyPaste(c.id, c.prompt);
+      await ab.ptyPaste(c.id, cleanPrompt(c.prompt));
     }
   }
   if (dirty) save();
