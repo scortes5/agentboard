@@ -4,6 +4,20 @@ All notable changes to AgentBoard. The format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+### Added
+
+- Branch per group (Queue Options or Settings → Tasks): tasks of the same `#group` share one worktree on `agentboard/group-<name>`, each finished task is committed there, and the branch is pushed to origin once the group has nothing left to run.
+- Automation run summary: after each run, a table of its steps (status, time, tokens, result) and a few lines from haiku on what worked, what failed and what to check; **Copy Summary** gives it as Markdown.
+- Lessons per automation: **Correct It** on a failed step (or **Add Lesson**) saves a rule that the automation's agents and conditions get on every later run, and that Design with AI keeps.
+- Live view of automation agents: a running Agent step shows the last line of its terminal on the node and in the inspector, with **Open Terminal**.
+- A task's terminals (its agent and its subagents) close on their own a few seconds after it is done; blocked tasks stay open. With cross-review on, the author's card waits for the reviewer. Turn it off in Settings → Tasks.
+
+### Changed
+
+- Tasks without a marker and the subagents agents open now run on a mid-tier model (`normal args`: Claude `--model sonnet`, Codex `gpt-5.6-terra`) instead of the CLI's default. Codex light and heavy tasks now pick a model too (`gpt-5.6-luna` / `gpt-6-astra`); boards still on the old Codex defaults move to the new ones.
+- Task results are clearer: agents end with «DONE: what they did | files | checked | pending» (or «BLOCKED: … | needs: …»), shown as labeled rows with the files git saw change. A DONE line the CLI wrapped onto several rows is now read whole (it used to keep only the first row).
+- The router sends more simple work (config tweaks, one-file fixes) to the light model.
+
 ## [1.11.0] - 2026-10-20
 
 ### Added

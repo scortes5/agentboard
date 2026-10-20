@@ -16,6 +16,7 @@ function agentRow(key, a) {
     <input name="command" value="${esc(a.command)}" placeholder="${key === 'shell' ? '(shell only)' : 'command'}" ${key === 'shell' ? 'disabled' : ''}/>
     <input name="resumeArgs" value="${esc(a.resumeArgs)}" placeholder="resume args" ${key === 'shell' ? 'disabled' : ''}/>
     <input name="lightArgs" value="${esc(a.lightArgs || '')}" placeholder="light args (!)" title="Tasks marked with ! (cheaper model)" ${key === 'shell' ? 'disabled' : ''}/>
+    <input name="normalArgs" value="${esc(a.normalArgs || '')}" placeholder="normal args" title="Tasks with no marker and subagents (mid-tier model; empty = the CLI's default)" ${key === 'shell' ? 'disabled' : ''}/>
     <input name="heavyArgs" value="${esc(a.heavyArgs || '')}" placeholder="heavy args (!!)" title="Tasks marked with !! (most capable model)" ${key === 'shell' ? 'disabled' : ''}/>
     <label class="local" title="Runs a local model (Ollama, LM Studio…): free, used first for light tasks"><input type="checkbox" name="local" ${a.local ? 'checked' : ''} ${key === 'shell' ? 'disabled' : ''}/> local</label>
     ${builtin ? '<span></span>' : `<button type="button" class="card-btn" title="Delete this custom agent">${icon('close', 13)}</button>`}`;
@@ -272,6 +273,9 @@ async function openSettings(section = 'general') {
   f.maxParallel.value = cfg.maxParallel || 3;
   f.perAgentParallel.value = cfg.perAgentParallel || 2;
   f.taskWorktrees.checked = !!cfg.taskWorktrees;
+  f.groupBranches.checked = !!cfg.groupBranches;
+  f.groupPush.checked = cfg.groupPush !== false;
+  f.autoCloseDone.checked = cfg.autoCloseDone !== false;
   f.taskRoute.checked = cfg.taskRoute !== false;
   f.taskSubagents.checked = cfg.taskSubagents !== false;
   f.maxSubagents.value = cfg.maxSubagents || 4;
@@ -330,6 +334,9 @@ $('#settings').addEventListener('close', async () => {
   cfg.maxParallel = clamp(+f.maxParallel.value || 3, 1, 12);
   cfg.perAgentParallel = clamp(+f.perAgentParallel.value || 2, 1, 6);
   cfg.taskWorktrees = f.taskWorktrees.checked;
+  cfg.groupBranches = f.groupBranches.checked;
+  cfg.groupPush = f.groupPush.checked;
+  cfg.autoCloseDone = f.autoCloseDone.checked;
   cfg.taskRoute = f.taskRoute.checked;
   cfg.taskSubagents = f.taskSubagents.checked;
   cfg.maxSubagents = clamp(+f.maxSubagents.value || 4, 1, 8);
@@ -361,7 +368,7 @@ $('#settings').addEventListener('close', async () => {
     agents[key] = {
       ...(cfg.agents[key] || {}), label: get('label') || get('command') || key, color: get('color'),
       command: shellOnly ? '' : get('command'), resumeArgs: shellOnly ? '' : get('resumeArgs'),
-      lightArgs: shellOnly ? '' : get('lightArgs'), heavyArgs: shellOnly ? '' : get('heavyArgs'),
+      lightArgs: shellOnly ? '' : get('lightArgs'), normalArgs: shellOnly ? '' : get('normalArgs'), heavyArgs: shellOnly ? '' : get('heavyArgs'),
       local: !shellOnly && row.querySelector('[name=local]').checked,
     };
   }

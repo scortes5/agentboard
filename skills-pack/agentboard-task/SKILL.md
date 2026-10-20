@@ -13,7 +13,7 @@ This task comes from the user's list. Other agents (other subscriptions) may be 
 4. **No loops**: finish the task in this session. Do not start `/goal`, `/loop`, scheduled wakeups or recurring jobs: they keep you working turn after turn and spend tokens after the work is done. Use them only when the task explicitly asks to repeat something or keep watching over time (e.g. "check the deploy every 10 minutes", "keep retrying until CI passes").
 5. **Verify** the minimum that proves it works (the affected test or command).
 6. **Finish** like this, so AgentBoard marks the task:
-   - If you have the `complete_task` tool (AgentBoard MCP), call it with a one-line summary (`blocked: true` if you could not finish).
+   - If you have the `complete_task` tool (AgentBoard MCP), call it with that same line as the summary (`blocked: true` if you could not finish).
    - And write as the last line of your answer, exactly:
-     - `DONE: <what you did, in one line>` or
-     - `BLOCKED: <what you need from the user>`
+     - `DONE: <what you did> | files: <main files changed> | checked: <how you verified it> | pending: <what is left, or nothing>` or
+     - `BLOCKED: <what stops you> | needs: <what you need from the user>`

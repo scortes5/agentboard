@@ -14,10 +14,11 @@ class QuickKey {
     if (this.current) { try { globalShortcut.unregister(this.current); } catch {} }
     this.current = null;
     if (!want) return { ok: true };
-    let ok = false;
-    try { ok = globalShortcut.register(want, this.onPress); } catch {}
+    let ok = false, why = 'is another app using it?';
+    try { ok = globalShortcut.register(want, this.onPress); } catch (e) { why = e.message; }
     if (ok) this.current = want;
-    return ok ? { ok: true } : { ok: false, error: `Could not register ${want} (is another app using it?).` };
+    if (!ok) console.warn(`[QuickKey] could not register ${want}: ${why}`);
+    return ok ? { ok: true } : { ok: false, error: `Could not register ${want} (${why}).` };
   }
 
   register(ipcMain) {

@@ -64,6 +64,9 @@ body.tasks-open #minimap { right: calc(var(--right-w) + 22px); }
 .tchip.light { color: var(--ok); }
 .tsum { margin-top: 5px; font-size: 12px; color: var(--text-2); }
 .tsum.warn { color: var(--warn); }
+.tres { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; margin-bottom: 0; }
+.tres dt { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .03em; padding-top: 1px; }
+.tres dd { margin: 0; overflow-wrap: anywhere; }
 .tacts { display: flex; gap: 2px; }
 .tacts button { background: transparent; box-shadow: none; padding: 2px 6px; color: var(--muted); }
 .tacts button:hover { color: var(--text); background: var(--fill-hi); }
@@ -126,7 +129,7 @@ body.diagram-open #dock, body.diagram-open #minimap, body.diagram-open #sidebar,
 #packRows .acts { flex-wrap: wrap; justify-content: flex-end; max-width: 300px; }
 
 /* ---------- Settings: "heavy mode" column ---------- */
-.agent-row { grid-template-columns: 34px 1fr 1.1fr 1fr 1fr 1fr 56px 28px; }
+.agent-row { grid-template-columns: 34px 1fr 1.1fr 1fr 1fr 1fr 1fr 56px 28px; }
 .agent-row .local { flex-direction: row; align-items: center; gap: 4px; font-size: 11.5px; }
 .tchip.heavy { color: var(--accent); }
 .task-auto .seg button.spent { opacity: .5; text-decoration: line-through; text-decoration-color: rgba(var(--bad-rgb), .6); }

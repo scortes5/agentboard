@@ -33,11 +33,15 @@ class ReviewDialog {
     this.task = t;
     const wt = this.hasWorktree(t);
     $('#reviewTitle').textContent = t.text.length > 70 ? `${t.text.slice(0, 68)}…` : t.text;
-    $('#reviewMeta').textContent = wt ? `Worktree branch ${t.branch}` : t.checkpoint ? `Changes since the checkpoint taken when the task started (${t.checkpoint.slice(0, 8)})` : '';
+    $('#reviewMeta').textContent = t.groupBranch ? `Branch ${t.branch}, shared by group "${t.group}": the diff is the whole group's work`
+      : wt ? `Worktree branch ${t.branch}` : t.checkpoint ? `Changes since the checkpoint taken when the task started (${t.checkpoint.slice(0, 8)})` : '';
     $('#reviewComment').value = '';
     $('#reviewFiles').innerHTML = '';
     $('#reviewDiff').innerHTML = '<p class="muted small">Reading the changes…</p>';
-    for (const id of ['#reviewMerge', '#reviewPR', '#reviewDiscard']) $(id).classList.toggle('hidden', !wt);
+    // A group's branch belongs to all its tasks: merging or discarding it from one task would
+    // pull the worktree from under the others, so only the pull request is offered.
+    for (const id of ['#reviewMerge', '#reviewDiscard']) $(id).classList.toggle('hidden', !wt || !!t.groupBranch);
+    $('#reviewPR').classList.toggle('hidden', !wt);
     $('#reviewRestore').classList.toggle('hidden', !t.checkpoint || wt);
     if (!$('#review').open) $('#review').showModal();
     const r = await ab.gitFullDiff({ dir: t.workdir || t.cwd, branch: wt ? t.branch : null, checkpoint: t.checkpoint });
