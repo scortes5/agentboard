@@ -103,6 +103,8 @@ body.sidebar-open #sidebar { display: flex; }
 .gitpill .ab { color: var(--accent); }
 .card-btn { background: transparent; box-shadow: none; padding: 2px 6px; color: var(--muted); font-size: 13px; border-radius: 6px; }
 .card-btn:hover { color: var(--text); background: var(--fill); }
+.card-btn.lockbtn:not(.on) { opacity: .45; }
+.card-btn.lockbtn.on { color: var(--accent); opacity: 1; }
 
 .card-body { flex: 1; min-height: 0; position: relative; padding: 6px 0 0 10px; background: var(--term-bg); }
 .card-body .xterm { height: 100%; }

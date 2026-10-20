@@ -1,5 +1,5 @@
 // AgentBoard — closes a task's terminals (its agent and the subagents it opened) once the task
-// is done, so finished agents stop holding a session. Blocked tasks stay open for you to read.
+// is done, so finished agents stop holding a session. Blocked tasks and locked cards stay open.
 // With cross-review on, the author's card waits for the reviewer: problems go back to it.
 'use strict';
 /* global cfg, taskById, taskCards, closeCards, autoAgents, taskPipeline */
@@ -23,7 +23,7 @@ class AutoCloseStep {
   later(t) {
     setTimeout(() => {
       if (t.status !== 'done') return;
-      const cards = taskCards(t);
+      const cards = taskCards(t).filter((c) => !c.locked);
       if (cards.length) closeCards(cards, { ask: false });
     }, AUTO_CLOSE_DELAY_MS);
   }

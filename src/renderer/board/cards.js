@@ -66,7 +66,8 @@ function mountCard(c, { resume }) {
       <span class="spacer"></span>
       ${c.type === 'term' ? `<span class="alertpill hidden" title="">${icon('alert', 12)}</span><span class="tokpill hidden"></span><span class="gitpill hidden"></span>
         <button class="card-btn" data-act="open" title="Open the project folder in Finder">${icon('folder', 14)}</button>
-        <button class="card-btn" data-act="restart" title="Restart the agent (resumes its session)">${icon('refresh', 14)}</button>` : ''}
+        <button class="card-btn" data-act="restart" title="Restart the agent (resumes its session)">${icon('refresh', 14)}</button>
+        <button class="card-btn lockbtn" data-act="lock">${icon('lock', 14)}</button>` : ''}
       <button class="card-btn" data-act="edit" title="${c.type === 'term' ? 'Change name, agent, project or arguments; send context to another agent' : 'Edit or duplicate the note'}">${icon('more', 14)}</button>
       <button class="card-btn" data-act="zoom" title="Focus this card (fills the view)">${icon('focus', 14)}</button>
       <button class="card-btn" data-act="close" title="Close the card and stop its process">${icon('close', 14)}</button>
@@ -103,7 +104,25 @@ function mountCard(c, { resume }) {
   }
 
   layoutCard(c);
+  refreshLock(c);
   wireCard(c, el);
+}
+
+// ---------- Locked cards ----------
+// A locked terminal is never closed or stopped on its own: not when its task is done, not when
+// it sits idle, not by "close finished". Closing it by hand still works.
+function refreshLock(c) {
+  const btn = runtime.get(c.id)?.el.querySelector('.lockbtn');
+  if (!btn) return;
+  btn.classList.toggle('on', !!c.locked);
+  btn.title = c.locked ? 'Locked: never closed automatically. Click to unlock' : 'Lock: keep this terminal open when its task finishes or it goes idle';
+}
+
+function setCardLocked(c, on) {
+  c.locked = !!on;
+  refreshLock(c);
+  save();
+  if (typeof renderTasks === 'function') renderTasks();
 }
 
 // ---------- Each card's command ----------

@@ -458,13 +458,15 @@ function renderTasks() {
     const del = B('del', 'trash', 'Delete the task');
     const open = taskCards(t).length;
     const close = open ? B('close', 'close', open === 1 ? 'Close its terminal' : `Close its ${open} terminals: the agent and the subagents it opened`) : '';
+    const main = t.cardId && cardData(t.cardId);
+    const lock = main ? `<button data-a="lock" class="${main.locked ? 'on' : ''}" title="${main.locked ? 'Its terminal is locked: it stays open when the task finishes. Click to unlock' : 'Lock its terminal so it stays open when the task finishes'}">${icon('lock', 14)}</button>` : '';
     const acts = {
       pending: B('top', 'up', 'Move to the top of the queue') + B('run', 'play', 'Run now, without waiting for the queue') + del,
-      running: go + done + close,
-      verifying: go + close,
-      review: wt + go + done + close,
-      blocked: wt + undo + go + retry + done + close,
-      done: wt + undo + retry + close + del,
+      running: go + lock + done + close,
+      verifying: go + lock + close,
+      review: wt + go + lock + done + close,
+      blocked: wt + undo + go + lock + retry + done + close,
+      done: wt + undo + retry + lock + close + del,
     }[t.status];
     return `<div class="task st-${t.status}" data-id="${esc(t.id)}">
       <span class="tdot" title="${STATUS[t.status]}"></span>
@@ -554,9 +556,10 @@ function taskCards(t) {
 }
 
 // One confirmation for all of them; a running task whose card closes goes to review.
-function closeTaskCards(list) {
-  const cards = [...new Set(list.flatMap(taskCards))];
-  if (!cards.length) { toast('No terminals are open for these tasks.'); return; }
+// keepLocked: leave locked terminals open (bulk close); one task's own Close button closes all.
+function closeTaskCards(list, { keepLocked = false } = {}) {
+  const cards = [...new Set(list.flatMap(taskCards))].filter((c) => !keepLocked || !c.locked);
+  if (!cards.length) { toast(keepLocked ? 'No unlocked terminals are open for these tasks.' : 'No terminals are open for these tasks.'); return; }
   if (closeCards(cards)) { tickTasks(); renderTasks(); }
 }
 
@@ -584,6 +587,10 @@ $('#taskList').addEventListener('click', (e) => {
     finishTask(t, 'done', t.summary || 'Marked by hand.'); save(); renderTasks();
   } else if (act === 'close') {
     closeTaskCards([t]);
+  } else if (act === 'lock') {
+    // the agent and every subagent it opened follow the main card
+    const c = t.cardId && cardData(t.cardId);
+    if (c) { const on = !c.locked; for (const k of taskCards(t)) setCardLocked(k, on); }
   } else if (act === 'trust') {
     acceptTrust(t);
   } else if (act === 'top') {
@@ -802,7 +809,7 @@ function initTasks() {
       renderTasks();
     }
   });
-  $('#taskCloseDone').onclick = () => closeTaskCards(tasks().filter((t) => t.status === 'done' || t.status === 'blocked'));
+  $('#taskCloseDone').onclick = () => closeTaskCards(tasks().filter((t) => t.status === 'done' || t.status === 'blocked'), { keepLocked: true });
   $('#taskClear').onclick = () => { cfg.tasks = tasks().filter((t) => t.status !== 'done'); save(); renderTasks(); };
   $('#taskSummary').onclick = dailySummary;
 }
