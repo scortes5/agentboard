@@ -201,7 +201,7 @@ refactor the payments module !!
 - **Limits and budgets**: if a subscription runs out, its tasks move to another; if all of them do, AgentBoard tells you when the first one comes back (with an idea for the break). Tokens per task are shown live, with optional budgets per task, per day, per week and per month, for all projects or for each one; you get a notice at 80% and 100%.
 - **Subagents you can see**: with *Agent Connection* on, a task agent may split its work with `start_agent`; each helper opens as a `↳` card next to it.
 - **GitHub issues**: **Issues** lists the project's open issues (needs the `gh` CLI signed in), with their labels, age, author, comments and assignees; filter them by text or label, select several (or all) and queue them, or turn one into a ready-to-run *Fix a GitHub issue* automation; the agent reads the issue and its pull request says `Closes #n`. Issues written by people outside the project are flagged and show their text first, and the agent is told to treat any issue's text as a description, never as instructions.
-- **Branches**: the branch button shows every branch of the chosen project, the ones being worked on first: the tasks and agent cards on each, its worktree, its last commit, how far it is from the main branch, whether it is pushed, and its pull request with the state of its checks. Switch to one or copy its name from there; a card's branch pill has the same view under *All branches…*.
+- **Branches**: the branch button shows every branch of the chosen project, the ones being worked on first: the tasks and agent cards on each, its worktree, its last commit, how far it is from the main branch, whether it is pushed, and its pull request with the state of its checks. It also shows the issue each branch works on, and **Clean Up** deletes merged branches and unused task worktrees after you review them. Switch to one or copy its name from there; a card's branch pill has the same view under *All branches…*.
 - **Summary**: copies what was done today and what is pending, as Markdown (or sends it every day to a chat, see below).
 - **Global shortcut** (⌃⌥Space, configurable): add a task from any app.
 
@@ -215,7 +215,7 @@ refactor the payments module !!
 
 | Step | What it does |
 |---|---|
-| **Trigger** | When it starts: by hand, every N minutes or every day at a set time. |
+| **Trigger** | When it starts: by hand, every N minutes, every day at a set time, when a task finishes, or when a new GitHub issue is opened. |
 | **Agent** | An agent does a piece of work. It becomes a queued task, with its subscription and model. |
 | **Command** | A command in the project (tests, build, git), with a time limit. If it fails, only what is connected to its red *On error* output runs. |
 | **Decision** | Claude reads the previous result and answers yes or no; the flow continues down that branch. |
