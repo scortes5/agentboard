@@ -80,3 +80,14 @@
 .br-pr.bad { color: var(--bad); box-shadow: inset 0 0 0 1px rgba(var(--bad-rgb), .45); }
 .br-pr.muted { color: var(--muted); }
 .br-foot { padding: 8px 14px; border-top: 1px solid var(--line); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.popover .is-head .br-clean { width: auto; display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; font: 500 11px var(--font-ui); color: var(--text-2); }
+.popover .is-head .br-clean:hover { color: var(--bad); }
+.cl-item { display: flex; align-items: flex-start; gap: 10px; padding: 7px 10px; border-radius: 9px; cursor: pointer; font-size: 12px; }
+.cl-item:hover { background: var(--fill); }
+.cl-item.off { cursor: default; opacity: .6; }
+.cl-item > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cl-sub { color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.popover.branches input[type=checkbox] { width: auto; flex: none; margin: 2px 0 0; padding: 0; background: none; box-shadow: none; }
+.popover.branches .is-foot button { width: auto; font: 500 12px var(--font-ui); padding: 5px 12px; }
+.is-branch { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; font: 500 10.5px var(--font-mono); padding: 1px 8px; border-radius: 6px; background: var(--accent-soft); color: var(--accent); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.is-branch em { font: 500 10px var(--font-ui); font-style: normal; color: var(--text-2); margin-left: 4px; }

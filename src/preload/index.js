@@ -14,6 +14,8 @@ contextBridge.exposeInMainWorld('ab', {
   gitStatus: (cwd) => ipcRenderer.invoke('git:status', cwd),
   gitBranches: (cwd) => ipcRenderer.invoke('git:branches', cwd),
   gitOverview: (cwd) => ipcRenderer.invoke('git:overview', cwd),
+  gitCleanupCandidates: (cwd, busy) => ipcRenderer.invoke('git:cleanupCandidates', cwd, busy),
+  gitCleanup: (cwd, picked, busy) => ipcRenderer.invoke('git:cleanup', cwd, picked, busy),
   gitCheckout: (cwd, branch, create) => ipcRenderer.invoke('git:checkout', cwd, branch, create),
 
   // Native notifications for task automations and finished agents

@@ -54,7 +54,13 @@ class GitService {
       const m = c.match(/^(\d+)\s+(\d+)$/);
       if (m) { b.behindBase = +m[1]; b.aheadBase = +m[2]; }
     }));
-    return { top, base, current, branches };
+    return { top, base, current, branches, repoUrl: await this.repoUrl(top) };
+  }
+
+  // https://github.com/owner/repo for a GitHub origin, '' otherwise.
+  async repoUrl(top) {
+    const m = (await this.git.text(top, ['remote', 'get-url', 'origin'])).match(/github\.com[:/]([\w.-]+\/[\w.-]+?)(?:\.git)?$/);
+    return m ? `https://github.com/${m[1]}` : '';
   }
 
   // `git for-each-ref` lines (tab-separated, see overview) as objects.

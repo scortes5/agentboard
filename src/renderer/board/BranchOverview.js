@@ -41,6 +41,35 @@ class BranchOverview {
       || (b.aheadBase > 0 && !shipped) || pr?.state === 'open' || pr?.state === 'draft');
   }
 
+  // The issue a branch works on, from its name: fix/issue-12, feat/gh-12, issue_12, fix/12-title.
+  static issueFromName(name) {
+    const m = /(?:^|[/_-])(?:issues?|gh)[-_/]?(\d{1,7})(?!\d)/i.exec(name) || /^[\w.-]+\/(\d{1,7})(?=$|[-_])/.exec(name);
+    return m ? +m[1] : null;
+  }
+
+  // Issue number -> branches working on it (by name or because their pull request closes it).
+  static issueLinks(branches, prs = {}) {
+    const map = {};
+    const link = (n, b) => { if (n && !(map[n] ||= []).some((x) => x.branch === b)) map[n].push({ branch: b, pr: prs[b] || null }); };
+    for (const b of branches) {
+      link(BranchOverview.issueFromName(b.name), b.name);
+      for (const n of prs[b.name]?.closes || []) link(n, b.name);
+    }
+    return map;
+  }
+
+  static issuesOf(name, pr) {
+    return [...new Set([BranchOverview.issueFromName(name), ...(pr?.closes || [])].filter(Boolean))];
+  }
+
+  // The tasks' worktrees and the cards' folders: cleanup never touches them.
+  static busyFolders() {
+    return [
+      ...tasks().filter((t) => t.workdir && !['done', 'blocked'].includes(t.status)).map((t) => t.workdir),
+      ...cfg.cards.filter((c) => c.type === 'term' && c.cwd).map((c) => c.cwd),
+    ];
+  }
+
   // The branch's pull request and its checks, linking to GitHub.
   static prChip(pr) {
     if (!pr || !/^https:\/\/github\.com\//.test(pr.url || '')) return '';
@@ -52,6 +81,7 @@ class BranchOverview {
   }
 
   static row(b, w, ctx, pr) {
+    const issues = BranchOverview.issuesOf(b.name, pr);
     const isCurrent = b.name === ctx.current;
     const chips = [
       isCurrent ? '<span class="br-chip accent" title="Checked out in the project folder">current</span>' : '',
@@ -69,7 +99,9 @@ class BranchOverview {
     const canSwitch = !isCurrent && !b.worktree;
     return `<div class="br-item${isCurrent ? ' current' : ''}" data-b="${esc(b.name)}">
       <div class="br-top">${icon('branch', 13)}<span class="br-name" title="${esc(b.name)}">${esc(b.name)}</span>${chips}<span class="spacer"></span>${vsBase}</div>
-      ${pr ? `<div class="br-prs">${BranchOverview.prChip(pr)}</div>` : ''}
+      ${pr || issues.length ? `<div class="br-prs">${BranchOverview.prChip(pr)}${issues.map((n) => (ctx.repoUrl
+        ? `<a class="br-pr" href="${esc(ctx.repoUrl)}/issues/${n}" target="_blank" title="Open issue #${n} on GitHub">Issue #${n}</a>`
+        : `<span class="br-pr" title="This branch works on issue #${n}">Issue #${n}</span>`)).join('')}</div>` : ''}
       <div class="br-commit"><span class="mono">${esc(b.sha)}</span> <span class="br-subject" title="${esc(b.subject)}">${esc(b.subject || '(no message)')}</span></div>
       <div class="br-meta"><span>${esc(b.author)}</span><span class="sep">·</span><span title="${esc(new Date(b.at).toLocaleString())}">${esc(fmt.ago(b.at))}</span>
         <span class="spacer"></span>
@@ -90,14 +122,15 @@ class BranchOverview {
     if (!pop.isConnected) return;
     if (!r.ok) { pop.innerHTML = `<div class="hint">${esc(r.error)}</div>`; return; }
     const prs = pulls.ok ? pulls.value : {};
-    const { top, base, current, branches } = r.value;
+    const { top, base, current, branches, repoUrl } = r.value;
     const proj = cfg.projects.find((p) => p.path === cwd || p.path === top)?.name || basename(top);
     const work = BranchOverview.work(top, branches);
-    const ctx = { top, base, current };
+    const ctx = { top, base, current, repoUrl };
     const live = branches.filter((b) => BranchOverview.active(b, work[b.name], base, prs[b.name]));
     const rest = branches.filter((b) => !live.includes(b));
     pop.innerHTML = `<div class="is-head"><b>Branches</b><span class="muted">${esc(proj)}</span><span class="spacer"></span>
-        <span class="muted small">compared with <span class="mono">${esc(base)}</span></span><span class="badge">${branches.length}</span></div>
+        <span class="muted small">compared with <span class="mono">${esc(base)}</span></span><span class="badge">${branches.length}</span>
+        <button type="button" class="card-btn br-clean" data-cleanup title="Delete branches already merged and task worktrees no task uses; you pick which">${icon('trash', 12)} Clean Up</button></div>
       <input class="is-search" type="search" placeholder="Filter by name, commit or author" value="${esc(this.query)}" title="Filter the branches" />
       <div class="br-list"></div>
       ${pulls.ok ? '' : `<div class="br-foot muted small" title="${esc(pulls.error)}">Pull requests are not shown: ${esc(pulls.error)}</div>`}`;
@@ -113,6 +146,7 @@ class BranchOverview {
     draw();
     pop.querySelector('.is-search').addEventListener('input', (e) => { this.query = e.target.value.trim(); draw(); });
     pop.addEventListener('click', async (e) => {
+      if (e.target.closest('[data-cleanup]')) { this.cleanup(pop, cwd, anchor); return; }
       const name = e.target.closest('[data-b]')?.dataset.b;
       const card = e.target.closest('[data-card]')?.dataset.card;
       if (card) {
@@ -131,5 +165,48 @@ class BranchOverview {
     });
   }
 }
+
+// Cleanup, in the same popover: what can go, picked by you, confirmed, then the list again.
+BranchOverview.prototype.cleanup = async function cleanup(pop, cwd, anchor) {
+  pop.innerHTML = '<div class="hint">Looking for merged branches and unused worktrees…</div>';
+  const busy = BranchOverview.busyFolders();
+  const r = await ab.gitCleanupCandidates(cwd, busy);
+  if (!pop.isConnected) return;
+  if (!r.ok) { pop.innerHTML = `<div class="hint">${esc(r.error)}</div>`; return; }
+  const { base, branches, worktrees } = r.value;
+  const item = (kind, value, checked, label, sub, disabled = false) => `<label class="cl-item${disabled ? ' off' : ''}"><input type="checkbox" data-${kind} value="${esc(value)}" ${checked ? 'checked' : ''} ${disabled ? 'disabled' : ''}/>
+    <span><span class="br-name">${esc(label)}</span><span class="cl-sub">${sub}</span></span></label>`;
+  const body = [
+    branches.length ? `<div class="br-section">Merged branches <span>${branches.length}</span></div>${branches.map((b) => item('branch', b.name, true, b.name,
+      `${b.how === 'merged' ? `merged into ${esc(base)}` : `pull request #${b.pr} merged`} · ${esc(fmt.ago(b.at))} · ${esc(b.subject)}`)).join('')}` : '',
+    worktrees.length ? `<div class="br-section">Task worktrees no task uses <span>${worktrees.length}</span></div>${worktrees.map((w) => item('tree', w.dir, w.removable, w.branch,
+      w.removable ? esc(w.dir) : `kept: ${esc(w.reason)}`, !w.removable)).join('')}` : '',
+  ].join('');
+  pop.innerHTML = `<div class="is-head"><b>Clean Up</b><span class="muted">compared with <span class="mono">${esc(base)}</span></span></div>
+    <div class="br-list">${body || '<div class="hint">Nothing to clean up: no merged branches and no unused task worktrees.</div>'}</div>
+    <div class="is-foot"><button type="button" data-back title="Back to the branches">Back</button><span class="spacer"></span>
+      ${body ? '<button type="button" class="primary" data-go title="Delete the selected branches and worktrees">Delete</button>' : ''}</div>`;
+  const go = pop.querySelector('[data-go]');
+  const picked = () => ({
+    branches: [...pop.querySelectorAll('[data-branch]:checked')].map((x) => x.value),
+    worktrees: [...pop.querySelectorAll('[data-tree]:checked')].map((x) => x.value),
+  });
+  const sync = () => { if (!go) return; const p = picked(); const n = p.branches.length + p.worktrees.length; go.disabled = !n; go.textContent = n ? `Delete ${n}` : 'Delete'; };
+  sync();
+  pop.addEventListener('change', sync);
+  pop.querySelector('[data-back]').onclick = () => this.open(cwd, anchor);
+  if (go) go.onclick = async () => {
+    const p = picked();
+    if (!confirm(`Delete ${p.branches.length} branch${p.branches.length === 1 ? '' : 'es'} and ${p.worktrees.length} worktree${p.worktrees.length === 1 ? '' : 's'}? `
+      + 'They are merged or have no work of their own, and git keeps their commits for a while, but this cannot be undone from AgentBoard.')) return;
+    go.disabled = true; go.textContent = 'Deleting…';
+    const res = await ab.gitCleanup(cwd, p, busy);
+    if (!res.ok) { toast(`Could not clean up: ${esc(res.error)}`, 6000); return this.open(cwd, anchor); }
+    const { branches: b, worktrees: w, errors } = res.value;
+    toast(`Deleted ${b.length} branch${b.length === 1 ? '' : 'es'} and ${w.length} worktree${w.length === 1 ? '' : 's'}.${errors.length ? ` Not deleted: ${esc(errors.join('; '))}` : ''}`, errors.length ? 8000 : 4500);
+    refreshGit();
+    this.open(cwd, anchor);
+  };
+};
 
 const branchOverview = new BranchOverview();
