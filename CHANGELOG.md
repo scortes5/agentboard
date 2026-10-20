@@ -4,11 +4,15 @@ All notable changes to AgentBoard. The format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-10-20
+
+### Added
+- **Branches follow GitHub**: every 15 minutes AgentBoard fetches each project and fast-forwards the local branches that are only behind GitHub and are not checked out, so no working folder changes by itself (turn it off with *Auto* in the Branches view). **Pull All** does it now and also updates checked-out branches without uncommitted changes. **Push** lists the branches with commits GitHub does not have (selected) and those that only exist on this computer (not selected) and pushes the ones you pick. Branches only on GitHub are listed with **Track** to create a local branch that follows them. Nothing is ever forced: branches with commits on both sides are left alone and reported, and git never waits for a password.
+
 ## [1.10.0] - 2026-10-20
 
 ### Added
 - **Event triggers for automations**: an automation can start *when a task finishes* (done, blocked or either; optionally only in one project or for tasks that mention some text) or *when a new GitHub issue is opened* (optionally with a label, checked every few minutes with the `gh` CLI). The task's summary or the issue reaches the agents as context, and `{issue}` in an instruction or a command becomes the issue's number. Issues already open when you turn it on are skipped, issues from outside the project are ignored unless you allow them, and tasks created by automations never start one, so automations cannot loop.
-- **Branches follow GitHub**: every 15 minutes AgentBoard fetches each project and fast-forwards the local branches that are only behind GitHub and are not checked out, so no working folder changes by itself (turn it off with *Auto* in the Branches view). **Pull All** does it now and also updates checked-out branches without uncommitted changes. **Push** lists the branches with commits GitHub does not have (selected) and those that only exist on this computer (not selected) and pushes the ones you pick. Branches only on GitHub are listed with **Track** to create a local branch that follows them. Nothing is ever forced: branches with commits on both sides are left alone and reported, and git never waits for a password.
 - **Clean Up in the Branches view**: lists the branches already merged into the main branch (or whose pull request was merged) and AgentBoard's task worktrees that no task or card uses, all selected for you to review, and deletes the ones you keep checked. Worktrees with uncommitted changes or unmerged commits are shown but never deleted.
 - **Branch graph**: *Graph* in the Branches view shows the history of every local branch as colored lines, one color per branch kept along its history, with hollow dots where a branch was merged and a label naming the merged branch, even after it was deleted. Click a branch to jump to it and highlight its commits, click a commit (or move with ↑ ↓, and ← for its parent) to see its message, the files it changed and links to its parents and children, and open it on GitHub.
 - **Issues and branches linked**: the Branches view shows the issue each branch works on (from its name, like `fix/issue-12`, or because its pull request closes it), and *Issues* shows the branches and pull requests already working on each issue.
@@ -338,7 +342,8 @@ Includes the 0.2.0 changes, which were not released separately.
 ### Added
 - First release: a board of terminals for CLI agents on Mac and Windows.
 
-[Unreleased]: https://github.com/scortes5/agentboard/compare/v1.10.0...HEAD
+[Unreleased]: https://github.com/scortes5/agentboard/compare/v1.11.0...HEAD
+[1.11.0]: https://github.com/scortes5/agentboard/compare/v1.10.0...v1.11.0
 [1.10.0]: https://github.com/scortes5/agentboard/compare/v1.9.0...v1.10.0
 [1.9.0]: https://github.com/scortes5/agentboard/compare/v1.8.2...v1.9.0
 [1.8.2]: https://github.com/scortes5/agentboard/compare/v1.8.1...v1.8.2
