@@ -23,8 +23,9 @@ dialog.settings-sheet form { display: grid; grid-template-columns: 200px 1fr; gr
 .set-group { background: var(--fill); border-radius: 10px; box-shadow: inset 0 0 0 .5px var(--line); margin-bottom: 14px; }
 .set-row { display: flex !important; flex-direction: row !important; align-items: center; justify-content: space-between; gap: 16px; padding: 9px 14px; color: var(--text) !important; font-size: 13px !important; min-height: 40px; }
 .set-row + .set-row { box-shadow: 0 -.5px 0 var(--line); }
-.set-row input:not([type=checkbox]):not([type=color]):not([type=range]) { width: 260px; max-width: 55%; }
-.set-row input[type=number] { width: 80px; }
+/* text fields share one width (a long label wraps instead of squeezing its field); numbers stay short */
+.set-row input:not([type=checkbox]):not([type=color]):not([type=range]):not([type=number]) { width: 260px; max-width: 55%; flex: none; }
+.set-row input[type=number] { width: 80px; flex: none; }
 .set-row .range { display: flex; align-items: center; gap: 10px; }
 .set-row output { font: 12px var(--font-mono); color: var(--muted); min-width: 44px; text-align: right; }
 .set-note { color: var(--muted); font-size: 12px; line-height: 1.5; margin: 4px 2px 12px; }
@@ -123,6 +124,9 @@ body.flows-open #dock, body.flows-open #minimap, body.flows-open #sidebar, body.
 .fl-back { margin: auto 10px 12px; background: transparent; box-shadow: none; color: var(--text-2); text-align: left; }
 #flList { flex: 1; }
 #flEmpty.hidden { display: none; }
+/* No automation open: the empty state takes the inspector's column too, so it sits centered. */
+#flows:has(#flEmpty:not(.hidden)) { grid-template-columns: 220px 1fr; }
+#flows:has(#flEmpty:not(.hidden)) #flInspector { display: none; }
 
 .set-nav button:focus:not(:focus-visible) { outline: none; }
 .set-nav button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }

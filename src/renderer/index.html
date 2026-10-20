@@ -80,8 +80,8 @@
     <div id="agentButtons" class="dock-group"><!-- generated buttons --></div>
     <button id="moreAgents" class="chip ghost icon" data-icon="plus" title="Add subscriptions, accounts or local models to this bar"></button>
     <span class="dock-sep"></span>
-    <button id="addNote" class="chip ghost" data-icon="note" title="New note on the board (⇧⌘N)">Note</button>
-    <button id="addGroup" class="chip ghost" data-icon="group" title="New group: a frame that gathers a team of agents (⇧⌘G)">Group</button>
+    <button id="addNote" class="chip ghost" data-icon="note" title="New note on the board (⇧⌘N)"><span class="tb-label">Note</span></button>
+    <button id="addGroup" class="chip ghost" data-icon="group" title="New group: a frame that gathers a team of agents (⇧⌘G)"><span class="tb-label">Group</span></button>
     <button id="arrange" class="chip ghost icon" data-icon="grid" title="Arrange the cards in a grid, keeping groups together (⇧⌘O)"></button>
     <button id="fit" class="chip ghost icon" data-icon="fit" title="Fit the view to show every card (⌘0)"></button>
     <span id="zoomLabel" class="zoom">100%</span>
@@ -98,7 +98,7 @@
           <div id="taskProgress" class="tprogress hidden" title="Progress of your tasks; running ones show what they are doing below"><div class="bar"><i></i></div><span></span></div>
           <div id="taskFilter" class="seg task-filter">
             <button data-f="active" class="active" title="Show queued, running and to-review tasks">Active</button><button data-f="all" title="Show every task, including finished ones">All</button><button data-f="done" title="Show finished tasks only, most recent first">Done</button>
-            <span class="spacer"></span><button id="taskSummary" class="ghost" data-icon="copy" title="Copy a Markdown summary of today's finished and pending tasks">Summary</button><button id="taskIssues" class="ghost" title="Import open GitHub issues of the chosen project as tasks (needs the gh CLI)">Issues</button><button id="taskBranches" class="ghost icon" data-icon="branch" title="See the branches of the chosen project and which ones agents are working on"></button><button id="taskCloseDone" class="ghost icon" data-icon="close" title="Close the terminals of finished and blocked tasks, with their subagents"></button><button id="taskClear" class="ghost" title="Remove finished tasks from the list">Clear</button>
+            <span class="spacer"></span><button id="taskSummary" class="ghost icon" data-icon="copy" title="Copy a Markdown summary of today's finished and pending tasks"></button><button id="taskIssues" class="ghost icon" data-icon="issue" title="Import open GitHub issues of the chosen project as tasks (needs the gh CLI)"></button><button id="taskBranches" class="ghost icon" data-icon="branch" title="See the branches of the chosen project and which ones agents are working on"></button><button id="taskCloseDone" class="ghost icon" data-icon="close" title="Close the terminals of finished and blocked tasks, with their subagents"></button><button id="taskClear" class="ghost icon" data-icon="trash" title="Remove finished tasks from the list"></button>
           </div>
           <div id="taskList"></div>
           <div class="composer">
