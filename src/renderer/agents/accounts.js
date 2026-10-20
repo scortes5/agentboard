@@ -82,7 +82,7 @@ $('#addClaudeAccount').onclick = async () => {
   const n = Object.values(cfg.agents).filter((a) => a.env?.CLAUDE_CONFIG_DIR).length;
   cfg.agents[key] = {
     label: `Claude · ${name}`, command: 'claude', resumeArgs: '--continue',
-    lightArgs: base.lightArgs || '--model haiku', heavyArgs: base.heavyArgs || '--model opus',
+    lightArgs: base.lightArgs || '--model haiku', normalArgs: base.normalArgs || '--model sonnet', heavyArgs: base.heavyArgs || '--model opus',
     color: ACCOUNT_COLORS[n % ACCOUNT_COLORS.length], env: { CLAUDE_CONFIG_DIR: r.value.dir },
   };
   cfg.autoAgents = [...new Set([...(cfg.autoAgents || ['claude']), key])];

@@ -127,6 +127,7 @@ function taskPrompt(t, subagents = false) {
   return `[AgentBoard task ${t.id}] ${t.text}\n`
     + issuePrompt(t.issue)
     + groundRules.forTask(t)
+    + (t.groupBranch ? `(You work on branch ${t.branch}, shared with the other agents of group "${t.group}". Commit your own changes as you go with short, clear messages, staging only the files you changed. Do not push, switch branches or rewrite history.)\n` : '')
     + '(Only this, keep it short; use the agentboard-task skill if you have it. When finished, call complete_task if available and end with the line «DONE: …» or «BLOCKED: …».)'
     + `\n${NO_LOOPS}`
     + (subagents && !t.light
@@ -144,7 +145,12 @@ async function startTask(t, key) {
   // The project chosen when the task was added, never the one open now (null = home folder).
   let cwd = t.cwd || null;
   const wantWorktree = t.worktree ?? cfg.taskWorktrees;
-  if (wantWorktree && cwd) {
+  const groupBranch = cfg.groupBranches && t.group && t.worktree !== false && cwd;
+  if (groupBranch) {
+    const r = await ab.gitGroupWorktree(cwd, t.group);
+    if (r.ok) { cwd = r.value.dir; t.branch = r.value.branch; t.workdir = r.value.dir; t.base = r.value.base; t.groupBranch = true; }
+    else toast(`No branch for group ${esc(t.group)} (${esc(r.error)}); using the project folder.`, 5000);
+  } else if (wantWorktree && cwd) {
     const r = await ab.gitWorktree(cwd, t.text.split(/\s+/).slice(0, 5).join(' '));
     if (r.ok) { cwd = r.value.dir; t.branch = r.value.branch; t.workdir = r.value.dir; t.base = r.value.base; }
     else toast(`No worktree for this task (${esc(r.error)}); using the project folder.`, 5000);
@@ -161,7 +167,7 @@ async function startTask(t, key) {
   const title = t.text.length > 34 ? t.text.slice(0, 32).trim() + '…' : t.text;
   await refreshBridgeStatus();
   const card = newCard('term', key, {
-    cwd, title, args: t.light ? (a.lightArgs || '') : t.heavy ? (a.heavyArgs || '') : '', prompt: taskPrompt(t, canOpenSubagents(key)), taskId: t.id, noFocus: true, ...pos,
+    cwd, title, args: tierArgs(a, t), prompt: taskPrompt(t, canOpenSubagents(key)), taskId: t.id, noFocus: true, ...pos,
   });
   if (!card) { t.status = 'pending'; taskRt.delete(t.id); save(); renderTasks(); return; }
   t.cardId = card.id;
@@ -171,6 +177,12 @@ async function startTask(t, key) {
   save(); renderTasks();
   setTimeout(() => { const rt = taskRt.get(t.id); if (rt) rt.dispatching = false; }, 4000);
   toast(`Task → <b>${esc(a.label)}</b>${g ? ` in ${esc(g.title)}` : ''}: ${esc(title)}`);
+}
+
+// The model for a task: ! light, !! heavy, otherwise the mid tier (sonnet-class), so plain
+// tasks do not run on the CLI's default, most expensive model.
+function tierArgs(a, t) {
+  return (t.light ? a.lightArgs : t.heavy ? a.heavyArgs : a.normalArgs) || '';
 }
 
 // A task with "after" waits until every task it depends on is done.
@@ -332,6 +344,7 @@ function renderTaskOptions() {
   $('#taskParallel').value = cfg.maxParallel || 3;
   $('#taskPerAgent').value = cfg.perAgentParallel || 2;
   $('#taskWorktree').checked = !!cfg.taskWorktrees;
+  $('#taskGroupBranch').checked = !!cfg.groupBranches;
   $('#taskRoute').checked = cfg.taskRoute !== false;
   const auto = new Set(autoAgents());
   const time = (ms) => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -383,7 +396,7 @@ function renderTasks() {
       t.group ? chip(esc(t.group)) : '',
       t.light ? chip('light', 'light') : '',
       t.heavy ? chip('heavy', 'heavy') : '',
-      t.branch ? chip(icon('branch', 11) + ' ' + esc(t.branch.replace(/^agentboard\//, '')), 'branch') : '',
+      t.branch ? chip(icon('branch', 11) + ' ' + esc(t.branch.replace(/^agentboard\//, '')) + (t.commit ? ` · ${esc(t.commit)}` : '') + (t.pushed ? ' · pushed' : ''), 'branch') : '',
       t.from ? chip('from ' + esc(cardData(t.from)?.title || 'an agent')) : '',
       t.flowRun ? chip('automation') : '',
       t.after?.length && !depsReady(t) ? chip('after: ' + esc((taskById(t.after[0])?.text || 'another task').slice(0, 30)), 'wait') : '',
@@ -730,6 +743,7 @@ function initTasks() {
   });
   $('#taskAuto').onchange = (e) => { cfg.taskAuto = e.target.checked; save(); tickTasks(); };
   $('#taskWorktree').onchange = (e) => { cfg.taskWorktrees = e.target.checked; save(); };
+  $('#taskGroupBranch').onchange = (e) => { cfg.groupBranches = e.target.checked; save(); };
   $('#taskRoute').onchange = (e) => { cfg.taskRoute = e.target.checked; save(); };
   $('#taskParallel').onchange = (e) => { cfg.maxParallel = clamp(+e.target.value || 3, 1, 12); e.target.value = cfg.maxParallel; save(); tickTasks(); };
   $('#taskPerAgent').onchange = (e) => { cfg.perAgentParallel = clamp(+e.target.value || 2, 1, 6); e.target.value = cfg.perAgentParallel; save(); tickTasks(); };

@@ -5,7 +5,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { IS_WIN } = require('./platform');
-const { defaultAgents } = require('../agents/registry');
+const { defaultAgents, previousArgs } = require('../agents/registry');
 const { DEFAULTS: DESKTOP_DEFAULTS } = require('../notifications/DesktopNotifications');
 
 class ConfigStore {
@@ -29,6 +29,9 @@ class ConfigStore {
       maxParallel: 3,          // tasks running at once, across all subscriptions
       perAgentParallel: 2,     // tasks running at once per subscription
       taskWorktrees: false,    // each task in its own git worktree, so agents don't step on each other
+      groupBranches: false,    // tasks of a #group share one worktree and branch, committed task by task
+      groupPush: true,         // push the group's branch once all its tasks have finished
+      autoCloseDone: true,     // close a task's terminals once it is done
       quickKey: 'Control+Alt+Space', // global shortcut: add a task from any app
       checkUpdates: true,      // look for a new release on start and every few hours
       tasks: [],
@@ -41,14 +44,19 @@ class ConfigStore {
     };
   }
 
-  // The saved board on top of the defaults; built-in agents get new default fields (light/heavy args).
+  // The saved board on top of the defaults; built-in agents get new default fields (light/normal/heavy
+  // args), and args still set to an earlier default move to the current one.
   load() {
     try {
       const raw = JSON.parse(fs.readFileSync(this.path, 'utf8'));
       const base = this.defaults();
       const agents = { ...base.agents, ...(raw.agents || {}) };
+      const old = previousArgs();
       for (const [k, a] of Object.entries(base.agents)) {
-        for (const f of ['lightArgs', 'heavyArgs']) if (agents[k][f] == null && a[f]) agents[k] = { ...agents[k], [f]: a[f] };
+        for (const f of ['lightArgs', 'normalArgs', 'heavyArgs']) {
+          const stale = agents[k][f] == null || !!old[k]?.[f]?.includes(agents[k][f]);
+          if (stale && a[f]) agents[k] = { ...agents[k], [f]: a[f] };
+        }
       }
       return { ...base, ...raw, agents };
     } catch {

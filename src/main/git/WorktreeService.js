@@ -1,4 +1,4 @@
-// A task's own worktree and branch (<repo>/.agentboard/worktrees/<name>, agentboard/<name>):
+// A task's own worktree and branch (<repo>/.agentboard/worktrees/<name>, agentboard/<name>), or the one a #group shares:
 // creating it, what it holds, its full diff, and merging, discarding or opening a pull request.
 'use strict';
 const fs = require('fs');
@@ -10,6 +10,7 @@ const { wrap, slugify } = require('../core/platform');
 class WorktreeService {
   constructor({ runner, gitService, shellEnv }) {
     Object.assign(this, { git: runner, gitService, shellEnv });
+    this.groupLocks = new Map();
   }
 
   async create(cwd, slug) {
@@ -24,6 +25,52 @@ class WorktreeService {
     if (!r.ok) throw new Error(r.err.trim() || 'git worktree failed.');
     await this.excludeFromRepo(top);
     return { dir, branch, base };
+  }
+
+  // The worktree and branch a #group shares (agentboard/group-<name>): created the first time,
+  // reused by the group's next tasks, and checked out again if only the branch is left.
+  // Serialized per group so tasks starting together do not race to create it.
+  forGroup(cwd, group) {
+    const key = `${cwd}\0${group}`;
+    const run = (this.groupLocks.get(key) || Promise.resolve()).catch(() => {}).then(() => this.openGroup(cwd, group));
+    this.groupLocks.set(key, run);
+    return run;
+  }
+
+  async openGroup(cwd, group) {
+    await this.git.top(cwd); // throws when the project is not a git repository
+    const top = await this.git.worktreeTop(cwd);
+    const name = `group-${slugify(group, 40) || 'group'}`;
+    const dir = path.join(top, '.agentboard', 'worktrees', name);
+    const branch = `agentboard/${name}`;
+    const mergeBase = () => this.git.text(top, ['merge-base', 'HEAD', branch]);
+    if (fs.existsSync(dir)) {
+      const cur = await this.git.text(dir, ['rev-parse', '--abbrev-ref', 'HEAD']);
+      if (cur !== branch) throw new Error(`${dir} is checked out on ${cur || 'another branch'}, not ${branch}.`);
+      return { dir, branch, base: await mergeBase() };
+    }
+    const hasBranch = (await this.git.run(top, ['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`])).ok;
+    const base = hasBranch ? '' : await this.git.text(top, ['rev-parse', 'HEAD']);
+    const r = await this.git.run(top, hasBranch ? ['worktree', 'add', dir, branch] : ['worktree', 'add', '-b', branch, dir]);
+    if (!r.ok) throw new Error(r.err.trim() || 'git worktree failed.');
+    await this.excludeFromRepo(top);
+    return { dir, branch, base: base || await mergeBase() };
+  }
+
+  // Commit what a finished task left in its group's worktree.
+  async commitWork(dir, message) {
+    if (!(await this.git.text(dir, ['status', '--porcelain']))) return { committed: false };
+    await this.git.commitAll(dir, message);
+    return { committed: true, sha: await this.git.text(dir, ['rev-parse', '--short', 'HEAD']) };
+  }
+
+  // Push a group's branch to origin (never forced). Uncommitted changes stay out of it.
+  async pushBranch(dir, branch) {
+    const top = await this.git.worktreeTop(dir);
+    if (!(await this.git.text(top, ['remote'])).split('\n').includes('origin')) throw new Error('The repository has no "origin" remote.');
+    const push = await this.git.run(top, ['push', '-u', 'origin', branch]);
+    if (!push.ok) throw new Error('Could not push the branch: ' + push.err.trim().split('\n').slice(-2).join(' '));
+    return { remote: 'origin', pending: !!(await this.git.text(dir, ['status', '--porcelain'])) };
   }
 
   // Keep worktrees from showing up as changes in the main repository.
@@ -91,6 +138,9 @@ class WorktreeService {
     ipcMain.handle('git:worktree', wrap((_e, cwd, slug) => this.create(cwd, slug)));
     ipcMain.handle('git:worktreeMerge', wrap((_e, dir, branch, message) => this.merge(dir, branch, message)));
     ipcMain.handle('git:worktreeDiscard', wrap((_e, dir, branch) => this.discard(dir, branch)));
+    ipcMain.handle('git:groupWorktree', wrap((_e, cwd, group) => this.forGroup(cwd, group)));
+    ipcMain.handle('git:groupCommit', wrap((_e, dir, message) => this.commitWork(dir, message)));
+    ipcMain.handle('git:groupPush', wrap((_e, dir, branch) => this.pushBranch(dir, branch)));
     ipcMain.handle('git:fullDiff', wrap((_e, opts) => this.fullDiff(opts)));
     ipcMain.handle('git:pullRequest', wrap((_e, opts) => this.pullRequest(opts)));
   }

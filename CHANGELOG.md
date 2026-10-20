@@ -4,6 +4,16 @@ All notable changes to AgentBoard. The format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+### Added
+
+- Branch per group (Queue Options or Settings → Tasks): tasks of the same `#group` share one worktree on `agentboard/group-<name>`, each finished task is committed there, and the branch is pushed to origin once the group has nothing left to run.
+- A task's terminals (its agent and its subagents) close on their own a few seconds after it is done; blocked tasks stay open. With cross-review on, the author's card waits for the reviewer. Turn it off in Settings → Tasks.
+
+### Changed
+
+- Tasks without a marker and the subagents agents open now run on a mid-tier model (`normal args`: Claude `--model sonnet`, Codex `gpt-5.6-terra`) instead of the CLI's default. Codex light and heavy tasks now pick a model too (`gpt-5.6-luna` / `gpt-6-astra`); boards still on the old Codex defaults move to the new ones.
+- The router sends more simple work (config tweaks, one-file fixes) to the light model.
+
 ## [1.10.0] - 2026-10-20
 
 ### Added

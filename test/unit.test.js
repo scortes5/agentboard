@@ -325,3 +325,33 @@ test('the branch graph keeps parents, local branches and tags', () => {
   assert.deepEqual([a.parents, a.branches, a.tags, a.head, a.at], [['p1', 'p2'], ['main'], ['v1.0'], true, 1700000000000]);
   assert.deepEqual([b.branches, b.head, b.subject], [['feat/x'], false, 'Add x']);
 });
+
+test('a group shares one worktree and branch, committed task by task and pushed to origin', async () => {
+  const { execFileSync } = require('child_process');
+  const { GitRunner } = require('../src/main/git/GitRunner');
+  const { WorktreeService } = require('../src/main/git/WorktreeService');
+  Object.assign(process.env, { GIT_AUTHOR_NAME: 'T', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 'T', GIT_COMMITTER_EMAIL: 't@t' });
+  const repo = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'group-')));
+  const remote = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'group-remote-')));
+  const git = (cwd, ...a) => String(execFileSync('git', a, { cwd, stdio: 'pipe' })).trim();
+  git(remote, 'init', '-q', '--bare');
+  git(repo, 'init', '-q', '-b', 'main');
+  fs.writeFileSync(path.join(repo, 'a'), '1'); git(repo, 'add', '.'); git(repo, 'commit', '-qm', 'one');
+  const wt = new WorktreeService({ runner: new GitRunner() });
+  const [a, b] = await Promise.all([wt.forGroup(repo, 'Login Page'), wt.forGroup(repo, 'Login Page')]);
+  assert.equal(a.branch, 'agentboard/group-login-page');
+  assert.equal(b.dir, a.dir);
+  assert.equal(a.base, git(repo, 'rev-parse', 'HEAD'));
+  assert.deepEqual(await wt.commitWork(a.dir, 'nothing'), { committed: false });
+  fs.writeFileSync(path.join(a.dir, 'b'), '2');
+  assert.equal((await wt.commitWork(a.dir, 'task one')).committed, true);
+  await assert.rejects(wt.pushBranch(a.dir, a.branch), /no "origin" remote/);
+  git(repo, 'remote', 'add', 'origin', remote);
+  assert.deepEqual(await wt.pushBranch(a.dir, a.branch), { remote: 'origin', pending: false });
+  assert.equal(git(remote, 'log', '-1', '--format=%s', a.branch), 'task one');
+  // Only the branch left (worktree removed): it is checked out again with its commits.
+  git(repo, 'worktree', 'remove', a.dir);
+  const again = await wt.forGroup(repo, 'Login Page');
+  assert.equal(fs.readFileSync(path.join(again.dir, 'b'), 'utf8'), '2');
+  assert.equal(again.base, git(repo, 'rev-parse', 'HEAD'));
+});

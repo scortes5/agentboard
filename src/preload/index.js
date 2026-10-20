@@ -52,6 +52,9 @@ contextBridge.exposeInMainWorld('ab', {
   gitWorktree: (cwd, slug) => ipcRenderer.invoke('git:worktree', cwd, slug),
   worktreeMerge: (dir, branch, msg) => ipcRenderer.invoke('git:worktreeMerge', dir, branch, msg),
   worktreeDiscard: (dir, branch) => ipcRenderer.invoke('git:worktreeDiscard', dir, branch),
+  gitGroupWorktree: (cwd, group) => ipcRenderer.invoke('git:groupWorktree', cwd, group),
+  gitGroupCommit: (dir, msg) => ipcRenderer.invoke('git:groupCommit', dir, msg),
+  gitGroupPush: (dir, branch) => ipcRenderer.invoke('git:groupPush', dir, branch),
   // Review: checkpoints, the full diff of a task and pull requests
   gitCheckpoint: (cwd, label) => ipcRenderer.invoke('git:checkpoint', cwd, label),
   gitRestore: (cwd, sha) => ipcRenderer.invoke('git:restore', cwd, sha),
