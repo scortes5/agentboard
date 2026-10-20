@@ -185,6 +185,7 @@ test('pull requests are summed up per branch with their checks', () => {
   ]));
   assert.deepEqual([prs['feat/a'].number, prs['feat/a'].state, prs['feat/a'].checks.state], [7, 'draft', 'pending']);
   assert.deepEqual([prs['fix/b'].state, prs['fix/b'].checks.failed, prs['fix/b'].checks.passed], ['merged', 1, 1]);
+  assert.deepEqual(GitHubIssues.parsePulls(JSON.stringify([{ number: 1, headRefName: 'x', state: 'OPEN', closingIssuesReferences: [{ number: 4 }] }])).x.closes, [4]);
 });
 
 test('issue label colors are kept only when they are plain hex', () => {
@@ -285,4 +286,42 @@ test('the security log exports as CSV that a spreadsheet will not run as formula
   assert.equal(csv, 'at,kind,cmd,code,secrets,card,yes\n'
     + '2026-10-18T03:00:00Z,command,"echo ""hi"", there",-1,A B,,\n'
     + `2026-10-18T03:01:00Z,approval,,,,"'=HYPERLINK(""x"")",true\n`);
+});
+
+test('cleanup only removes merged branches and unused, clean task worktrees', async () => {
+  const { execFileSync } = require('child_process');
+  const { GitRunner } = require('../src/main/git/GitRunner');
+  const { GitService } = require('../src/main/git/GitService');
+  const { BranchCleanup } = require('../src/main/git/BranchCleanup');
+  const repo = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'cleanup-')));
+  const git = (...a) => execFileSync('git', ['-c', 'user.name=T', '-c', 'user.email=t@t', ...a], { cwd: repo, stdio: 'pipe' });
+  git('init', '-q', '-b', 'main');
+  fs.writeFileSync(path.join(repo, 'a'), '1'); git('add', '.'); git('commit', '-qm', 'one');
+  git('branch', 'feat/merged');
+  git('checkout', '-qb', 'feat/open'); fs.writeFileSync(path.join(repo, 'b'), '2'); git('add', '.'); git('commit', '-qm', 'two'); git('checkout', '-q', 'main');
+  git('worktree', 'add', '-q', '-b', 'agentboard/idle', path.join(repo, '.agentboard', 'worktrees', 'idle'));
+  git('worktree', 'add', '-q', '-b', 'agentboard/busy', path.join(repo, '.agentboard', 'worktrees', 'busy'));
+  git('worktree', 'add', '-q', '-b', 'agentboard/dirty', path.join(repo, '.agentboard', 'worktrees', 'dirty'));
+  fs.writeFileSync(path.join(repo, '.agentboard', 'worktrees', 'dirty', 'x'), 'wip');
+  const runner = new GitRunner();
+  const cleanup = new BranchCleanup({ runner, gitService: new GitService({ runner }), github: { pulls: async () => { throw new Error('no gh'); } } });
+  const busy = [path.join(repo, '.agentboard', 'worktrees', 'busy')];
+  const c = await cleanup.candidates(repo, busy);
+  assert.deepEqual(c.branches.map((b) => b.name), ['feat/merged']);
+  assert.deepEqual(c.worktrees.map((w) => [w.branch, w.removable]).sort(), [['agentboard/dirty', false], ['agentboard/idle', true]]);
+  const r = await cleanup.apply(repo, { branches: ['feat/merged', 'feat/open'], worktrees: c.worktrees.map((w) => w.dir).concat(busy) }, busy);
+  assert.deepEqual([r.branches, r.worktrees.length, r.errors], [['feat/merged'], 1, []]);
+  const left = String(git('branch', '--format=%(refname:short)')).split('\n').filter(Boolean).sort();
+  assert.deepEqual(left, ['agentboard/busy', 'agentboard/dirty', 'feat/open', 'main']);
+});
+
+test('the branch graph keeps parents, local branches and tags', () => {
+  const { GitService } = require('../src/main/git/GitService');
+  const U = '\x1f';
+  const [a, b] = GitService.parseGraph([
+    ['m1', 'p1 p2', 'Ana', '1700000000', 'HEAD -> main, origin/main, tag: v1.0', 'Merge feat/x'].join(U),
+    ['p2', 'p1', 'Bo', '1699999000', 'feat/x, origin/feat/x', 'Add x'].join(U),
+  ].join('\n'), new Set(['main', 'feat/x']));
+  assert.deepEqual([a.parents, a.branches, a.tags, a.head, a.at], [['p1', 'p2'], ['main'], ['v1.0'], true, 1700000000000]);
+  assert.deepEqual([b.branches, b.head, b.subject], [['feat/x'], false, 'Add x']);
 });

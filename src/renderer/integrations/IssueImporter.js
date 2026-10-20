@@ -5,7 +5,7 @@
 // their text is shown before you queue them: anyone can open an issue on a public repo.
 'use strict';
 /* global $, ab, esc, cfg, fmt, icon, tasks, addTask, composerDefaults, tickTasks, toast, openPopover, closePopover, basename,
-   toggleFlows, flowTemplates */
+   toggleFlows, flowTemplates, BranchOverview */
 
 class IssueImporter {
   constructor() {
@@ -37,7 +37,12 @@ class IssueImporter {
     return `<span class="is-label" title="Label: ${esc(l)}">${c ? `<i style="background:#${esc(c)}"></i>` : '<i></i>'}${esc(l)}</span>`;
   }
 
-  static row(i) {
+  // The branches (and their pull requests) already working on an issue.
+  static workChips(links = []) {
+    return links.map(({ branch, pr }) => `<span class="is-branch" title="Branch ${esc(branch)} works on this issue${pr ? `; pull request #${pr.number} is ${esc(pr.state)}` : ''}">${icon('branch', 10)} ${esc(branch)}${pr ? `<em>PR #${pr.number} ${esc(pr.state)}</em>` : ''}</span>`).join('');
+  }
+
+  static row(i, links) {
     const meta = [
       `<span class="mono">#${i.number}</span>`,
       i.createdAt ? `<span title="${esc(new Date(i.createdAt).toLocaleString())}">opened ${esc(fmt.ago(i.createdAt))}</span>` : '',
@@ -51,6 +56,7 @@ class IssueImporter {
         <span class="is-text">
           <span class="is-title">${esc(i.title)}</span>
           <span class="is-meta">${meta}</span>
+          ${links?.length ? `<span class="is-labels">${IssueImporter.workChips(links)}</span>` : ''}
           ${i.labels.length || !i.trusted ? `<span class="is-labels">${i.trusted ? '' : `<span class="tchip warn" title="${esc(i.author)} is not a collaborator of this repository: read the text before queuing it">${icon('alert', 10)} outside contributor</span>`}${i.labels.map((l) => IssueImporter.labelChip(i, l)).join('')}</span>` : ''}
         </span></label>
       <span class="is-actions">
@@ -70,8 +76,10 @@ class IssueImporter {
     pop.className = 'popover issues';
     pop.innerHTML = '<div class="hint">Loading issues…</div>';
     openPopover(pop, anchor, 480);
-    const r = await ab.githubIssues(d.cwd);
+    // branches and pull requests only add "in progress on…" chips: the list works without them
+    const [r, ov, pulls] = await Promise.all([ab.githubIssues(d.cwd), ab.gitOverview(d.cwd), ab.githubPulls(d.cwd)]);
     if (!pop.isConnected) return;
+    const links = ov.ok ? BranchOverview.issueLinks(ov.value.branches, pulls.ok ? pulls.value : {}) : {};
     if (!r.ok) { pop.innerHTML = `<div class="hint">${esc(r.error)}</div>`; return; }
     const done = IssueImporter.imported(d.cwd);
     const list = r.value.filter((i) => !done.has(i.number)).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
@@ -104,7 +112,7 @@ class IssueImporter {
     };
     const draw = () => {
       const vis = shown();
-      box.innerHTML = vis.map(IssueImporter.row).join('') || '<div class="hint">No issue matches this filter.</div>';
+      box.innerHTML = vis.map((i) => IssueImporter.row(i, links[i.number])).join('') || '<div class="hint">No issue matches this filter.</div>';
       box.querySelectorAll('[data-issue]').forEach((x) => { x.checked = picked.has(+x.value); x.closest('.is-item').classList.toggle('picked', x.checked); });
       pop.querySelectorAll('[data-label]').forEach((b) => b.classList.toggle('active', b.dataset.label === this.label));
       sync();
