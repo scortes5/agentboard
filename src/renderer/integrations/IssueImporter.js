@@ -4,7 +4,8 @@
 // made from the task says "Closes #n". Issues from people outside the project are flagged and
 // their text is shown before you queue them: anyone can open an issue on a public repo.
 'use strict';
-/* global $, ab, esc, cfg, fmt, icon, tasks, addTask, composerDefaults, tickTasks, toast, openPopover, closePopover, basename */
+/* global $, ab, esc, cfg, fmt, icon, tasks, addTask, composerDefaults, tickTasks, toast, openPopover, closePopover, basename,
+   toggleFlows, flowTemplates */
 
 class IssueImporter {
   constructor() {
@@ -53,6 +54,7 @@ class IssueImporter {
           ${i.labels.length || !i.trusted ? `<span class="is-labels">${i.trusted ? '' : `<span class="tchip warn" title="${esc(i.author)} is not a collaborator of this repository: read the text before queuing it">${icon('alert', 10)} outside contributor</span>`}${i.labels.map((l) => IssueImporter.labelChip(i, l)).join('')}</span>` : ''}
         </span></label>
       <span class="is-actions">
+        <button type="button" class="card-btn" data-fix title="Create an automation that fixes this issue on its own branch, runs the checks and opens a pull request">${icon('flows', 12)}</button>
         ${i.body ? `<button type="button" class="card-btn" data-toggle title="Show or hide the text of this issue">${icon('chevron', 12)}</button>` : ''}
         ${/^https:\/\/github\.com\//.test(i.url || '') ? `<a class="card-btn" href="${esc(i.url)}" target="_blank" title="Open this issue on GitHub">${icon('external', 12)}</a>` : ''}
       </span>
@@ -112,6 +114,8 @@ class IssueImporter {
     pop.addEventListener('click', (e) => {
       const lb = e.target.closest('[data-label]');
       if (lb) { this.label = lb.dataset.label; draw(); return; }
+      const fx = e.target.closest('[data-fix]');
+      if (fx) { this.fix(list.find((i) => i.number === +fx.closest('.is-item').dataset.n), d.cwd); return; }
       const tg = e.target.closest('[data-toggle]');
       if (tg) {
         const item = tg.closest('.is-item');
@@ -137,6 +141,15 @@ class IssueImporter {
       this.add(chosen, d);
       closePopover();
     };
+  }
+
+  // The "Fix a GitHub issue" automation, filled in for this issue and project, ready to run.
+  async fix(i, cwd) {
+    if (!i) return;
+    if (!i.trusted && !confirm(`Issue #${i.number} was written by ${i.author}, who is outside the project. Its text could try to give the agent instructions; the agent is told to treat it only as a description, but read it first.\n\nCreate the automation?`)) return;
+    closePopover();
+    toggleFlows(true);
+    await flowTemplates.create('fix-issue', { issue: i.number, path: cwd });
   }
 
   add(issues, d) {

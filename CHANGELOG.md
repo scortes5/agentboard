@@ -7,6 +7,10 @@ All notable changes to AgentBoard. The format follows [Keep a Changelog](https:/
 ## [1.9.0] - 2026-10-19
 
 ### Added
+- **"On error" paths in automations**: *Agent* and *Command* steps have a second, red output for what to do if they fail, for example an agent that fixes the failing tests. A failure handled this way no longer stops the run.
+- **Time limits for automation steps**: an *Agent* step can give up after a number of minutes (60 for new steps, no limit for existing ones), so a task left waiting for review no longer hangs the run; the task itself is left for you. A *Command* step's limit (10 minutes before) can now be set from 1 to 180 minutes.
+- **Pull requests in the Branches view**: each branch shows its pull request (open, draft, merged or closed) and, while it is open, whether its checks pass, fail or are running. Click it to open the PR on GitHub. Needs the `gh` CLI; without it, branches still show.
+- **Fix this issue**: a button on each issue in *Issues* creates the *Fix a GitHub issue* automation for it, ready to run.
 - **Branches view**: a branch button in the Tasks panel (and *All branches…* in a card's branch menu) lists every branch of the project, the ones being worked on first, with the tasks and agent cards on each, its worktree, last commit, commits ahead of and behind the main branch, and whether it is pushed. Switch to a branch or copy its name from there.
 - **Automation history**: the automations list shows when each one last ran, and its panel shows the next scheduled run and the last runs with their result and duration.
 
