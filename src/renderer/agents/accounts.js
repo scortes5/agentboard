@@ -25,7 +25,8 @@ async function openAccounts() {
   await renderAccounts();
 }
 
-async function renderAccounts() {
+async function renderAccounts(force = false) {
+  renderLimits(force === true);
   $('#catalogRows').innerHTML = '<span class="muted small">Checking what you have installed…</span>';
   $('#localRows').innerHTML = '<span class="muted small">Looking for local models…</span>';
   const [cat, local, avail] = await Promise.all([ab.catalogStatus(), ab.localModels(), ab.checkAgents()]);
@@ -35,6 +36,49 @@ async function renderAccounts() {
   renderCatalog();
   renderLocal(local);
   renderClaudeAccounts();
+}
+
+// ---------- Usage limits ----------
+// What is left of each subscription's 5-hour window and week, and when each resets.
+// Claude (every account) and Codex report it; other CLIs do not.
+function limitTargets() {
+  return Object.entries(cfg.agents).filter(([, a]) => !a.hidden).flatMap(([key, a]) => {
+    const cmd = (a.command || '').trim().split(/\s+/)[0];
+    if (isClaude(a)) return [{ key, kind: 'claude', dir: a.env?.CLAUDE_CONFIG_DIR, label: a.label, color: a.color }];
+    if (cmd === 'codex') return [{ key, kind: 'codex', label: a.label, color: a.color }];
+    return [];
+  });
+}
+
+// "at 15:30 · in 2 h 05 min", or the weekday when it is more than a day away.
+function resetText(ts) {
+  if (!ts) return 'reset since the last use: full';
+  const ms = ts - Date.now();
+  const when = ms > 864e5 ? new Date(ts).toLocaleString([], { weekday: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : fmt.clock(ts);
+  return `resets ${when} · in ${ms > 864e5 ? `${Math.floor(ms / 864e5)} d ${Math.floor(ms / 36e5) % 24} h` : fmt.wait(ms)}`;
+}
+
+async function renderLimits(force) {
+  const box = $('#limitRows');
+  const list = limitTargets();
+  if (!list.length) { box.innerHTML = '<span class="muted small">Add Claude or Codex to see their limits.</span>'; return; }
+  if (!box.children.length) box.innerHTML = '<span class="muted small">Asking for your limits…</span>';
+  const r = await ab.subscriptionLimits(list.map(({ key, kind, dir }) => ({ key, kind, dir })), force);
+  const data = r.ok ? r.value : {};
+  box.innerHTML = list.map((t) => {
+    const d = data[t.key] || { error: r.error || 'No data.' };
+    const bars = d.windows?.length ? d.windows.map((w) => {
+      const left = Math.max(0, 100 - w.used);
+      const level = w.used >= 90 ? 'bad' : w.used >= 70 ? 'warn' : 'ok';
+      return `<div class="limit"><span class="limit-name">${esc(w.label)}</span>
+        <span class="limit-bar ${level}" title="${w.used}% used"><i style="width:${w.used}%"></i></span>
+        <span class="limit-left"><b>${left}%</b> left</span><small>${esc(resetText(w.resetsAt))}</small></div>`;
+    }).join('') : `<small class="muted">${esc(d.error || 'No data.')}</small>`;
+    const sub = [d.plan, d.asOf && t.kind === 'codex' ? `as of ${fmt.ago(d.asOf)}` : ''].filter(Boolean).join(' · ');
+    return `<div class="hub-row limit-row"><span class="dot" style="background:${esc(t.color)};color:${esc(t.color)}"></span>
+      <span class="meta"><strong>${esc(t.label)}</strong>${sub ? `<small>${esc(sub)}</small>` : ''}</span>
+      <div class="limits-list">${bars}</div></div>`;
+  }).join('');
 }
 
 // ---------- Multiple Claude accounts ----------
@@ -225,4 +269,4 @@ function renderLocal(local) {
 
 $('#accountsBtn').onclick = openAccounts;
 $('#moreAgents').onclick = openAccounts;
-$('#accountsRefresh').onclick = renderAccounts;
+$('#accountsRefresh').onclick = () => renderAccounts(true);
