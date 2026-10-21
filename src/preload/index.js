@@ -85,6 +85,7 @@ contextBridge.exposeInMainWorld('ab', {
   workRecent: () => ipcRenderer.invoke('work:recent'),
   usageScan: (tasks) => ipcRenderer.invoke('usage:scan', tasks),
   usageSessions: (ids) => ipcRenderer.invoke('usage:sessions', ids),
+  subscriptionLimits: (list, force) => ipcRenderer.invoke('limits:get', list, force),
   localModels: () => ipcRenderer.invoke('local:models'),
   pickFolder: () => ipcRenderer.invoke('dialog:pickFolder'),
   openPath: (p) => ipcRenderer.invoke('shell:openPath', p),

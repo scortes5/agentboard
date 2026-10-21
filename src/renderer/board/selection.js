@@ -123,6 +123,7 @@ function wireCard(c, el) {
       const act = btn.dataset.act;
       if (act === 'close') closeCard(c);
       else if (act === 'restart') restartCard(c);
+      else if (act === 'lock') setCardLocked(c, !c.locked);
       else if (act === 'zoom') focusCardView(c);
       else if (act === 'edit') editMenu(c, btn);
       else if (act === 'open') ab.openPath(c.cwd);

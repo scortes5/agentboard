@@ -432,10 +432,14 @@
       <span class="eyebrow">Your accounts, on your computer</span>
       <h2>Subscriptions and Models</h2>
       <p class="muted small">Each CLI signs in with your subscription and keeps the session on this computer.
-        AgentBoard only checks that it exists: it never reads, copies or sends your tokens. Local models run on your machine, with no account.</p>
+        AgentBoard never copies your tokens; to show Claude's usage limits it reads the CLI's sign-in on this computer and sends it only to Anthropic. Local models run on your machine, with no account.</p>
 
       <h3>Subscriptions and CLIs</h3>
       <div id="catalogRows" class="rows"></div>
+
+      <h3>Usage Limits</h3>
+      <p class="muted small">How much is left of each subscription's 5-hour window and week, and when each one resets.</p>
+      <div id="limitRows" class="rows"></div>
 
       <h3>Claude Accounts</h3>
       <p class="muted small">Have more than one Claude subscription (personal and work, or two plans)? Add them: each one uses its own folder and session,
