@@ -658,7 +658,8 @@ async function summarizeRun(f, last, entry) {
 }
 
 function runMarkdown(f, last) {
-  const cell = (s) => String(s).replace(/\|/g, '\\|').replace(/\s+/g, ' ').slice(0, 200);
+  // backslashes first, so a "\|" in the text cannot undo the pipe's escape and split the cell
+  const cell = (s) => String(s).replace(/\s+/g, ' ').slice(0, 200).replace(/[\\|]/g, '\\$&');
   return [`## ${f.name} — ${new Date(last.at).toLocaleString()} (${last.stopped ? 'stopped' : last.ok ? 'no errors' : 'with errors'})`, '',
     ...(last.summary ? [last.summary, ''] : []),
     '| Step | Status | Time | Tokens | Result |', '|---|---|---|---|---|',
