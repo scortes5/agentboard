@@ -127,7 +127,10 @@ function taskPrompt(t, subagents = false) {
   return `[AgentBoard task ${t.id}] ${t.text}\n`
     + issuePrompt(t.issue)
     + groundRules.forTask(t)
-    + '(Only this, keep it short; use the agentboard-task skill if you have it. When finished, call complete_task if available and end with the line «DONE: …» or «BLOCKED: …».)'
+    + (t.groupBranch ? `(You work on branch ${t.branch}, shared with the other agents of group "${t.group}". Commit your own changes as you go with short, clear messages, staging only the files you changed. Do not push, switch branches or rewrite history.)\n` : '')
+    + '(Only this, keep it short; use the agentboard-task skill if you have it. When finished, call complete_task if available and end with ONE line in this format: '
+    + '«DONE: <what you did> | files: <main files changed> | checked: <how you verified it, or "not checked"> | pending: <what is left, or "nothing">» '
+    + 'or «BLOCKED: <what stops you> | needs: <what you need to continue>».)'
     + `\n${NO_LOOPS}`
     + (subagents && !t.light
       ? `\n(If the task has parts that can be done at the same time, split it: open up to ${max} helpers with the AgentBoard tool start_agent — light=true for simple parts, each with a self-contained message — so they work in parallel on the user's board next to you. Follow them with read_agent_output, check and combine their work, then write your own DONE line. Do not split small tasks.)`
@@ -144,7 +147,12 @@ async function startTask(t, key) {
   // The project chosen when the task was added, never the one open now (null = home folder).
   let cwd = t.cwd || null;
   const wantWorktree = t.worktree ?? cfg.taskWorktrees;
-  if (wantWorktree && cwd) {
+  const groupBranch = cfg.groupBranches && t.group && t.worktree !== false && cwd;
+  if (groupBranch) {
+    const r = await ab.gitGroupWorktree(cwd, t.group);
+    if (r.ok) { cwd = r.value.dir; t.branch = r.value.branch; t.workdir = r.value.dir; t.base = r.value.base; t.groupBranch = true; }
+    else toast(`No branch for group ${esc(t.group)} (${esc(r.error)}); using the project folder.`, 5000);
+  } else if (wantWorktree && cwd) {
     const r = await ab.gitWorktree(cwd, t.text.split(/\s+/).slice(0, 5).join(' '));
     if (r.ok) { cwd = r.value.dir; t.branch = r.value.branch; t.workdir = r.value.dir; t.base = r.value.base; }
     else toast(`No worktree for this task (${esc(r.error)}); using the project folder.`, 5000);
@@ -161,7 +169,7 @@ async function startTask(t, key) {
   const title = t.text.length > 34 ? t.text.slice(0, 32).trim() + '…' : t.text;
   await refreshBridgeStatus();
   const card = newCard('term', key, {
-    cwd, title, args: t.light ? (a.lightArgs || '') : t.heavy ? (a.heavyArgs || '') : '', prompt: taskPrompt(t, canOpenSubagents(key)), taskId: t.id, noFocus: true, ...pos,
+    cwd, title, args: tierArgs(a, t), prompt: taskPrompt(t, canOpenSubagents(key)), taskId: t.id, noFocus: true, ...pos,
   });
   if (!card) { t.status = 'pending'; taskRt.delete(t.id); save(); renderTasks(); return; }
   t.cardId = card.id;
@@ -171,6 +179,12 @@ async function startTask(t, key) {
   save(); renderTasks();
   setTimeout(() => { const rt = taskRt.get(t.id); if (rt) rt.dispatching = false; }, 4000);
   toast(`Task → <b>${esc(a.label)}</b>${g ? ` in ${esc(g.title)}` : ''}: ${esc(title)}`);
+}
+
+// The model for a task: ! light, !! heavy, otherwise the mid tier (sonnet-class), so plain
+// tasks do not run on the CLI's default, most expensive model.
+function tierArgs(a, t) {
+  return (t.light ? a.lightArgs : t.heavy ? a.heavyArgs : a.normalArgs) || '';
 }
 
 // A task with "after" waits until every task it depends on is done.
@@ -191,16 +205,48 @@ function dispatchQueued(onlyFlows = false) {
 }
 
 // Look for «DONE: …» / «BLOCKED: …» at the end of the terminal (HECHO/BLOQUEADO from older
-// prompts still count). The echo of our own instruction says «DONE: …» and is skipped by the "…".
+// prompts still count). The echo of our own instruction («DONE: <what you did> | …») is skipped
+// by its "<" or "…". The CLIs wrap a long line onto indented rows: those are joined back.
 // ignore: markers already handled (e.g. a DONE whose checks failed and was sent back).
+const MARKER_MAX = 600;
 function findMarker(c, ignore = []) {
-  const lines = terminalTail(c, 30).split('\n').reverse();
-  for (const line of lines) {
-    const m = line.match(/(?:^|[\s●⏺•>*✦│])(DONE|BLOCKED|HECHO|BLOQUEADO):\s*(.+?)\s*$/);
-    if (!m || m[2].startsWith('…') || m[2].length < 3 || ignore.includes(m[2].slice(0, 300))) continue;
-    return { status: /^(DONE|HECHO)$/.test(m[1]) ? 'done' : 'blocked', text: m[2].slice(0, 300) };
+  const lines = terminalTail(c, 40).split('\n');
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const m = lines[i].match(/(?:^|[\s●⏺•>*✦│])(DONE|BLOCKED|HECHO|BLOQUEADO):\s*(.+?)\s*$/);
+    if (!m || /^[…<]/.test(m[2]) || m[2].length < 3) continue;
+    let text = m[2];
+    for (let j = i + 1; j < lines.length; j++) {
+      const next = lines[j].trim();
+      if (!next || NOISE_RE.test(next) || /^[─━│┃╭╰>❯›⏺●]/.test(next)) break;
+      text += ' ' + next;
+    }
+    text = text.replace(/\s+/g, ' ').slice(0, MARKER_MAX);
+    if (ignore.includes(text) || ignore.includes(m[2].slice(0, 300))) continue;
+    return { status: /^(DONE|HECHO)$/.test(m[1]) ? 'done' : 'blocked', text };
   }
   return null;
+}
+
+// «did X | files: a, b | checked: npm test | pending: nothing» → { did, files, checked, pending, needs }
+// (older one-line summaries come back as { did }).
+function parseResult(summary) {
+  const out = {};
+  String(summary || '').split(/\s+\|\s+/).forEach((part, i) => {
+    const m = part.match(/^(files|checked|pending|needs)\s*:\s*(.*)$/i);
+    if (m) out[m[1].toLowerCase()] = m[2].trim();
+    else if (i === 0) out.did = part.trim();
+    else out.did = `${out.did || ''} | ${part}`.trim();
+  });
+  return out;
+}
+
+// The result of a task as labeled rows; the files git saw changed win over what the agent listed.
+function resultHtml(t) {
+  const r = parseResult(t.summary);
+  const files = t.files?.length ? `${t.fileCount || t.files.length} changed: ${t.files.slice(0, 6).join(', ')}${(t.fileCount || 0) > 6 ? '…' : ''}` : r.files;
+  const rows = [['Result', r.did], ['Files', files], ['Checked', r.checked], ['Pending', r.pending], ['Needs', r.needs]].filter(([, v]) => v);
+  if (rows.length <= 1) return `<div class="tsum">${esc(t.summary)}</div>`;
+  return `<dl class="tsum tres">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('')}</dl>`;
 }
 
 // "Claude usage limit reached… resets 3pm", "You've hit your usage limit… try again in 2 hours"
@@ -251,7 +297,13 @@ function finishTask(t, status, summary) {
   if (changed) {
     notifyDesktop(status === 'done' ? 'completed' : 'blocked', t);
     ab.workFinish({ id: t.id, text: t.text, agent: t.assigned, status, summary: t.summary, cwd: t.runDir || t.workdir || t.cwd, startedAt: t.startedAt, finishedAt: t.finishedAt })
-      .then((r) => { if (!r.ok) console.warn('Work summary:', r.error); });
+      .then((r) => {
+        if (!r.ok) return console.warn('Work summary:', r.error);
+        // what git saw change, for the task's result (more reliable than the agent's own list)
+        t.files = r.value.files.filter((f) => !f.preexisting).map((f) => f.path).slice(0, 12);
+        t.fileCount = r.value.fileCount;
+        save(); renderTasks();
+      });
   }
   taskPipeline.afterFinish(t);
   if (changed) onTaskFinished(t, status); // automations that start when a task ends
@@ -277,6 +329,8 @@ function tickTasks() {
   const now = Date.now();
   for (const t of tasks()) {
     if (t.status !== 'running' && t.status !== 'review') continue;
+    // still being set up (worktree, checkpoint…): it has no card yet, which is not "closed"
+    if (taskRt.get(t.id)?.dispatching) continue;
     const c = t.cardId && cardData(t.cardId);
     const rt = c && runtime.get(c.id);
     if (!c || !rt) {
@@ -332,6 +386,7 @@ function renderTaskOptions() {
   $('#taskParallel').value = cfg.maxParallel || 3;
   $('#taskPerAgent').value = cfg.perAgentParallel || 2;
   $('#taskWorktree').checked = !!cfg.taskWorktrees;
+  $('#taskGroupBranch').checked = !!cfg.groupBranches;
   $('#taskRoute').checked = cfg.taskRoute !== false;
   const auto = new Set(autoAgents());
   const time = (ms) => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -383,7 +438,7 @@ function renderTasks() {
       t.group ? chip(esc(t.group)) : '',
       t.light ? chip('light', 'light') : '',
       t.heavy ? chip('heavy', 'heavy') : '',
-      t.branch ? chip(icon('branch', 11) + ' ' + esc(t.branch.replace(/^agentboard\//, '')), 'branch') : '',
+      t.branch ? chip(icon('branch', 11) + ' ' + esc(t.branch.replace(/^agentboard\//, '')) + (t.commit ? ` · ${esc(t.commit)}` : '') + (t.pushed ? ' · pushed' : ''), 'branch') : '',
       t.from ? chip('from ' + esc(cardData(t.from)?.title || 'an agent')) : '',
       t.flowRun ? chip('automation') : '',
       t.after?.length && !depsReady(t) ? chip('after: ' + esc((taskById(t.after[0])?.text || 'another task').slice(0, 30)), 'wait') : '',
@@ -405,20 +460,22 @@ function renderTasks() {
     const del = B('del', 'trash', 'Delete the task');
     const open = taskCards(t).length;
     const close = open ? B('close', 'close', open === 1 ? 'Close its terminal' : `Close its ${open} terminals: the agent and the subagents it opened`) : '';
+    const main = t.cardId && cardData(t.cardId);
+    const lock = main ? `<button data-a="lock" class="${main.locked ? 'on' : ''}" title="${main.locked ? 'Its terminal is locked: it stays open when the task finishes. Click to unlock' : 'Lock its terminal so it stays open when the task finishes'}">${icon('lock', 14)}</button>` : '';
     const acts = {
       pending: B('top', 'up', 'Move to the top of the queue') + B('run', 'play', 'Run now, without waiting for the queue') + del,
-      running: go + done + close,
-      verifying: go + close,
-      review: wt + go + done + close,
-      blocked: wt + undo + go + retry + done + close,
-      done: wt + undo + retry + close + del,
+      running: go + lock + done + close,
+      verifying: go + lock + close,
+      review: wt + go + lock + done + close,
+      blocked: wt + undo + go + lock + retry + done + close,
+      done: wt + undo + retry + lock + close + del,
     }[t.status];
     return `<div class="task st-${t.status}" data-id="${esc(t.id)}">
       <span class="tdot" title="${STATUS[t.status]}"></span>
       <div class="tmain">
         <div class="ttext" title="Double-click to edit">${esc(t.text)}</div>
         <div class="tmeta">${meta}</div>
-        ${t.summary ? `<div class="tsum">${esc(t.summary)}</div>` : ''}
+        ${t.summary ? resultHtml(t) : ''}
         ${['running', 'review', 'verifying'].includes(t.status) ? `<div class="tlive" data-live="${esc(t.id)}"></div>` : ''}
         ${t.needsTrust ? '<div class="tsum warn">It asks whether you trust the folder. <button class="inline" data-a="trust" title="Answer that you trust this folder so the task continues">Trust and Continue</button></div>'
           : t.status === 'review' ? '<div class="tsum warn">The agent is waiting: check whether it finished or asked you something.</div>' : ''}
@@ -501,9 +558,10 @@ function taskCards(t) {
 }
 
 // One confirmation for all of them; a running task whose card closes goes to review.
-function closeTaskCards(list) {
-  const cards = [...new Set(list.flatMap(taskCards))];
-  if (!cards.length) { toast('No terminals are open for these tasks.'); return; }
+// keepLocked: leave locked terminals open (bulk close); one task's own Close button closes all.
+function closeTaskCards(list, { keepLocked = false } = {}) {
+  const cards = [...new Set(list.flatMap(taskCards))].filter((c) => !keepLocked || !c.locked);
+  if (!cards.length) { toast(keepLocked ? 'No unlocked terminals are open for these tasks.' : 'No terminals are open for these tasks.'); return; }
   if (closeCards(cards)) { tickTasks(); renderTasks(); }
 }
 
@@ -531,6 +589,10 @@ $('#taskList').addEventListener('click', (e) => {
     finishTask(t, 'done', t.summary || 'Marked by hand.'); save(); renderTasks();
   } else if (act === 'close') {
     closeTaskCards([t]);
+  } else if (act === 'lock') {
+    // the agent and every subagent it opened follow the main card
+    const c = t.cardId && cardData(t.cardId);
+    if (c) { const on = !c.locked; for (const k of taskCards(t)) setCardLocked(k, on); }
   } else if (act === 'trust') {
     acceptTrust(t);
   } else if (act === 'top') {
@@ -730,6 +792,7 @@ function initTasks() {
   });
   $('#taskAuto').onchange = (e) => { cfg.taskAuto = e.target.checked; save(); tickTasks(); };
   $('#taskWorktree').onchange = (e) => { cfg.taskWorktrees = e.target.checked; save(); };
+  $('#taskGroupBranch').onchange = (e) => { cfg.groupBranches = e.target.checked; save(); };
   $('#taskRoute').onchange = (e) => { cfg.taskRoute = e.target.checked; save(); };
   $('#taskParallel').onchange = (e) => { cfg.maxParallel = clamp(+e.target.value || 3, 1, 12); e.target.value = cfg.maxParallel; save(); tickTasks(); };
   $('#taskPerAgent').onchange = (e) => { cfg.perAgentParallel = clamp(+e.target.value || 2, 1, 6); e.target.value = cfg.perAgentParallel; save(); tickTasks(); };
@@ -748,7 +811,7 @@ function initTasks() {
       renderTasks();
     }
   });
-  $('#taskCloseDone').onclick = () => closeTaskCards(tasks().filter((t) => t.status === 'done' || t.status === 'blocked'));
+  $('#taskCloseDone').onclick = () => closeTaskCards(tasks().filter((t) => t.status === 'done' || t.status === 'blocked'), { keepLocked: true });
   $('#taskClear').onclick = () => { cfg.tasks = tasks().filter((t) => t.status !== 'done'); save(); renderTasks(); };
   $('#taskSummary').onclick = dailySummary;
 }

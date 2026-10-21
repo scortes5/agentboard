@@ -325,3 +325,77 @@ test('the branch graph keeps parents, local branches and tags', () => {
   assert.deepEqual([a.parents, a.branches, a.tags, a.head, a.at], [['p1', 'p2'], ['main'], ['v1.0'], true, 1700000000000]);
   assert.deepEqual([b.branches, b.head, b.subject], [['feat/x'], false, 'Add x']);
 });
+
+test('a group shares one worktree and branch, committed task by task and pushed to origin', async () => {
+  const { execFileSync } = require('child_process');
+  const { GitRunner } = require('../src/main/git/GitRunner');
+  const { WorktreeService } = require('../src/main/git/WorktreeService');
+  Object.assign(process.env, { GIT_AUTHOR_NAME: 'T', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 'T', GIT_COMMITTER_EMAIL: 't@t' });
+  const repo = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'group-')));
+  const remote = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'group-remote-')));
+  const git = (cwd, ...a) => String(execFileSync('git', a, { cwd, stdio: 'pipe' })).trim();
+  git(remote, 'init', '-q', '--bare');
+  git(repo, 'init', '-q', '-b', 'main');
+  fs.writeFileSync(path.join(repo, 'a'), '1'); git(repo, 'add', '.'); git(repo, 'commit', '-qm', 'one');
+  const wt = new WorktreeService({ runner: new GitRunner() });
+  const [a, b] = await Promise.all([wt.forGroup(repo, 'Login Page'), wt.forGroup(repo, 'Login Page')]);
+  assert.equal(a.branch, 'agentboard/group-login-page');
+  assert.equal(b.dir, a.dir);
+  assert.equal(a.base, git(repo, 'rev-parse', 'HEAD'));
+  assert.deepEqual(await wt.commitWork(a.dir, 'nothing'), { committed: false });
+  fs.writeFileSync(path.join(a.dir, 'b'), '2');
+  assert.equal((await wt.commitWork(a.dir, 'task one')).committed, true);
+  await assert.rejects(wt.pushBranch(a.dir, a.branch), /no "origin" remote/);
+  git(repo, 'remote', 'add', 'origin', remote);
+  assert.deepEqual(await wt.pushBranch(a.dir, a.branch), { remote: 'origin', pending: false });
+  assert.equal(git(remote, 'log', '-1', '--format=%s', a.branch), 'task one');
+  // Only the branch left (worktree removed): it is checked out again with its commits.
+  git(repo, 'worktree', 'remove', a.dir);
+  const again = await wt.forGroup(repo, 'Login Page');
+  assert.equal(fs.readFileSync(path.join(again.dir, 'b'), 'utf8'), '2');
+  assert.equal(again.base, git(repo, 'rev-parse', 'HEAD'));
+});
+
+test('branch sync fast-forwards safely, pushes picked branches and tracks remote ones', async () => {
+  const { execFileSync } = require('child_process');
+  const { GitRunner } = require('../src/main/git/GitRunner');
+  const { GitService } = require('../src/main/git/GitService');
+  const { BranchSync } = require('../src/main/git/BranchSync');
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'sync-')));
+  const run = (cwd, ...a) => String(execFileSync('git', ['-c', 'user.name=T', '-c', 'user.email=t@t', ...a], { cwd, stdio: 'pipe' }));
+  const hub = path.join(root, 'hub.git'), me = path.join(root, 'me'), other = path.join(root, 'other');
+  run(root, 'init', '-q', '--bare', '-b', 'main', hub);
+  run(root, 'clone', '-q', hub, other);
+  fs.writeFileSync(path.join(other, 'a'), '1'); run(other, 'add', '.'); run(other, 'commit', '-qm', 'one');
+  for (const b of ['feat/behind', 'feat/diverged']) run(other, 'branch', b);
+  run(other, 'push', '-q', 'origin', 'main', 'feat/behind', 'feat/diverged');
+  run(root, 'clone', '-q', hub, me);
+  for (const b of ['feat/behind', 'feat/diverged']) run(me, 'branch', '--track', b, `origin/${b}`);
+  // someone else moves main and both branches on GitHub, and adds a new branch
+  const commitOn = (cwd, branch, file) => { run(cwd, 'checkout', '-q', branch); fs.writeFileSync(path.join(cwd, file), file); run(cwd, 'add', '.'); run(cwd, 'commit', '-qm', file); };
+  commitOn(other, 'main', 'm2'); commitOn(other, 'feat/behind', 'b2'); commitOn(other, 'feat/diverged', 'd2');
+  run(other, 'checkout', '-q', '-b', 'feat/remote'); run(other, 'push', '-q', 'origin', 'main', 'feat/behind', 'feat/diverged', 'feat/remote');
+  commitOn(me, 'feat/diverged', 'mine'); run(me, 'checkout', '-q', 'main'); // a local commit too
+  const runner = new GitRunner();
+  const sync = new BranchSync({ runner, gitService: new GitService({ runner }) });
+
+  const auto = await sync.pull(me, { auto: true });
+  assert.deepEqual(auto.updated.map((u) => u.name), ['feat/behind']);
+  assert.deepEqual(auto.skipped.map((s) => s.name).sort(), ['feat/diverged', 'main']);
+  const full = await sync.pull(me);
+  assert.deepEqual(full.updated.map((u) => u.name), ['main']);
+  assert.ok(fs.existsSync(path.join(me, 'm2')), 'the checked-out branch moved forward');
+
+  run(me, 'branch', 'feat/new');
+  const p = await sync.push(me, ['feat/new', 'feat/diverged', '--delete']);
+  assert.deepEqual(p.pushed, ['feat/new']);
+  assert.match(p.failed[0].why, /pull it first/);
+  assert.match(run(me, 'ls-remote', 'origin', 'feat/new'), /refs\/heads\/feat\/new/);
+  assert.equal(run(me, 'rev-parse', '--abbrev-ref', 'feat/new@{u}').trim(), 'origin/feat/new');
+
+  const ov = await new GitService({ runner }).overview(me);
+  assert.deepEqual(ov.remoteOnly.map((r) => r.name), ['feat/remote']);
+  await sync.track(me, 'feat/remote');
+  await assert.rejects(sync.track(me, '../x'), /Invalid branch name/);
+  assert.equal(run(me, 'rev-parse', '--abbrev-ref', 'feat/remote@{u}').trim(), 'origin/feat/remote');
+});

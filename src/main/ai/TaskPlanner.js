@@ -21,7 +21,7 @@ class TaskPlanner {
       `[{"text":"clear, self-contained instruction","agent":"auto|${names}","light":true|false,"heavy":true|false,"project":"name or empty","group":"short label or empty","after":-1}]`,
       'after: the index (0-based, in this same list) of an earlier task that must finish first, or -1 when it can start right away. Prefer -1: only use it when the task really needs the other\'s result.',
       'Split a large request into tasks that touch different files or areas, so agents do not step on each other; keep small requests as one task.',
-      'light=true for simple work (docs, renames, a small test, a question); heavy=true only for hard work (architecture, tricky bugs, large refactors); never both.',
+      'light=true for simple work (docs, renames, config tweaks, a small test, a small fix in one file, a question); heavy=true only for hard work (architecture, tricky bugs, large refactors); never both. Tasks with neither run on a mid-tier model; when in doubt between light and normal, pick light.',
       'Use "auto" unless the text asks for a specific agent.',
       ...(local.length ? [`These agents run local models for free: ${local.join(', ')}. Send them trivial tasks (renames, docs, small questions) with light=true.`] : []),
       ...(history ? [`How each agent did on past tasks: ${history}. When a task is clearly the kind one agent is better at, pick it; otherwise use "auto".`] : []),

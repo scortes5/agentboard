@@ -66,7 +66,8 @@ function mountCard(c, { resume }) {
       <span class="spacer"></span>
       ${c.type === 'term' ? `<span class="alertpill hidden" title="">${icon('alert', 12)}</span><span class="tokpill hidden"></span><span class="gitpill hidden"></span>
         <button class="card-btn" data-act="open" title="Open the project folder in Finder">${icon('folder', 14)}</button>
-        <button class="card-btn" data-act="restart" title="Restart the agent (resumes its session)">${icon('refresh', 14)}</button>` : ''}
+        <button class="card-btn" data-act="restart" title="Restart the agent (resumes its session)">${icon('refresh', 14)}</button>
+        <button class="card-btn lockbtn" data-act="lock">${icon('lock', 14)}</button>` : ''}
       <button class="card-btn" data-act="edit" title="${c.type === 'term' ? 'Change name, agent, project or arguments; send context to another agent' : 'Edit or duplicate the note'}">${icon('more', 14)}</button>
       <button class="card-btn" data-act="zoom" title="Focus this card (fills the view)">${icon('focus', 14)}</button>
       <button class="card-btn" data-act="close" title="Close the card and stop its process">${icon('close', 14)}</button>
@@ -103,7 +104,25 @@ function mountCard(c, { resume }) {
   }
 
   layoutCard(c);
+  refreshLock(c);
   wireCard(c, el);
+}
+
+// ---------- Locked cards ----------
+// A locked terminal is never closed or stopped on its own: not when its task is done, not when
+// it sits idle, not by "close finished". Closing it by hand still works.
+function refreshLock(c) {
+  const btn = runtime.get(c.id)?.el.querySelector('.lockbtn');
+  if (!btn) return;
+  btn.classList.toggle('on', !!c.locked);
+  btn.title = c.locked ? 'Locked: never closed automatically. Click to unlock' : 'Lock: keep this terminal open when its task finishes or it goes idle';
+}
+
+function setCardLocked(c, on) {
+  c.locked = !!on;
+  refreshLock(c);
+  save();
+  if (typeof renderTasks === 'function') renderTasks();
 }
 
 // ---------- Each card's command ----------
@@ -120,10 +139,15 @@ function newSessionId() {
 }
 const usesPowerShell = () => platform === 'win32' && (!cfg.shell || /pwsh|powershell/i.test(cfg.shell));
 const usesCmd = () => platform === 'win32' && /(^|\\)cmd(\.exe)?(\s|$)/i.test(cfg.shell || '');
+// PowerShell also ends a single-quoted string at the typographic quotes U+2018–U+201B, so each
+// is doubled too: task text can come from GitHub issues, the phone page or other agents.
 function shellQuote(s) {
-  if (usesPowerShell()) return "'" + s.replace(/'/g, "''") + "'";
+  if (usesPowerShell()) return "'" + s.replace(/['‘-‛]/g, '$&$&') + "'";
   return "'" + s.replace(/'/g, "'\\''") + "'";
 }
+// Control characters in a task (Ctrl-C, ESC, end of bracketed paste…) could cancel or escape the
+// typed line, so they are dropped; tabs and line breaks stay.
+const cleanPrompt = (s) => s.replace(/[\x00-\x08\x0b-\x1f\x7f]/g, '');
 function orElse(a, b) { return usesPowerShell() ? `${a}; if (-not $?) { ${b} }` : `${a} || ${b}`; }
 // How an agent receives its first task: as an argument (independent of when the
 // TUI finishes starting) or pasted into the terminal (unknown CLIs, cmd.exe).
@@ -142,7 +166,7 @@ function commandFor(c, resume) {
   else if (resume && cfg.resumeOnOpen) parts.push(a.resumeArgs);
   const mode = promptMode(a);
   if (c.prompt && !c.promptSent && mode !== 'paste') {
-    parts.push((mode === 'arg' ? '' : mode + ' ') + shellQuote(c.prompt.replace(/\s*\n\s*/g, ' ').trim()));
+    parts.push((mode === 'arg' ? '' : mode + ' ') + shellQuote(cleanPrompt(c.prompt).replace(/\s*\n\s*/g, ' ').trim()));
   }
   const cmd = parts.filter(Boolean).join(' ');
   // if the saved session no longer exists (nothing was ever typed), open a new one with the same id
@@ -169,7 +193,7 @@ async function startPty(c, resume) {
     c.promptSent = true; dirty = true;
     if (promptMode(agentOf(c)) === 'paste') {
       await waitReady(c.id);
-      await ab.ptyPaste(c.id, c.prompt);
+      await ab.ptyPaste(c.id, cleanPrompt(c.prompt));
     }
   }
   if (dirty) save();

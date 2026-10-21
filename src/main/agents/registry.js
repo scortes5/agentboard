@@ -32,4 +32,10 @@ function defaultAgents(providers = loadProviders()) {
   return agents;
 }
 
-module.exports = { loadProviders, defaultAgents, validateProvider };
+// Default args a provider used before (key -> { field: [old values] }), so saved boards that
+// never changed them move to the current defaults.
+function previousArgs(providers = loadProviders()) {
+  return Object.fromEntries(providers.filter((p) => p.previousArgs).map((p) => [p.key, p.previousArgs]));
+}
+
+module.exports = { loadProviders, defaultAgents, previousArgs, validateProvider };

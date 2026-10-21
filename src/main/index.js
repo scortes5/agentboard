@@ -18,6 +18,7 @@ const { GroundRules } = require('./agents/GroundRules');
 const { SkillLibrary } = require('./library/SkillLibrary');
 const { SkillPack } = require('./library/SkillPack');
 const { UsageService } = require('./library/UsageService');
+const { SubscriptionLimits } = require('./library/SubscriptionLimits');
 const { TaskPlanner } = require('./ai/TaskPlanner');
 const { AgentBridge } = require('./bridge/AgentBridge');
 const { Updater } = require('./updates/Updater');
@@ -25,6 +26,7 @@ const { RemoteServer } = require('./remote/RemoteServer');
 const { WebhookNotifier } = require('./integrations/WebhookNotifier');
 const { GitHubIssues } = require('./integrations/GitHubIssues');
 const { BranchCleanup } = require('./git/BranchCleanup');
+const { BranchSync } = require('./git/BranchSync');
 const { SecretVault } = require('./secrets/SecretVault');
 const { CommandRunner } = require('./flows/CommandRunner');
 const { AuditLog } = require('./security/AuditLog');
@@ -91,11 +93,12 @@ application = new App({
     gitService, new WorktreeService({ runner, gitService, shellEnv }),
     new AgentCatalog({ config, shellEnv }), new LocalModels({ shellEnv }), claudeAccounts,
     new GroundRules({ config, claudeAccounts }),
-    new SkillLibrary({ config }), new SkillPack({ claudeAccounts }), new UsageService({ dataDir, claudeAccounts }),
+    new SkillLibrary({ config }), new SkillPack({ claudeAccounts }), new UsageService({ dataDir, claudeAccounts }), new SubscriptionLimits(),
     desktopNotifications, new WorkLog({ file: path.join(dataDir, 'work-log.json'), runner }),
     new TaskPlanner({ shellEnv }), new CommandRunner({ shellEnv, vault, audit }), vault, audit,
     new RemoteServer({ config, send, audit, tls: new TlsIdentity({ dataDir }) }), new WebhookNotifier({ vault }), github,
     new BranchCleanup({ runner, gitService, github, audit }),
+    new BranchSync({ runner, gitService, audit }),
   ],
 });
 application.start();

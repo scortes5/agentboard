@@ -34,7 +34,7 @@ ab.onBridgeNewCard(async ({ reqId, agent, cwd, title, light, from }) => {
     return ab.bridgeCardCreated(reqId, null);
   }
   const c = cfg.agents[agent] ? newCard('term', agent, {
-    cwd, title: title || (parent ? `↳ ${cfg.agents[agent].label}` : undefined), args: light ? (cfg.agents[agent].lightArgs || '') : '', parent: from,
+    cwd, title: title || (parent ? `↳ ${cfg.agents[agent].label}` : undefined), args: (light ? cfg.agents[agent].lightArgs : cfg.agents[agent].normalArgs) || '', parent: from,
     noFocus: !!parent, ...(parent ? spotNear(parent) : {}),
   }) : null;
   if (c && parent?.taskId) c.parentTask = parent.taskId;

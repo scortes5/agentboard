@@ -3,7 +3,7 @@
 // of the previous steps = few tokens); independent branches run in parallel.
 'use strict';
 /* global ab, cfg, fmt, SecretsSettings, ISSUE_CAUTION, $, esc, uid, basename, clamp, toast, save, addTask, taskById, subscriptions, agentKeyFrom, projectFrom,
-   openTasks, tickTasks, diagramOpen, toggleDiagram, cardData, focusCardView, focusCard, icon */
+   openTasks, tickTasks, diagramOpen, toggleDiagram, cardData, focusCardView, focusCard, icon, liveOf */
 
 const NODE_TYPES = {
   trigger:   { icon: 'bolt', label: 'Trigger', color: '#ffd60a', hint: 'When it starts: by hand, on a schedule, when a task finishes or when a new GitHub issue is opened.' },
@@ -120,6 +120,7 @@ function renderFlow({ keepInspector = false } = {}) {
   box.innerHTML = f.nodes.map((n) => {
     const T = NODE_TYPES[n.type];
     const st = run?.status[n.id] || '';
+    const live = liveStep(f, n);
     const ports = n.type === 'note' ? ''
       : `${n.type !== 'trigger' ? '<span class="port in" data-port="in"></span>' : ''}
          ${n.type === 'condition'
@@ -131,7 +132,8 @@ function renderFlow({ keepInspector = false } = {}) {
       <div class="fl-node-head"><span class="fl-icon">${icon(T.icon, 13)}</span><span class="fl-type">${T.label}</span>${st ? `<span class="fl-st st-${st}">${STEP_STATUS[st] || ''}</span>` : ''}</div>
       <div class="fl-node-title">${esc(n.title || T.label)}</div>
       <div class="fl-node-sum">${esc(nodeSummary(n))}</div>
-      ${run?.results[n.id]?.text ? `<div class="fl-node-res">${esc(run.results[n.id].text.slice(0, 120))}</div>` : ''}
+      ${live ? `<div class="fl-node-res live" title="What the agent is doing now">${esc((live.line || live.label).slice(0, 120))}</div>`
+        : run?.results[n.id]?.text ? `<div class="fl-node-res">${esc(run.results[n.id].text.slice(0, 120))}</div>` : ''}
       ${ports}
     </div>`;
   }).join('');
@@ -210,7 +212,12 @@ function renderInspector() {
         ${next ? `<br/>Next run: ${esc(whenText(next))}.` : ''}
         ${last ? `<br/>Last run: ${esc(whenText(last.at))} — ${last.stopped ? 'stopped' : last.ok ? 'no errors' : 'with errors'}.` : ''}</p>
       ${history.length > 1 ? `<h3>Recent runs</h3><ul class="fl-runs">${history.map((h) => `<li><span class="fl-dot ${h.stopped ? '' : h.ok ? 'ok' : 'fail'}"></span><span>${esc(whenText(h.at))}</span><span class="muted">${esc(h.reason || '')}</span><span class="muted">${h.ms != null ? esc(fmt.elapsed(h.ms)) : ''}</span></li>`).join('')}</ul>` : ''}
-      ${run ? `<h3>Running</h3><ol class="fl-log">${run.log.slice(-12).map((l) => `<li>${esc(l)}</li>`).join('')}</ol>` : last?.log ? `<h3>Log</h3><ol class="fl-log">${last.log.slice(-12).map((l) => `<li>${esc(l)}</li>`).join('')}</ol>` : ''}
+      ${run ? `<h3>Running</h3><ol class="fl-log">${run.log.slice(-12).map((l) => `<li>${esc(l)}</li>`).join('')}</ol>`
+        : `${runSummaryHtml(f, last)}${last?.log ? `<details class="fl-logbox"><summary>Log</summary><ol class="fl-log">${last.log.slice(-12).map((l) => `<li>${esc(l)}</li>`).join('')}</ol></details>` : ''}`}
+      <h3>Lessons</h3>
+      ${lessons(f).length ? `<ul class="fl-lessons">${lessons(f).map((l, i) => `<li><span>${esc(l)}</span><button type="button" class="card-btn" data-x="del-lesson" data-i="${i}" title="Forget this lesson">${icon('close', 12)}</button></li>`).join('')}</ul>`
+        : '<p class="set-note">Corrections you make after a step fails are kept here and given to this automation\'s agents on every run.</p>'}
+      <div class="row-end"><button type="button" data-x="add-lesson" title="Add a rule its agents must follow on every run">Add Lesson</button></div>
       ${flowPlan[f.id] ? `<h3>How it runs (AI analysis)</h3><div class="fl-plan">${mdLite(flowPlan[f.id])}</div>` : `<p class="set-note">Select a node to edit it. Drag from the dot on the right of a node to another node to connect them. <kbd>⌫</kbd> deletes the selection.</p>`}
       <div class="row-end"><button type="button" data-x="dup-flow" title="Create a copy of this automation">Duplicate</button><button type="button" data-x="del-flow" title="Delete this automation">Delete Automation</button></div>`;
     return;
@@ -262,8 +269,12 @@ function renderInspector() {
     body += `<p class="set-note">Use it to think the flow through. "Design with AI" can turn your concepts into runnable steps.</p>`;
   }
   const res = activeRuns.get(f.id)?.results[n.id] || f.lastRun?.results?.[n.id];
+  const live = liveStep(f, n);
   box.innerHTML = `<h3><span style="color:${T.color}">${icon(T.icon, 14)}</span> ${T.label}</h3><p class="set-note">${T.hint}</p>${body}
+    ${live ? `<h3>Now</h3><div class="fl-plan fl-live"><span class="status ${esc(live.st)}"></span> ${esc(live.line || live.label)}</div>
+      <div class="row-end"><button type="button" data-x="go-term" title="Open the agent's terminal on the board">Open Terminal</button></div>` : ''}
     ${res ? `<h3>Last result</h3><div class="fl-plan">${esc(res.text || '')}</div>` : ''}
+    ${res && !res.ok && !res.skip ? `<div class="row-end"><button type="button" data-x="lesson-node" data-node="${esc(n.id)}" title="Tell it what to do instead; remembered for every run">Correct It</button></div>` : ''}
     <div class="row-end"><button type="button" data-x="del-node" title="Delete this node and its connections (⌫)">Delete Node</button></div>`;
 }
 
@@ -382,6 +393,16 @@ function wireFlowCanvas() {
     const x = e.target.closest('[data-x]')?.dataset.x;
     const f = curFlow();
     if (x === 'del-node' || x === 'del-edge') deleteSelection();
+    if (x === 'add-lesson') addLesson(f, null);
+    if (x === 'lesson-node') addLesson(f, f.nodes.find((n) => n.id === e.target.closest('[data-node]').dataset.node));
+    if (x === 'del-lesson') { f.lessons = lessons(f).filter((_, i) => i !== +e.target.closest('[data-i]').dataset.i); save(); renderInspector(); }
+    if (x === 'copy-run' && f.lastRun) { ab.copy(runMarkdown(f, f.lastRun)); toast('Run summary copied.'); }
+    if (x === 'go-term') {
+      const run = activeRuns.get(f.id);
+      const t = run && nodeTask(run, nodeSel);
+      const c = t?.cardId && cardData(t.cardId);
+      if (c) { toggleFlows(false); focusCardView(c); focusCard(c.id); }
+    }
     if (x === 'del-flow' && confirm(`Delete "${f.name}"?${activeRuns.has(f.id) ? ' It is running: it will be stopped first.' : ''}`)) { stopFlow(f); cfg.flows = flows().filter((q) => q !== f); flowSel = flows()[0]?.id || null; save(); renderFlow(); }
     if (x === 'dup-flow') {
       const copy = JSON.parse(JSON.stringify(f));
@@ -421,7 +442,7 @@ function contextFor(f, run, nodeId) {
   return ancestorsOf(f, nodeId).map((id) => {
     const n = f.nodes.find((x) => x.id === id);
     const r = run.results[id];
-    return n && r && !r.skip && (n.type !== 'trigger' || r.event) ? `- ${n.title || NODE_TYPES[n.type].label}: ${(r.text || '').replace(/\s+/g, ' ').slice(0, 300)}` : '';
+    return n && r && !r.skip && (n.type !== 'trigger' || r.event) ? `- ${n.title || NODE_TYPES[n.type].label}: ${(r.text || '').replace(/\s+/g, ' ').slice(0, 500)}` : '';
   }).filter(Boolean).join('\n');
 }
 
@@ -479,14 +500,14 @@ async function execNode(f, run, n) {
     return { ok: r.value.code === 0, text: `${r.value.code === 0 ? 'OK' : `exit code ${r.value.code}`}\n${tail}` };
   }
   if (n.type === 'condition') {
-    const r = await ab.aiAsk(`Answer only "YES" or "NO", nothing else.\nQuestion: ${c.question || n.title}\nResults of the previous steps:\n${ctx || '(none)'}`, 'haiku');
+    const r = await ab.aiAsk(`Answer only "YES" or "NO", nothing else.\nQuestion: ${c.question || n.title}\nResults of the previous steps:\n${ctx || '(none)'}${lessonsText(f)}`, 'haiku');
     if (!r.ok) return { ok: false, text: r.error };
     const yes = /^\W*(yes|s[ií])(?![a-z])/i.test(r.value.trim());
     return { ok: true, branch: yes ? 'yes' : 'no', text: yes ? 'Yes' : 'No' };
   }
   if (n.type === 'agent') {
     if (!c.prompt) return { ok: false, text: 'No instruction.' };
-    const text = `${withVars(c.prompt, run)}${ctx ? `\n\nContext (previous steps of "${f.name}"):\n${ctx}` : ''}`;
+    const text = `${withVars(c.prompt, run)}${ctx ? `\n\nContext (previous steps of "${f.name}"):\n${ctx}` : ''}${lessonsText(f)}`;
     const t = addTask({
       text, agent: c.agent || 'auto', cwd: c.project || cfg.selectedProject, group: c.group || '',
       light: c.mode === 'light', heavy: c.mode === 'heavy',
@@ -505,7 +526,7 @@ async function runFlow(f, reason = 'by hand', event = null) {
   if (activeRuns.has(f.id)) return;
   const nodes = f.nodes.filter((n) => n.type !== 'note');
   const edges = f.edges.map((e, i) => ({ ...e, i })).filter((e) => nodes.some((n) => n.id === e.from) && nodes.some((n) => n.id === e.to));
-  const run = { id: uid(), reason, event: event?.text || '', vars: event?.vars || {}, status: {}, results: {}, edge: {}, log: [], taskNode: {}, startedAt: Date.now() };
+  const run = { id: uid(), reason, event: event?.text || '', vars: event?.vars || {}, status: {}, results: {}, edge: {}, log: [], taskNode: {}, timing: {}, startedAt: Date.now() };
   activeRuns.set(f.id, run);
   const log = (m) => { run.log.push(`${fmt.clock(Date.now())} ${m}`); if (flowSel === f.id) refreshFlow(); else renderFlowList(); };
   log(`Start (${reason})`);
@@ -518,6 +539,7 @@ async function runFlow(f, reason = 'by hand', event = null) {
   const settle = async (n, res) => {
     run.results[n.id] = res;
     run.status[n.id] = res.skip ? 'skip' : res.ok ? 'ok' : 'fail';
+    if (run.timing[n.id]) run.timing[n.id].end = Date.now();
     finished.add(n.id);
     // a failure with an error path connected is handled there, so the run can still succeed
     const handled = !res.ok && !res.skip && edges.some((x) => x.from === n.id && x.branch === 'error');
@@ -541,6 +563,7 @@ async function runFlow(f, reason = 'by hand', event = null) {
   const start = async (n) => {
     if (run.stopped) return settle(n, { ok: false, skip: true, text: 'Stopped' });
     run.status[n.id] = 'running';
+    run.timing[n.id] = { start: Date.now() };
     log(`Starting: ${n.title}`);
     let res;
     try { res = await execNode(f, run, n); } catch (err) { res = { ok: false, text: err.message }; }
@@ -556,8 +579,9 @@ async function runFlow(f, reason = 'by hand', event = null) {
   const outcome = run.stopped ? 'was stopped' : failed ? 'finished with errors' : 'finished';
   log(run.stopped ? 'Stopped.' : failed ? 'Finished with errors.' : 'Finished successfully.');
   const at = Date.now();
-  f.lastRun = { at, ok: !failed && !run.stopped, stopped: !!run.stopped, results: run.results, log: run.log.slice(-30) };
+  f.lastRun = { at, ok: !failed && !run.stopped, stopped: !!run.stopped, reason, ms: at - run.startedAt, results: run.results, log: run.log.slice(-30), steps: runSteps(f, run) };
   f.runs = [...(f.runs || []), { at, ok: f.lastRun.ok, stopped: f.lastRun.stopped, reason, ms: at - run.startedAt }].slice(-RUN_HISTORY);
+  summarizeRun(f, f.lastRun, f.runs[f.runs.length - 1]);
   activeRuns.delete(f.id);
   save();
   if (!document.hasFocus()) { try { new Notification(`${f.name}: ${outcome}`, { body: run.log.slice(-1)[0] || '' }); } catch {} }
@@ -567,6 +591,92 @@ async function runFlow(f, reason = 'by hand', event = null) {
   const next = flowEvents.get(f.id)?.shift();
   if (next) runFlow(f, next.reason, next.event);
   else if (moreIssues.delete(f.id)) f.lastScheduled = 0; // more new issues: check again on the next tick
+}
+
+// ---------- Lessons ----------
+// Corrections you made after a step went wrong ("use npm ci, not npm install"): kept with the
+// automation and sent to its agents and conditions on every run, so a mistake is fixed once.
+const lessons = (f) => (Array.isArray(f.lessons) ? f.lessons : []);
+function lessonsText(f) {
+  const list = lessons(f);
+  return list.length ? `\n\nRules learned in earlier runs of "${f.name}" (follow them):\n${list.map((l) => `- ${l}`).join('\n')}` : '';
+}
+async function addLesson(f, n) {
+  const res = n && (activeRuns.get(f.id)?.results[n.id] || f.lastRun?.results?.[n.id]);
+  const text = await askText(n ? `Correct "${n.title || NODE_TYPES[n.type].label}"` : 'Add a lesson',
+    `${res && !res.ok ? `It failed with: ${res.text.split('\n')[0].slice(0, 160)}\n` : ''}Write what it should do instead. It is remembered and given to this automation's agents on every run.`,
+    'e.g. run npm ci instead of npm install');
+  if (!text?.trim()) return;
+  f.lessons = [...lessons(f), `${n ? `${n.title || NODE_TYPES[n.type].label}: ` : ''}${text.trim()}`.slice(0, 400)].slice(-30);
+  save(); renderInspector();
+  toast('Lesson saved: the next runs will follow it.');
+}
+
+// ---------- Live view ----------
+// What an agent step is doing right now (the last line of its terminal), while it runs.
+function liveStep(f, n) {
+  const run = activeRuns.get(f.id);
+  if (!run || n.type !== 'agent' || !['running', 'wait'].includes(run.status[n.id])) return null;
+  const t = nodeTask(run, n.id);
+  const c = t?.cardId && cardData(t.cardId);
+  if (c) return liveOf(c);
+  return t?.status === 'pending' ? { st: 'idle', label: 'Queued: waiting for a free slot', line: '' } : null;
+}
+
+// ---------- Run summary ----------
+// The task an agent step started in this run (to show its terminal live and its tokens).
+function nodeTask(run, nodeId) {
+  const id = Object.keys(run.taskNode || {}).find((k) => run.taskNode[k] === nodeId);
+  return id ? taskById(id) : null;
+}
+
+// Each step that ran, in order: status, time, tokens and result.
+function runSteps(f, run) {
+  return Object.entries(run.timing).sort((a, b) => a[1].start - b[1].start).map(([id, tm]) => {
+    const n = f.nodes.find((x) => x.id === id);
+    const t = nodeTask(run, id);
+    return {
+      id, title: n?.title || NODE_TYPES[n?.type]?.label || '?', type: n?.type || '', status: run.status[id] || 'skip',
+      ms: (tm.end || Date.now()) - tm.start, tokens: t?.tokens || 0, text: (run.results[id]?.text || '').slice(0, 600),
+    };
+  }).filter((s) => s.type !== 'trigger');
+}
+
+// A few lines from haiku on what the run achieved, what failed and what to check (one short call).
+async function summarizeRun(f, last, entry) {
+  if (!last.steps?.length) return;
+  const r = await ab.aiAsk([
+    'Summarize this automation run for its owner in 3 to 5 short lines: what was achieved, what failed and the likely cause, and what to check or fix next.',
+    'Plain text, no preamble, no Markdown headings. Write in the same language as the step titles.',
+    JSON.stringify({ automation: f.name, outcome: last.stopped ? 'stopped' : last.ok ? 'ok' : 'errors', steps: last.steps.map(({ title, type, status, ms, text }) => ({ title, type, status, seconds: Math.round(ms / 1000), result: text.slice(0, 400) })) }),
+  ].join('\n'), 'haiku');
+  if (!r.ok) { last.summaryFailed = true; if (flowsOpen() && curFlow() === f) renderInspector(); return; }
+  last.summary = r.value.trim().slice(0, 1200);
+  if (entry) entry.summary = last.summary.split('\n')[0].slice(0, 200);
+  save();
+  if (flowsOpen() && curFlow() === f) renderInspector();
+}
+
+function runMarkdown(f, last) {
+  // backslashes first, so a "\|" in the text cannot undo the pipe's escape and split the cell
+  const cell = (s) => String(s).replace(/\s+/g, ' ').slice(0, 200).replace(/[\\|]/g, '\\$&');
+  return [`## ${f.name} — ${new Date(last.at).toLocaleString()} (${last.stopped ? 'stopped' : last.ok ? 'no errors' : 'with errors'})`, '',
+    ...(last.summary ? [last.summary, ''] : []),
+    '| Step | Status | Time | Tokens | Result |', '|---|---|---|---|---|',
+    ...(last.steps || []).map((s) => `| ${cell(s.title)} | ${STEP_STATUS[s.status] || s.status} | ${fmt.elapsed(s.ms)} | ${s.tokens ? fmt.tokens(s.tokens) : ''} | ${cell(s.text)} |`),
+  ].join('\n');
+}
+
+function runSummaryHtml(f, last) {
+  if (!last?.steps?.length) return '';
+  const rows = last.steps.map((s) => `<tr class="st-${s.status}"><td><span class="fl-dot ${s.status === 'ok' ? 'ok' : s.status === 'fail' ? 'fail' : ''}"></span>${esc(s.title)}</td>
+    <td class="muted">${esc(fmt.elapsed(s.ms))}${s.tokens ? ` · ${esc(fmt.tokens(s.tokens))}` : ''}</td>
+    <td>${s.status === 'fail' ? `<button type="button" class="inline" data-x="lesson-node" data-node="${esc(s.id)}" title="Tell it what to do instead; remembered for every run">Correct</button>` : ''}</td></tr>
+    ${s.text ? `<tr class="fl-sum-res"><td colspan="3">${esc(s.text.split('\n').slice(0, 3).join(' · ').slice(0, 300))}</td></tr>` : ''}`).join('');
+  return `<h3>Last run summary</h3>
+    ${last.summary ? `<div class="fl-plan">${esc(last.summary).replace(/\n/g, '<br/>')}</div>` : last.summaryFailed || Date.now() - last.at > 180_000 ? '' : '<p class="set-note">Writing the summary…</p>'}
+    <table class="fl-sum">${rows}</table>
+    <div class="row-end"><button type="button" data-x="copy-run" title="Copy this run's summary as Markdown">Copy Summary</button></div>`;
 }
 
 function stopFlow(f) {
@@ -711,6 +821,7 @@ async function designWithAI() {
     'Write titles and instructions in the same language as the request.',
     `Available subscriptions: ${agents}. Projects: ${cfg.projects.map((p) => p.name).join(', ') || '(none)'}.`,
     current ? `Current automation: ${current}` : '',
+    f && lessons(f).length ? `Lessons the user taught it after earlier runs (keep the design consistent with them): ${lessons(f).join(' / ')}` : '',
     `Request: ${desc}`,
   ].filter(Boolean).join('\n'), 'sonnet');
   btn.disabled = false; btn.lastChild.textContent = 'Design with AI';

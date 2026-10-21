@@ -22,10 +22,11 @@ ab.onPtyExit((id, code) => {
 // ---------- Idle close ----------
 // Optional (Settings → General). Only agent cards with no task in progress are stopped: a plain
 // shell may be running a quiet server, and a task's agent may be waiting for your answer.
+// Locked cards are never stopped.
 const hasActiveTask = (c) => (cfg.tasks || []).some((t) => t.cardId === c.id && (t.status === 'running' || t.status === 'review'));
 function idleExpired(c, rt, now) {
   const min = +cfg.idleCloseMin || 0;
-  return min > 0 && rt.alive && !!agentOf(c).command && now - (rt.lastActivity || now) >= min * 60_000 && !hasActiveTask(c);
+  return min > 0 && rt.alive && !!agentOf(c).command && now - (rt.lastActivity || now) >= min * 60_000 && !hasActiveTask(c) && !c.locked;
 }
 
 // Stops the process but keeps the card, so Restart resumes the same session.
